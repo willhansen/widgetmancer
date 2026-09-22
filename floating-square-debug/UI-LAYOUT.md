@@ -37,8 +37,19 @@ screen  (alternate screen + raw mode + mouse; run_animation, main.rs:1611)
 │      └─ interact: the "([ ] cycle)" in the title is an affordance
 │         label — the actual input is the [ / ] keys
 ├── box "common"                              (boxed_row,     :1578)
+├── box "metric help (? hides)"              (boxed_row, only when toggled)
+│      └─ one line per metric (METRIC_HELP — the on-screen condensation
+│         of the per-metric sections below), the selected one prefixed
+│         with "> "; ? toggles it on and off
 └── bottom hint line                          (:1797-1801)
-       └─ interact: display-only key summary; q and esc quit anywhere
+       └─ interact: display-only key summary; q and esc quit anywhere.
+          While a drag is active it switches to drag context (hint_line):
+          what this drag is doing plus the alternative mouse mode, so the
+          other button teaches itself mid-drag. When the terminal is
+          smaller than the layout's measured footprint
+          (animate_min_size), the hint line is replaced by a warning
+          naming both sizes — enlarging the terminal restores the hint on
+          the next redraw
 ```
 
 The two method rows ("in use" = the game's real render path; "candidate" =
@@ -92,11 +103,13 @@ box "common"
 │   (ideal_big_pixel_pane), width BIG_PX_W
 │   interact: display-only; the reference both rows are judged against
 ├── col 2: global state — pos / frac, motion name, speed, family
-│   switches, elapsed time, [paused] / [fine-drag] flags
+│   switches, elapsed time, current preset label, [paused] /
+│   [fine-drag] flags
 │   interact: display-only; mirrors your input live (space toggles
 │   [paused], +/- change speed=, f or a held modifier shows
-│   [fine-drag], and every family crossing you steer past increments
-│   switches=)
+│   [fine-drag], every family crossing you steer past increments
+│   switches=, and a digit-key jump sets preset: — manual steering
+│   drops the label again)
 └── col 3: controls legend (the key list below)
     interact: display-only — a reminder of the keys, not clickable
     text; the terminal has no clickable regions
@@ -115,6 +128,9 @@ box "common"
 | `f` | toggle fine-drag mode |
 | `[` / `]` | cycle candidate method |
 | `,` / `.` | cycle error metric |
+| `0`–`9` | jump to a preset spot (paused; includes the roadmap's tear corner) |
+| `r` | reset sparkline histories and the switch count |
+| `?` | toggle the on-screen metric explainer box |
 | left drag | set orbit angle (angle from the grid center to the mouse) |
 | mid/right drag | place the square (drag to move) |
 | shift/ctrl/alt-drag | fine placement (large mouse moves → sub-cell moves) |
@@ -305,13 +321,16 @@ Line numbers refer to `src/main.rs` at time of writing and may drift.
 | What | Function | Line |
 | --- | --- | ---: |
 | sampling lattice / denominators | `SX`, `SY`, `NX`, `NY` | coverage.rs:25-33 |
+| ANSI-stripped line text | `strip_ansi` | 290 |
 | titled box container | `boxed_row` | 317 |
 | checkerboard grid frame | `grid_frame` | 136 |
 | method rows / metric list | `IN_USE`, `CANDIDATES`, `METRICS` | 348 |
 | error pane + value | `metric_report` | 434 |
 | history sparkline | `sparkline_graph` | 608 |
 | method row layout (4 columns) | `method_section` | 709 |
+| mouse→world anchor (measured, drift-guarded) | `GRID_SCREEN_ORIGIN` | 1402 |
 | interaction state | `DragMode`, `AnimState` | 1250 |
+| layout probe: frame text + min size | `probe_frame`, `animate_min_size` | 1428 |
 | full-screen composer | `render_animation_frame` | 1419 |
 | event loop, alt screen | `run_animation` | 1611 |
 | mode dispatch | `main` | 1851 |

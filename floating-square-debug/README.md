@@ -28,8 +28,13 @@ or directly:
 - `glyphs` — reference table: every block character the renderer can emit
   with an exact big-pixel zoom. Plain text; redirect to a file.
 - `animate` (default) — square on the alternate screen (q quits): orbit,
-  arrow-key nudge, line trajectories; two-method comparison with cycled
-  candidates and error panes.
+  arrow-key nudge, line trajectories, preset jumps (`0`–`9`, paused — the
+  roadmap's tear corner among them), `r` to reset histories and switches,
+  `?` for an on-screen metric explainer; two-method comparison with cycled
+  candidates and error panes. The hint line names the active drag's mode
+  and alternative while dragging. Needs a large terminal (measured at
+  runtime, ~132×87); smaller ones get a size warning in place of the key
+  hint.
 
 ## Layout
 

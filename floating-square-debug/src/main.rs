@@ -66,7 +66,15 @@
 //!                 buttons place the square (drag to move it), and
 //!                 holding shift/ctrl/alt while dragging (or pressing f)
 //!                 switches placement to fine control, where large mouse
-//!                 movements map to sub-cell square movements.
+//!                 movements map to sub-cell square movements. Digit
+//!                 keys jump to curated preset spots (paused; the
+//!                 roadmap's tear corner among them), r resets the
+//!                 sparkline histories and the switch count, and ?
+//!                 toggles a one-line-per-metric explainer box. A
+//!                 terminal smaller than the measured layout footprint
+//!                 (animate_min_size) replaces the bottom key hint with
+//!                 a size warning until enlarged; while a drag is active
+//!                 the hint line names the drag's mode and alternative.
 //!
 //! Run via the ./floating-square-debug/debug-floating-squares wrapper, or:
 //!   cargo run -p floating_square_debug -- animate
@@ -81,6 +89,7 @@ use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermReadEventsAndRaw};
 use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
+use termion::terminal_size;
 
 use terminal_rendering::coverage::{
     self, actual_sample, assign_colors, big_pane_from_colors, big_pixel_pane, cell_bg,
@@ -283,11 +292,11 @@ fn glyph_legend(
     (legend, w)
 }
 
-/// Strip ANSI CSI sequences (ESC [ ... final letter) to get a line's
-/// visible width. Pane lines are full of color codes; the box borders need
-/// printable widths to pad straight right edges.
-fn visible_width(s: &str) -> usize {
-    let mut w = 0;
+/// The line without ANSI CSI sequences (ESC [ ... final letter). Pane
+/// lines are full of color codes; box borders and the size probe need
+/// the printable text underneath.
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::new();
     let mut chars = s.chars();
     while let Some(c) = chars.next() {
         if c == '\x1b' {
@@ -297,10 +306,17 @@ fn visible_width(s: &str) -> usize {
                 }
             }
         } else {
-            w += 1;
+            out.push(c);
         }
     }
-    w
+    out
+}
+
+/// Strip ANSI CSI sequences (ESC [ ... final letter) to get a line's
+/// visible width. Pane lines are full of color codes; the box borders need
+/// printable widths to pad straight right edges.
+fn visible_width(s: &str) -> usize {
+    strip_ansi(s).chars().count()
 }
 
 /// Visible width of a whole column of pre-styled lines.
@@ -357,6 +373,20 @@ const CANDIDATES: [(&str, Neighborhood); 3] = [
 /// The error measurements that can be cycled with , and . — one shown at a
 /// time, as a full-resolution colored pane per method.
 const METRICS: [&str; 7] = ["center", "area", "per-char", "xor", "jagged", "disp", "frame"];
+
+/// One line per metric for the `?` help box, condensed from
+/// UI-LAYOUT.md's per-metric "measures/why" sections; names padded so
+/// the descriptions align. Order and length must match METRICS — the
+/// test pins them together.
+const METRIC_HELP: [&str; 7] = [
+    "center  — silhouette centroid vs the true center; catches lopsided ink xor trades away",
+    "area    — signed rendered-minus-ideal ink; |v| past ~0.23 exceeds any family's rounding",
+    "per-char — ink-amount error per half-cell; localizes bad cells, blind to ink position",
+    "xor     — symmetric difference vs the true square; the objective the family map was baked on",
+    "jagged  — total variation of edge contours; staircase penalty (snapped edges are straight)",
+    "disp    — xor growth under the worst 1/16 nudge; pop sensitivity one pick-boundary away",
+    "frame   — samples changed vs the previous render; motion smoothness, scales with speed",
+];
 
 /// The method's own objective, formatted for the stats column ("the error
 /// used for rendering"). `index` 0 = in use, 1..=3 = CANDIDATES index + 1.
@@ -1208,6 +1238,25 @@ const ANIMATE_GRID_RADIUS: i32 = 4;
 /// terminal grid's resolution otherwise forbids.
 const FINE_SCALE: f32 = 1.0 / 32.0;
 
+/// Curated jump targets for the digit keys (1..=9, then 0), paused on
+/// arrival so the position sticks — the same contract as a mouse
+/// placement. Boundary-heavy offsets where snap decisions get
+/// interesting, plus the roadmap's known tear corner. The test pins that
+/// they stay finite and inside the animation grid, so a jump never
+/// silently clamps through the mouse-placement limit.
+const PRESETS: [(&str, WorldPoint); 10] = [
+    ("origin center", WorldPoint::new(0.0, 0.0)),
+    ("quarter interior", WorldPoint::new(0.25, 0.25)),
+    ("half-cell corner", WorldPoint::new(0.5, 0.5)),
+    ("finest offset 1/16", WorldPoint::new(1.0 / 16.0, 1.0 / 16.0)),
+    ("eighth boundaries", WorldPoint::new(0.125, 0.375)),
+    ("mixed boundary", WorldPoint::new(0.5, 0.25)),
+    ("negative half", WorldPoint::new(-0.5, 0.5)),
+    ("cell crossing", WorldPoint::new(1.0, 0.0)),
+    ("three-quarter corner", WorldPoint::new(0.75, 0.75)),
+    ("tear corner (roadmap #9)", WorldPoint::new(2.363, -0.816)),
+];
+
 enum Motion {
     Orbit { theta: f32 },
     /// Parked at a spot (arrow-key nudge or mouse placement).
@@ -1275,6 +1324,12 @@ struct AnimState {
     candidate: usize,
     /// Which error measurement pane is displayed (index into METRICS).
     metric: usize,
+    /// Index of the last preset jumped to with a digit key, for the
+    /// global-state label; any manual steering (arrows, o/l, mouse)
+    /// clears it.
+    preset: Option<usize>,
+    /// `?` toggles the on-screen metric explainer box.
+    help: bool,
     /// Previously rendered glyph neighborhoods per method slot (0 = the
     /// in-use row, 1..=3 = CANDIDATES index + 1), for the frame-diff
     /// metric. Updated after every rendered frame — moving or not — so
@@ -1305,11 +1360,24 @@ impl AnimState {
             drag: None,
             candidate: 0,
             metric: 0,
+            preset: None,
+            help: false,
             prev_renders: [None; 4],
             history: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
             history_metric: 0,
             last_sample_pos: None,
         }
+    }
+
+    /// Clear what a long comparison session accumulates — histories, the
+    /// switch count, the preset label — without touching prev_renders:
+    /// frame diff is defined against the immediately previous render, so
+    /// clearing that would fake an n/a gap in the next frame's diff.
+    fn reset_counters(&mut self) {
+        self.history = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        self.switches = 0;
+        self.last_sample_pos = None;
+        self.preset = None;
     }
 
     /// Clear all history buffers when the metric cycled to a new one —
@@ -1386,10 +1454,12 @@ fn parse_sgr_mouse(raw: &[u8]) -> Option<(MouseEvent, bool)> {
 }
 
 /// 1-based terminal cell of the animation grid's top-left corner. The
-/// large view is the second column of the first boxed row (first column is
-/// the 6-wide small view, then the 2-cell gap, then "│ " prefix): 2 + 6 + 2.
-/// If the boxed layout changes, this moves with it.
-const GRID_SCREEN_ORIGIN: (u16, u16) = (10, 2);
+/// large view is the FIRST column of the first boxed row, so the grid
+/// starts right after the "│ " box prefix: col 3, and one row down from
+/// the box title: row 2. Pinned against a rendered frame by
+/// `grid_origin_and_size`'s test; if the boxed layout changes, that test
+/// fails until this moves with it.
+const GRID_SCREEN_ORIGIN: (u16, u16) = (3, 2);
 
 /// World point under the (1-based) terminal cell, using the same grid
 /// geometry as the frame: 2 columns per square, rows increase downward.
@@ -1410,6 +1480,26 @@ fn mouse_cell_point(col: u16, row: u16) -> WorldPoint {
 fn mouse_cell_angle(col: u16, row: u16) -> f32 {
     let p = mouse_cell_point(col, row);
     p.y.atan2(p.x)
+}
+
+/// One animate frame from a fresh default state, as text — the layout
+/// probe behind both the too-small warning's size numbers and the
+/// GRID_SCREEN_ORIGIN drift test.
+fn probe_frame() -> String {
+    let mut buf: Vec<u8> = Vec::new();
+    render_animation_frame(&mut buf, &mut AnimState::new(), false);
+    String::from_utf8(buf).expect("frame is UTF-8")
+}
+
+/// The animate layout's required terminal size: the probe frame's widest
+/// line and its line count, plus one row for the hint/warning line under
+/// it. Measured rather than hardcoded, so layout changes move the number
+/// with them instead of leaving a stale one behind.
+fn animate_min_size() -> (u16, u16) {
+    let frame = probe_frame();
+    let w = frame.lines().map(visible_width).max().unwrap_or(0);
+    let h = frame.lines().count() + 1;
+    (w as u16, h as u16)
 }
 
 /// `raw_mode`: true when writing to a termion raw-mode terminal. Raw mode
@@ -1557,6 +1647,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
             if state.paused { "  [paused]" } else { "" },
             if state.fine_drag { "  [fine-drag]" } else { "" },
         ),
+        format!("preset: {}", state.preset.map_or("—", |i| PRESETS[i].0)),
     ];
     let controls: Vec<String> = [
         "controls:",
@@ -1566,6 +1657,8 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         "+/- speed  f fine-drag",
         "[ ] candidate method",
         ", . error metric",
+        "0-9 preset spots  r reset",
+        "? metric help",
         "left drag: orbit angle",
         "mid/right drag: place",
         "shift/ctrl/alt-drag fine",
@@ -1585,6 +1678,20 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     );
     text.push_str(&common_row.join("\n"));
     text.push('\n');
+
+    // the `?` help box: one line per metric, the selected one marked —
+    // the on-screen condensation of UI-LAYOUT.md's metric sections
+    if state.help {
+        let col: Vec<String> = METRIC_HELP
+            .iter()
+            .enumerate()
+            .map(|(i, s)| format!("{}{s}", if i == state.metric { "> " } else { "  " }))
+            .collect();
+        for line in boxed_row("metric help (? hides)", &[(col.as_slice(), visible_w(&col))]) {
+            text.push_str(&line);
+            text.push('\n');
+        }
+    }
 
     // Remember all four renders for the next frame's frame-diff metric —
     // every rendered frame, moving or not, so the diff is always against
@@ -1606,9 +1713,28 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     out.flush().unwrap();
 }
 
+/// The bottom hint line. While a drag is active it names what the drag
+/// is doing plus its alternative — the one moment attention is on mouse
+/// semantics, so the other button teaches itself. Otherwise the full key
+/// summary. A modifier-drag without the f-toggle shows the coarse
+/// message, which still names how to get fine control.
+fn hint_line(state: &AnimState) -> String {
+    match state.drag {
+        Some(DragMode::Angle) => {
+            "drag: setting orbit angle (mid/right-drag places the square)".into()
+        }
+        Some(DragMode::Place) if state.fine_drag => {
+            "drag: placing, fine 1/32 per cell (f: back to coarse)".into()
+        }
+        Some(DragMode::Place) => "drag: placing the square (shift/ctrl/alt or f: fine)".into(),
+        None => "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed r=reset 0-9=presets ?=help Ldrag=angle drag=place mod+drag=fine []=cand ,.=metric".into(),
+    }
+}
+
 /// `frame_count`: None = run until quit (interactive) or a short default
-/// (piped output).
-fn run_animation(frame_count: Option<u32>) {
+/// (piped output). Terminal-setup failures come back as Err for `main`
+/// to report — panicking on a bad $TERM helps nobody.
+fn run_animation(frame_count: Option<u32>) -> Result<(), String> {
     let interactive = stdout().is_terminal();
 
     if !interactive {
@@ -1621,7 +1747,7 @@ fn run_animation(frame_count: Option<u32>) {
             state.motion.advance(FRAME_DT.as_secs_f32(), state.speed);
             state.anim_time += FRAME_DT;
         }
-        return;
+        return Ok(());
     }
 
     let (tx, rx) = channel();
@@ -1633,13 +1759,20 @@ fn run_animation(frame_count: Option<u32>) {
         }
     });
 
-    let mut screen = MouseTerminal::from(stdout().into_raw_mode().unwrap())
+    let raw = stdout().into_raw_mode().map_err(|e| {
+        format!(
+            "animate: cannot enter raw mode (TERM={}): {e}",
+            std::env::var("TERM").unwrap_or_else(|_| "?".into())
+        )
+    })?;
+    let mut screen = MouseTerminal::from(raw)
         .into_alternate_screen()
-        .unwrap();
+        .map_err(|e| format!("animate: cannot enter the alternate screen: {e}"))?;
 
     let mut state = AnimState::new();
     let mut frames = 0u32;
     let mut dirty = true;
+    let (need_w, need_h) = animate_min_size();
     loop {
         while let Ok((event, raw)) = rx.try_recv() {
             // recover the mouse modifier bits termion drops, so a held
@@ -1650,7 +1783,7 @@ fn run_animation(frame_count: Option<u32>) {
             };
             let fine = fine_mod || state.fine_drag;
             match event {
-                Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => return,
+                Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => return Ok(()),
                 Event::Key(Key::Char(' ')) => {
                     state.paused = !state.paused;
                     dirty = true;
@@ -1669,6 +1802,7 @@ fn run_animation(frame_count: Option<u32>) {
                     state.motion = Motion::Free {
                         pos: state.motion.pos() + step,
                     };
+                    state.preset = None;
                     dirty = true;
                 }
                 Event::Key(Key::Char('o')) => {
@@ -1677,6 +1811,7 @@ fn run_animation(frame_count: Option<u32>) {
                         theta: p.y.atan2(p.x),
                     };
                     state.paused = false;
+                    state.preset = None;
                     dirty = true;
                 }
                 Event::Key(Key::Char('l')) => {
@@ -1686,6 +1821,7 @@ fn run_animation(frame_count: Option<u32>) {
                         t: 0.0,
                     };
                     state.paused = false;
+                    state.preset = None;
                     dirty = true;
                 }
                 Event::Key(Key::Char('+') | Key::Char('=')) => {
@@ -1700,6 +1836,24 @@ fn run_animation(frame_count: Option<u32>) {
                 // mouse modifiers through
                 Event::Key(Key::Char('f')) => {
                     state.fine_drag = !state.fine_drag;
+                    dirty = true;
+                }
+                // digit presets: paused jumps to curated positions (the
+                // roadmap's tear corner among them); arrows then walk
+                // across snap boundaries from there
+                Event::Key(Key::Char(c @ '0'..='9')) => {
+                    let i = if c == '0' { 9 } else { c.to_digit(10).unwrap() as usize - 1 };
+                    state.motion = Motion::Free {
+                        pos: PRESETS[i].1,
+                    };
+                    state.paused = true;
+                    state.preset = Some(i);
+                    dirty = true;
+                }
+                // reset what a session accumulates; prev_renders stays
+                // (see reset_counters)
+                Event::Key(Key::Char('r')) => {
+                    state.reset_counters();
                     dirty = true;
                 }
                 // two-button cycles: candidate method (second row) and
@@ -1720,6 +1874,13 @@ fn run_animation(frame_count: Option<u32>) {
                     state.metric = (state.metric + METRICS.len() - 1) % METRICS.len();
                     dirty = true;
                 }
+                // ? toggles the on-screen metric explainer (one-line
+                // versions of UI-LAYOUT.md's per-metric sections, the
+                // selected one marked)
+                Event::Key(Key::Char('?')) => {
+                    state.help = !state.help;
+                    dirty = true;
+                }
                 // Left click/drag steers the orbit: the angle from the
                 // grid center to the mouse becomes the orbit's angular
                 // position (orbit radius unchanged, so the square jumps to
@@ -1731,6 +1892,8 @@ fn run_animation(frame_count: Option<u32>) {
                 // Press pauses so the placement sticks.
                 Event::Mouse(MouseEvent::Press(_, x, y))
                 | Event::Mouse(MouseEvent::Hold(x, y)) => {
+                    // any mouse steering drops the preset label
+                    state.preset = None;
                     if let Event::Mouse(MouseEvent::Press(button, _, _)) = &event {
                         state.drag = Some(if *button == MouseButton::Left && !fine {
                             DragMode::Angle
@@ -1794,16 +1957,28 @@ fn run_animation(frame_count: Option<u32>) {
         if dirty {
             write!(screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
             render_animation_frame(&mut screen, &mut state, true);
-            write!(
-                screen,
-                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed Ldrag=angle drag=place mod+drag=fine []=cand ,.=metric"
-            )
+            // Too small a terminal wraps the fixed-width layout and
+            // offsets the mouse→world map; say so in place of the key
+            // hint (the more important line when nothing fits). Re-checked
+            // per redraw so it clears when the terminal is enlarged; an
+            // unreadable size is skipped — can't know, shouldn't guess.
+            let cramped = match terminal_size() {
+                Ok((w, h)) if w < need_w || h < need_h => Some((w, h)),
+                _ => None,
+            };
+            match cramped {
+                Some((w, h)) => write!(
+                    screen,
+                    "warning: terminal is {w}x{h}, layout needs {need_w}x{need_h} — display may wrap and mouse mapping may drift (q still quits)"
+                ),
+                None => write!(screen, "{}", hint_line(&state)),
+            }
             .unwrap();
             screen.flush().unwrap();
             dirty = false;
             frames += 1;
             if frame_count.is_some_and(|n| frames >= n) {
-                return;
+                return Ok(());
             }
         }
         thread::sleep(FRAME_DT);
@@ -1835,8 +2010,12 @@ fn usage() {
           \x20      the error's recent history as a five-row bar graph\n  \
           \x20      (shared y-axis; the candidate row marks the in-use\n  \
           \x20      error with a thin horizontal line); q quits, space\n  \
-          \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
-          \x20      line trajectory, +/- change speed, left click/drag sets\n  \
+           \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
+           \x20      line trajectory, +/- change speed, 0-9 jump to preset\n  \
+           \x20      spots (paused; the roadmap tear corner among them),\n  \
+           \x20      r resets histories and the switch count, ? toggles\n  \
+           \x20      an on-screen explainer of the shown metric, left\n  \
+           \x20      click/drag sets\n  \
           \x20      the orbit's angular position (angle from the top-row\n  \
           \x20      grid's center to the mouse); other buttons place the\n  \
           \x20      square, and holding shift/ctrl/alt while dragging (or\n  \
@@ -1848,38 +2027,59 @@ fn usage() {
     );
 }
 
-fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let parse_xy = |i: usize| -> Option<(f32, f32)> {
-        match (
-            args.get(i).and_then(|s| s.parse().ok()),
-            args.get(i + 1).and_then(|s| s.parse().ok()),
-        ) {
-            (Some(x), Some(y)) => Some((x, y)),
-            _ => None,
+/// `X Y` for pos/families: both present, numeric, finite. Bare
+/// `f32::parse` accepts NaN/inf, which would render garbage frames
+/// instead of an error.
+fn parse_xy(args: &[String], mode: &str) -> Result<WorldPoint, String> {
+    let (x, y) = match (
+        args.first().and_then(|s| s.parse::<f32>().ok()),
+        args.get(1).and_then(|s| s.parse::<f32>().ok()),
+    ) {
+        (Some(x), Some(y)) => (x, y),
+        _ => {
+            return Err(format!(
+                "{mode}: expected two numbers, e.g. `{mode} 1.3 0.7`"
+            ))
         }
     };
+    if !x.is_finite() || !y.is_finite() {
+        return Err(format!("{mode}: X and Y must be finite (got {x}, {y})"));
+    }
+    Ok(euclid::point2(x, y))
+}
+
+/// Bad command-line arguments: the message plus the usage dump, exit 2.
+fn arg_error(e: &str) {
+    eprintln!("{e}");
+    usage();
+    std::process::exit(2);
+}
+
+/// Terminal-setup failure inside animate: not the arguments' fault, so
+/// exit status 1 and just the message (no usage dump). Returns () only
+/// so it fits `unwrap_or_else` — `exit` never actually returns.
+fn die(e: String) {
+    eprintln!("{e}");
+    std::process::exit(1)
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
-        None => run_animation(None),
-        Some("pos") => match parse_xy(1) {
-            Some((x, y)) => show_position(euclid::point2(x, y)),
-            _ => {
-                usage();
-                std::process::exit(2);
-            }
+        None => run_animation(None).unwrap_or_else(die),
+        Some("pos") => match parse_xy(&args[1..], "pos") {
+            Ok(pos) => show_position(pos),
+            Err(e) => arg_error(&e),
         },
-        Some("families") => match parse_xy(1) {
-            Some((x, y)) => show_families(euclid::point2(x, y)),
-            _ => {
-                usage();
-                std::process::exit(2);
-            }
+        Some("families") => match parse_xy(&args[1..], "families") {
+            Ok(pos) => show_families(pos),
+            Err(e) => arg_error(&e),
         },
         Some("sweep") => show_sweep(),
         Some("glyphs") => print_glyph_table(),
         Some("animate") => match args.get(1).map(|s| s.parse::<u32>()) {
-            None => run_animation(None),
-            Some(Ok(n)) => run_animation(Some(n)),
+            None => run_animation(None).unwrap_or_else(die),
+            Some(Ok(n)) => run_animation(Some(n)).unwrap_or_else(die),
             Some(Err(_)) => {
                 eprintln!("animate: frame count must be a non-negative integer");
                 usage();
@@ -2115,5 +2315,190 @@ mod history_tests {
         let r =
             metric_report(rendered_neighborhood, &glyphs, center, pos, frame, Some((&pg, pc)), &style);
         assert!(r.number.unwrap() > 0.0);
+    }
+}
+
+#[cfg(test)]
+mod arg_tests {
+    use super::*;
+
+    /// parse_xy: valid pairs pass through; missing, non-numeric, and
+    /// non-finite (NaN/inf — f32::parse accepts both) all reject, and
+    /// the message names the mode so the eprintln reads as a hint.
+    #[test]
+    fn parse_xy_accepts_finite_pairs_rejects_the_rest() {
+        let s = |v: &str| v.to_string();
+        let p = parse_xy(&[s("1.3"), s("-0.7")], "pos").unwrap();
+        assert!((p.x - 1.3).abs() < 1e-6 && (p.y + 0.7).abs() < 1e-6);
+
+        for bad in [
+            vec![],
+            vec![s("1.3")],
+            vec![s("nan"), s("0")],
+            vec![s("0"), s("inf")],
+            vec![s("-inf"), s("2")],
+            vec![s("1.3"), s("x")],
+        ] {
+            assert!(parse_xy(&bad, "pos").is_err(), "{bad:?} should reject");
+        }
+        assert!(parse_xy(&[], "families").unwrap_err().starts_with("families:"));
+    }
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::*;
+
+    /// GRID_SCREEN_ORIGIN must point at the animation grid's top-left
+    /// cell in the real rendered frame — the mouse→world map is anchored
+    /// to it, so a stale constant silently offsets every click (it was
+    /// 7 columns off before being measured). The grid is the first
+    /// column of the first boxed row: its top row is the frame's second
+    /// line, whose first checkerboard mark is the grid's left edge.
+    #[test]
+    fn grid_screen_origin_matches_the_rendered_frame() {
+        let frame = probe_frame();
+        let lines: Vec<&str> = frame.lines().collect();
+        let row = GRID_SCREEN_ORIGIN.1 as usize - 1;
+        assert!(row < lines.len(), "origin row {row} is past the frame");
+        let grid_line = strip_ansi(lines[row]);
+        // char position, not str::find's byte offset: every glyph here is
+        // multi-byte UTF-8
+        let first_mark = grid_line
+            .chars()
+            .position(|c| c == '·' || c == '+')
+            .map(|i| i + 1);
+        assert_eq!(
+            first_mark,
+            Some(GRID_SCREEN_ORIGIN.0 as usize),
+            "GRID_SCREEN_ORIGIN.0={} but the frame's grid starts at {:?} — \
+             every mouse click is offset",
+            GRID_SCREEN_ORIGIN.0,
+            first_mark
+        );
+    }
+
+    /// The footprint the too-small warning quotes: it must exceed a
+    /// default 80x24 terminal (otherwise the warning is dead code) and
+    /// stay sane (a layout bug that balloons it should not pass silently).
+    #[test]
+    fn animate_min_size_exceeds_a_default_terminal() {
+        let (w, h) = animate_min_size();
+        assert!(w > 80, "layout width shrank to {w}");
+        assert!(h > 24, "layout height shrank to {h}");
+        assert!(w < 200 && h < 120, "layout ballooned to {w}x{h}");
+    }
+}
+
+#[cfg(test)]
+mod hint_tests {
+    use super::*;
+
+    /// The hint line switches to drag context while a drag is active and
+    /// back to the key summary otherwise; every drag arm names its
+    /// alternative, so the other mouse mode is discoverable mid-drag.
+    #[test]
+    fn hint_line_follows_drag_context() {
+        let mut state = AnimState::new();
+        let keys = hint_line(&state);
+        assert!(keys.contains("q=quit") && keys.contains("[]=cand"));
+
+        state.drag = Some(DragMode::Angle);
+        let angle = hint_line(&state);
+        assert!(angle.contains("orbit angle"));
+        assert!(angle.contains("place"), "names the alternative button");
+
+        state.drag = Some(DragMode::Place);
+        assert!(hint_line(&state).contains("fine"), "coarse arm names fine mode");
+
+        state.fine_drag = true;
+        let fine = hint_line(&state);
+        assert!(fine.contains("1/32") && fine.contains("coarse"));
+    }
+}
+
+#[cfg(test)]
+mod preset_tests {
+    use super::*;
+
+    /// Every preset stays finite and inside the animation grid's
+    /// placement bounds — a preset outside would silently clamp through
+    /// the mouse-placement limit and land somewhere other than labeled.
+    #[test]
+    fn presets_are_finite_and_on_the_grid() {
+        let limit = ANIMATE_GRID_RADIUS as f32 + 0.5;
+        assert_eq!(PRESETS.len(), 10);
+        for (name, p) in PRESETS {
+            assert!(p.x.is_finite() && p.y.is_finite(), "{name} not finite");
+            assert!(
+                p.x.abs() <= limit && p.y.abs() <= limit,
+                "{name} at ({}, {}) is off the grid",
+                p.x,
+                p.y
+            );
+        }
+    }
+
+    /// reset_counters clears histories, the switch count, and the preset
+    /// label, but keeps prev_renders — frame diff must stay defined
+    /// against the immediately previous render.
+    #[test]
+    fn reset_counters_clears_history_but_keeps_prev_renders() {
+        let mut state = AnimState::new();
+        state.record_history(euclid::point2(0.0, 0.0), &[Some(1.0); 4]);
+        state.switches = 7;
+        state.preset = Some(3);
+        let (g, c) = rendered_neighborhood(euclid::point2(0.3, 0.3));
+        state.prev_renders[0] = Some((g, c));
+
+        state.reset_counters();
+
+        assert!(state.history.iter().all(|h| h.is_empty()));
+        assert_eq!(state.switches, 0);
+        assert_eq!(state.preset, None);
+        assert!(
+            state.prev_renders[0].is_some(),
+            "prev_renders must survive a reset"
+        );
+    }
+}
+
+#[cfg(test)]
+mod help_tests {
+    use super::*;
+
+    /// METRIC_HELP covers every metric and only those — a new metric
+    /// without a help line (or a stale extra) fails here.
+    #[test]
+    fn metric_help_covers_every_metric() {
+        assert_eq!(METRIC_HELP.len(), METRICS.len());
+        for (name, help) in METRICS.iter().zip(METRIC_HELP.iter()) {
+            assert!(
+                help.starts_with(name),
+                "help for {name:?} must start with the metric name"
+            );
+        }
+    }
+
+    /// The help box renders under the common row when toggled, and marks
+    /// the selected metric's line with "> ".
+    #[test]
+    fn help_box_renders_and_marks_the_selected_metric() {
+        let mut state = AnimState::new();
+        state.help = true;
+        state.metric = 4; // jagged
+        let mut buf: Vec<u8> = Vec::new();
+        render_animation_frame(&mut buf, &mut state, false);
+        let frame = String::from_utf8(buf).unwrap();
+        assert!(
+            frame.lines().any(|l| strip_ansi(l).contains("metric help")),
+            "the help box title is rendered"
+        );
+        let marked = frame
+            .lines()
+            .map(strip_ansi)
+            .find(|l| l.contains("> jagged"))
+            .expect("selected metric marked with '> '");
+        assert!(marked.contains("staircase"));
     }
 }
