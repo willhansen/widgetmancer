@@ -1556,9 +1556,15 @@ pub fn first_inside_square_face_hit_by_ray(
 
     let naive_end_point: WorldPoint = start + unit_vector_from_angle(angle).cast_unit() * range;
 
+    // Round (not truncate) the endpoints to squares: a segment running
+    // along a row/column center picks up ~1e-7 of perpendicular drift from
+    // axis-angle float noise, and truncating an endpoint like 4.999999
+    // down to row 4 drops the row the segment actually runs in — silently
+    // missing portal faces on it. `WorldLine::touched_squares` below uses
+    // the same rounding.
     let squares_on_naive_line: HashSet<WorldSquare> = Supercover::new(
-        start.to_i32().to_tuple(),
-        naive_end_point.to_i32().to_tuple(),
+        world_point_to_world_square(start).to_tuple(),
+        world_point_to_world_square(naive_end_point).to_tuple(),
     )
     .map(|(x, y)| WorldSquare::new(x, y))
     .collect();

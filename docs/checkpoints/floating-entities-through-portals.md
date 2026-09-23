@@ -90,6 +90,37 @@ per-entity transit tracking):
   remapped in the draw buffer (content at exit square, gone from the
   beyond-face cell); the two previously-ignored tests.
 
+## Verification map
+
+`set_up_portal_cube_racetrack_map` (game/mod.rs), runnable with
+`./maps/racetrack.sh` or `./play-game --map racetrack`, is a visual
+verification exhibit. Two self-running loops, no randomness, nothing
+despawns:
+
+- A four-corner "racetrack" of one-way 90° portals (lap = 29 squares):
+  three fast cubes (4/s, turret speed) put a corner crossing on screen
+  every ~2.4s; one slow cube (1.5/s) straddles each face long enough to
+  watch the poke-through rendering on both sides.
+- A vertical "shuttle" of two 180° flip portals: one cube oscillates
+  (1 square up, 2 down), showing velocity reversal and the one-way exit
+  tail.
+
+The loop tests (`test_racetrack_map_cubes_loop_back_after_one_lap`,
+`test_racetrack_map_cubes_survive_frame_rate_ticks`,
+`test_shuttle_cube_oscillates`, plus the geometry-level
+`test_portal_aware_move_racetrack_lap_closes`) double as exactness
+proofs: a cube returns to its seed point after one lap (within 0.01 for
+a single multi-crossing tick, within one frame's travel for 21ms ticks),
+which would fail if portal crossings drifted position. They immediately
+earned their keep: building the map exposed a latent bug in the shared
+`first_inside_square_face_hit_by_ray` (utility) — the candidate-square
+supercover truncated its endpoint coordinates instead of rounding, so a
+ray or mover running along a row/column center (~1e-7 of perpendicular
+drift from axis-angle float noise) could have the endpoint row truncated
+away and silently miss portal faces on it. Fixed by rounding via
+`world_point_to_world_square` (matching `WorldLine::touched_squares`);
+this also affected drone sight rays and raycasts.
+
 ## Accepted edge cases
 
 - An entity spawned mid-portal at a corner where two entrance faces

@@ -1,0 +1,91 @@
+From 3a6ba59720df259c8098100a330e1a6ed1370d30 Mon Sep 17 00:00:00 2001
+From: boxed-pi <boxed-pi@localhost>
+Date: Wed, 23 Sep 2026 16:44:59 +0000
+Subject: [PATCH 3/4] Fix portal-face hit search truncating endpoint squares
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+first_inside_square_face_hit_by_ray built its candidate-square supercover
+from start.to_i32()/naive_end_point.to_i32(), which truncates. A ray or
+mover running along a row/column center carries ~1e-7 of perpendicular
+drift from axis-angle float noise, so an endpoint like 4.999999 truncated
+into the wrong row and dropped the row the segment actually runs in —
+silently missing portal faces on it (also latent for drone sight rays and
+raycasts). Round via world_point_to_world_square instead, matching
+WorldLine::touched_squares. Found by the racetrack verification map's
+lap-closure tests; regression test at the geometry level. Also normalize
+portal_aware_move's accumulated rotation (AddAssign keeps raw quarter
+turns; only new() does rem_euclid).
+---
+ crates/game/src/portal_geometry.rs | 26 +++++++++++++++++++++++++-
+ crates/utility/src/lib.rs          | 10 ++++++++--
+ 2 files changed, 33 insertions(+), 3 deletions(-)
+
+diff --git a/crates/game/src/portal_geometry.rs b/crates/game/src/portal_geometry.rs
+index 658a34d..91895a5 100644
+--- a/crates/game/src/portal_geometry.rs
++++ b/crates/game/src/portal_geometry.rs
+@@ -454,7 +454,13 @@ impl PortalGeometry {
+                 remaining = 0.0;
+             }
+         }
+-        (position, rotation, segments)
++        (
++            position,
++            // Normalize: AddAssign accumulates raw quarter-turns, and
++            // callers compare against 0 / pass it to rotation helpers.
++            QuarterTurnsAnticlockwise::new(rotation.quarter_turns()),
++            segments,
++        )
+     }
+ }
+ 
+@@ -589,4 +595,22 @@ mod tests {
+         assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
+         assert!(segments.is_empty());
+     }
++    #[test]
++    fn test_portal_aware_move_racetrack_lap_closes() {
++        // Regression test for a float-truncation bug in
++        // first_inside_square_face_hit_by_ray: a mover running along a row
++        // center (here y=5, moving left with ~1e-7 of drift from
++        // sin(pi_f32)) used to have its naive endpoint truncated into the
++        // wrong row, silently dropping the bottom-left crossing.
++        let mut pg = PortalGeometry::default();
++        pg.create_portal((point2(10, 11), STEP_UP).into(), (point2(12, 11), STEP_RIGHT).into());
++        pg.create_portal((point2(20, 11), STEP_RIGHT).into(), (point2(20, 9), STEP_DOWN).into());
++        pg.create_portal((point2(20, 5), STEP_DOWN).into(), (point2(18, 5), STEP_LEFT).into());
++        pg.create_portal((point2(10, 5), STEP_LEFT).into(), (point2(10, 6), STEP_UP).into());
++        let (end, rotation, segments) = pg.portal_aware_move(point2(10.0, 8.0), vec2(0.0, 29.0));
++        assert_about_eq_2d(end, point2(10.0, 8.0));
++        // Four 90° corners per lap; net rotation is a full turn = identity.
++        assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
++        assert_eq!(segments.len(), 5);
++    }
+ }
+diff --git a/crates/utility/src/lib.rs b/crates/utility/src/lib.rs
+index 1ee3e49..2b7b7de 100644
+--- a/crates/utility/src/lib.rs
++++ b/crates/utility/src/lib.rs
+@@ -1556,9 +1556,15 @@ pub fn first_inside_square_face_hit_by_ray(
+ 
+     let naive_end_point: WorldPoint = start + unit_vector_from_angle(angle).cast_unit() * range;
+ 
++    // Round (not truncate) the endpoints to squares: a segment running
++    // along a row/column center picks up ~1e-7 of perpendicular drift from
++    // axis-angle float noise, and truncating an endpoint like 4.999999
++    // down to row 4 drops the row the segment actually runs in — silently
++    // missing portal faces on it. `WorldLine::touched_squares` below uses
++    // the same rounding.
+     let squares_on_naive_line: HashSet<WorldSquare> = Supercover::new(
+-        start.to_i32().to_tuple(),
+-        naive_end_point.to_i32().to_tuple(),
++        world_point_to_world_square(start).to_tuple(),
++        world_point_to_world_square(naive_end_point).to_tuple(),
+     )
+     .map(|(x, y)| WorldSquare::new(x, y))
+     .collect();
+-- 
+2.49.1
+

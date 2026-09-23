@@ -454,7 +454,13 @@ impl PortalGeometry {
                 remaining = 0.0;
             }
         }
-        (position, rotation, segments)
+        (
+            position,
+            // Normalize: AddAssign accumulates raw quarter-turns, and
+            // callers compare against 0 / pass it to rotation helpers.
+            QuarterTurnsAnticlockwise::new(rotation.quarter_turns()),
+            segments,
+        )
     }
 }
 
@@ -588,5 +594,23 @@ mod tests {
         assert_about_eq_2d(end, point2(2.0, 2.49));
         assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
         assert!(segments.is_empty());
+    }
+    #[test]
+    fn test_portal_aware_move_racetrack_lap_closes() {
+        // Regression test for a float-truncation bug in
+        // first_inside_square_face_hit_by_ray: a mover running along a row
+        // center (here y=5, moving left with ~1e-7 of drift from
+        // sin(pi_f32)) used to have its naive endpoint truncated into the
+        // wrong row, silently dropping the bottom-left crossing.
+        let mut pg = PortalGeometry::default();
+        pg.create_portal((point2(10, 11), STEP_UP).into(), (point2(12, 11), STEP_RIGHT).into());
+        pg.create_portal((point2(20, 11), STEP_RIGHT).into(), (point2(20, 9), STEP_DOWN).into());
+        pg.create_portal((point2(20, 5), STEP_DOWN).into(), (point2(18, 5), STEP_LEFT).into());
+        pg.create_portal((point2(10, 5), STEP_LEFT).into(), (point2(10, 6), STEP_UP).into());
+        let (end, rotation, segments) = pg.portal_aware_move(point2(10.0, 8.0), vec2(0.0, 29.0));
+        assert_about_eq_2d(end, point2(10.0, 8.0));
+        // Four 90° corners per lap; net rotation is a full turn = identity.
+        assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
+        assert_eq!(segments.len(), 5);
     }
 }

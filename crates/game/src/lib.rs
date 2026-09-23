@@ -59,7 +59,7 @@ pub fn set_up_input_thread() -> Receiver<(Instant, Event)> {
     return rx;
 }
 
-pub fn do_everything() {
+pub fn do_everything(map_name: Option<String>) {
     let (width, height) = termion::terminal_size().unwrap();
     //let (width, height) = (40, 20);
     let mut game = Game::new(width, height, Instant::now());
@@ -88,7 +88,11 @@ pub fn do_everything() {
     //game.set_up_labyrinth(&mut rng);
     // game.set_up_columns();
     // game.set_up_simple_portal_map();
-    game.set_up_demo_map();
+    match map_name.as_deref() {
+        None | Some("demo") => game.set_up_demo_map(),
+        Some("racetrack") => game.set_up_portal_cube_racetrack_map(),
+        Some(unknown) => panic!("Unknown map '{unknown}'. Known maps: demo, racetrack."),
+    }
     // game.set_up_portal_across_wall_map(2, 0);
     // game.set_up_simple_freestanding_portal();
     // game.place_dense_horizontal_portals(

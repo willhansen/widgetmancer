@@ -2576,6 +2576,52 @@
         let new_pos = game.floating_hunter_drones[0].position;
         assert!((new_pos - point2(7.0, 2.25)).length() < 0.001);
     }
+
+    fn set_up_racetrack_game() -> Game {
+        // Width is in terminal characters (2 per square): a 24x14-square
+        // board. The racetrack needs squares up to x = player.x + 14.
+        let mut game = Game::new(48, 14, Instant::now());
+        game.place_player(point2(6, 7));
+        game.set_up_portal_cube_racetrack_map();
+        game
+    }
+
+    #[test]
+    fn test_racetrack_map_cubes_loop_back_after_one_lap() {
+        let mut game = set_up_racetrack_game();
+        let seed = point2(10.0, 8.0); // left-edge fast cube, moving up
+        // One lap = 29 squares; the fast cubes move at 4/s.
+        game.tick_realtime_effects(Duration::from_secs_f32(7.25));
+        let cube = game.death_cubes[0];
+        assert!((cube.position - seed).length() < 0.01);
+        game.draw_headless_now();
+    }
+
+    #[test]
+    fn test_racetrack_map_cubes_survive_frame_rate_ticks() {
+        let mut game = set_up_racetrack_game();
+        let seed = point2(10.0, 8.0);
+        let frame = Duration::from_secs_f32(0.021);
+        // 345 frames ~= one lap at the real tick cadence (~48 fps).
+        for _ in 0..345 {
+            game.tick_realtime_effects(frame);
+        }
+        let cube = game.death_cubes[0];
+        assert!((cube.position - seed).length() < 0.1);
+        assert_eq!(game.death_cubes.len(), 5);
+        game.draw_headless_now();
+    }
+
+    #[test]
+    fn test_shuttle_cube_oscillates() {
+        let mut game = set_up_racetrack_game();
+        let seed = point2(1.0, 4.75); // shuttle cube, moving up
+        // Oscillation period: 3 squares at speed 2 = 1.5s.
+        game.tick_realtime_effects(Duration::from_secs_f32(1.5));
+        let cube = game.death_cubes[4];
+        assert!((cube.position - seed).length() < 0.01);
+        game.draw_headless_now();
+    }
     #[test]
     fn test_hunter_drone_visually_pokes_through_a_portal_a_little_bit() {
         let mut game = set_up_10x10_game();

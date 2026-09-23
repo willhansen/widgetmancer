@@ -1035,6 +1035,87 @@ impl Game {
         self.place_death_turret(base_square + STEP_LEFT * 14);
     }
 
+    /// Verification map for floating entities through portals (ROADMAP
+    /// item 11). Two exhibits; every cube loops forever, so crossings
+    /// repeat indefinitely and nothing despawns:
+    ///
+    /// - A four-corner "racetrack" of one-way 90° portals right of the
+    ///   player: cubes lap it counter-clockwise (up the left edge, right
+    ///   along the top, down the right edge, left along the bottom), each
+    ///   corner teleporting them onto the next edge with velocity rotated
+    ///   90°. Lap length 29 squares — at turret-cube speed (4/s) the three
+    ///   fast cubes put a corner crossing on screen every ~2.4s; the slow
+    ///   cube (1.5/s) straddles each face long enough to watch the
+    ///   poke-through rendering on both sides.
+    /// - A vertical "shuttle" left of the player: two 180° flip portals
+    ///   bounce a cube up and down (1 square up, 2 down), showing velocity
+    ///   reversal and the one-way exit tail.
+    pub fn set_up_portal_cube_racetrack_map(&mut self) {
+        let base = self.player_square();
+
+        let left_edge_x = base.x + 4;
+        let right_edge_x = base.x + 14;
+        let top_row_y = base.y + 4;
+        let bottom_row_y = base.y - 2;
+
+        // Each exit square is the first square past its corner on the next
+        // edge, facing along it — a cube emerges there moving in the next
+        // edge's direction.
+        // top-left corner: moving up → emerges moving right
+        self.place_single_sided_one_way_portal(
+            (point2(left_edge_x, top_row_y), STEP_UP).into(),
+            (point2(left_edge_x + 2, top_row_y), STEP_RIGHT).into(),
+        );
+        // top-right corner: moving right → emerges moving down
+        self.place_single_sided_one_way_portal(
+            (point2(right_edge_x, top_row_y), STEP_RIGHT).into(),
+            (point2(right_edge_x, top_row_y - 2), STEP_DOWN).into(),
+        );
+        // bottom-right corner: moving down → emerges moving left
+        self.place_single_sided_one_way_portal(
+            (point2(right_edge_x, bottom_row_y), STEP_DOWN).into(),
+            (point2(right_edge_x - 2, bottom_row_y), STEP_LEFT).into(),
+        );
+        // bottom-left corner: moving left → emerges moving up
+        self.place_single_sided_one_way_portal(
+            (point2(left_edge_x, bottom_row_y), STEP_LEFT).into(),
+            (point2(left_edge_x, bottom_row_y + 1), STEP_UP).into(),
+        );
+
+        self.place_linear_death_cube(
+            point2(left_edge_x as f32, (base.y + 1) as f32),
+            STEP_UP.to_f32() * 4.0,
+        );
+        self.place_linear_death_cube(
+            point2((base.x + 9) as f32, top_row_y as f32),
+            STEP_RIGHT.to_f32() * 4.0,
+        );
+        self.place_linear_death_cube(
+            point2(right_edge_x as f32, base.y as f32),
+            STEP_DOWN.to_f32() * 4.0,
+        );
+        self.place_linear_death_cube(
+            point2((base.x + 8) as f32, bottom_row_y as f32),
+            STEP_LEFT.to_f32() * 1.5,
+        );
+
+        let shuttle_x = base.x - 5;
+        // moving up through the bottom portal → exits at the top moving down
+        self.place_single_sided_one_way_portal(
+            (point2(shuttle_x, bottom_row_y), STEP_UP).into(),
+            (point2(shuttle_x, top_row_y - 1), STEP_DOWN).into(),
+        );
+        // moving down through the top portal → exits at the bottom moving up
+        self.place_single_sided_one_way_portal(
+            (point2(shuttle_x, bottom_row_y + 4), STEP_DOWN).into(),
+            (point2(shuttle_x, bottom_row_y), STEP_UP).into(),
+        );
+        self.place_linear_death_cube(
+            point2(shuttle_x as f32, bottom_row_y as f32 - 0.25),
+            STEP_UP.to_f32() * 2.0,
+        );
+    }
+
     fn place_dotted_thin_walls(&mut self, bars_top_left_root_square: WorldSquare) {
         let block_square = bars_top_left_root_square + STEP_DOWN_LEFT * 3;
         self.place_block(block_square);
