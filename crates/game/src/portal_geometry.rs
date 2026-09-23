@@ -7,13 +7,17 @@ use ntest::assert_false;
 
 use utility::{
     angle_interval::AngleInterval,
-    coordinate_frame_conversions::{StepSet, WorldPoint, WorldSquare, WorldStep},
+    coordinate_frame_conversions::{StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep},
 };
 use utility::{
     better_angle_from_x_axis, first_inside_square_face_hit_by_ray, naive_ray_endpoint, revolve_square,
     rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle, Octant,
     QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir, WorldLine, STEP_RIGHT,
 };
+
+/// Defense against degenerate portal chains (an exit face lying exactly on
+/// another entrance face could produce zero-length crossings forever).
+const MAX_PORTAL_CROSSINGS_PER_MOVE: u32 = 16;
 
 #[derive(Hash, Clone, Copy, Debug)]
 pub struct RigidTransform {
@@ -320,6 +324,15 @@ impl PortalGeometry {
             .map(|&exit| Portal::new(entrance, exit))
     }
 
+    /// Every registered portal. Two-way and double-sided portal placements
+    /// register their reverse/back faces as entrances too, so callers that
+    /// care about "all portal windows" only need to look at entrances.
+    pub fn iter_portals(&self) -> impl Iterator<Item = Portal> + '_ {
+        self.portal_exits_by_entrance
+            .iter()
+            .map(|(&entrance, &exit)| Portal::new(entrance, exit))
+    }
+
     pub fn multiple_portal_aware_steps(
         &self,
         start: SquareWithKingDir,
@@ -396,12 +409,60 @@ impl PortalGeometry {
             self.portal_exits_by_entrance.keys().cloned().collect();
         first_inside_square_face_hit_by_ray(start, angle, range, &all_entrances)
     }
+
+    /// Move a point continuously along `movement`, crossing portals exactly
+    /// like rays do — but without the draw-back epsilon, because entity
+    /// positions persist between ticks and must land exactly on the
+    /// transformed crossing point. Returns the end position, the total
+    /// quarter-turn rotation applied (callers rotate the mover's velocity),
+    /// and the straight sub-paths traveled (callers apply along-path
+    /// effects, e.g. death-cube kill lines, to each sub-path).
+    pub fn portal_aware_move(
+        &self,
+        start: WorldPoint,
+        movement: WorldMove,
+    ) -> (WorldPoint, QuarterTurnsAnticlockwise, Vec<WorldLine>) {
+        if movement.length() == 0.0 {
+            // No path. (Along-path callers treat an empty path specially if
+            // they need the mover's own square, e.g. death-cube kill lines —
+            // WorldLine can't represent a degenerate segment.)
+            return (start, QuarterTurnsAnticlockwise::default(), vec![]);
+        }
+        let mut position = start;
+        let mut remaining = movement.length();
+        let mut angle = better_angle_from_x_axis(movement);
+        let mut rotation = QuarterTurnsAnticlockwise::default();
+        let mut segments = vec![];
+        let mut crossings_left = MAX_PORTAL_CROSSINGS_PER_MOVE;
+        while remaining > 0.0 && crossings_left > 0 {
+            if let Some((entrance, intersection_point)) =
+                self.first_portal_entrance_hit_by_ray(position, angle, remaining)
+            {
+                crossings_left -= 1;
+                let segment = WorldLine::new(position, intersection_point);
+                remaining = (remaining - segment.length()).max(0.0);
+                segments.push(segment);
+
+                let portal = self.get_portal_by_entrance(entrance).unwrap();
+                let transform = portal.get_transform();
+                rotation += transform.rotation();
+                (position, angle) = transform.transform_ray(intersection_point, angle);
+            } else {
+                let end = position + unit_vector_from_angle(angle).cast_unit() * remaining;
+                segments.push(WorldLine::new(position, end));
+                position = end;
+                remaining = 0.0;
+            }
+        }
+        (position, rotation, segments)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use ntest::assert_about_eq;
+    use euclid::vec2;
     use itertools::Itertools;
+    use ntest::assert_about_eq;
     use utility::{assert_about_eq_2d, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT};
 
     use super::*;
@@ -492,5 +553,40 @@ mod tests {
             .collect_vec();
         dbg!("asdf", &squares);
         assert_eq!(squares.len(), 2);
+    }
+    #[test]
+    fn test_portal_aware_move_crosses_straight_portal() {
+        let mut portal_geometry = PortalGeometry::default();
+        portal_geometry.create_portal(
+            (WorldSquare::new(2, 2), STEP_UP).into(),
+            (WorldSquare::new(7, 2), STEP_DOWN).into(),
+        );
+        let (end, rotation, segments) =
+            portal_geometry.portal_aware_move(point2(2.0, 2.49), vec2(0.0, 0.5));
+        assert_about_eq_2d(end, point2(7.0, 2.01));
+        assert_eq!(rotation, QuarterTurnsAnticlockwise::new(2));
+        assert_eq!(segments.len(), 2);
+    }
+    #[test]
+    fn test_portal_aware_move_without_portal_is_naive() {
+        let portal_geometry = PortalGeometry::default();
+        let (end, rotation, segments) =
+            portal_geometry.portal_aware_move(point2(1.2, 3.4), vec2(0.3, -0.8));
+        assert_about_eq_2d(end, point2(1.5, 2.6));
+        assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
+        assert_eq!(segments.len(), 1);
+    }
+    #[test]
+    fn test_portal_aware_move_zero_movement_stays_put() {
+        let mut portal_geometry = PortalGeometry::default();
+        portal_geometry.create_portal(
+            (WorldSquare::new(2, 2), STEP_UP).into(),
+            (WorldSquare::new(7, 2), STEP_DOWN).into(),
+        );
+        let (end, rotation, segments) =
+            portal_geometry.portal_aware_move(point2(2.0, 2.49), vec2(0.0, 0.0));
+        assert_about_eq_2d(end, point2(2.0, 2.49));
+        assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
+        assert!(segments.is_empty());
     }
 }

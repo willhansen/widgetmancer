@@ -9,6 +9,7 @@ use itertools::Itertools;
 use rgb::RGB8;
 
 use crate::fov_stuff::SquareVisibility;
+use crate::portal_geometry::PortalGeometry;
 use glyph_constants::named_colors::*;
 use terminal_rendering::*;
 
@@ -487,6 +488,70 @@ impl OffsetSquareDrawable {
             });
         });
         output
+    }
+
+    /// Placement through a portal: same square-relative silhouette, seen
+    /// from the exit side. The forced snap family survives straight portals
+    /// so the seam between the two halves of a straddling square can't
+    /// tear; rotated portals drop it (families are not rotation-invariant —
+    /// same policy as `Drawable::rotated`).
+    fn remapped_to_square(&self, quarter_turns_anticlockwise: i32) -> OffsetSquareDrawable {
+        OffsetSquareDrawable {
+            offset: rotated_n_quarter_turns_counter_clockwise(
+                self.offset,
+                quarter_turns_anticlockwise,
+            ),
+            colors: self.colors,
+            forced_family: if quarter_turns_anticlockwise == 0 {
+                self.forced_family
+            } else {
+                None
+            },
+        }
+    }
+}
+
+/// True when a 1×1 floating entity at `pos` crosses the plane of `face`
+/// within the face's lateral extent, i.e. part of it is sticking through
+/// that portal entrance.
+fn floating_entity_straddles_face(pos: WorldPoint, face: SquareWithOrthogonalDir) -> bool {
+    let face_normal: WorldMove = face.direction().step().to_f32();
+    let face_center: WorldPoint = face.square().to_f32() + face_normal * 0.5;
+    let delta = pos - face_center;
+    let along = delta.dot(face_normal);
+    let lateral = (delta - face_normal * along).length();
+    along.abs() < 0.5 && lateral < 1.0
+}
+
+/// Move the part of a floating square that sticks through a portal entrance
+/// to where it appears at the exit. Portal faces lie on cell borders and a
+/// face's lateral extent is exactly one cell wide, so the through-portal
+/// part is always the content of the single cell `entrance.stepped()`, and
+/// the rigid portal transform maps cell centers to cell centers — so the
+/// remap is just that one cell moved to the transformed square with its
+/// offset rotated. Only registered entrances are considered: a one-way
+/// portal's exit face is not a window from behind (matching FOV/ray
+/// behavior), while two-way and double-sided portals register their
+/// reverse/back faces, so those directions are covered by this same rule.
+pub fn remap_floating_square_drawables_through_portals(
+    pos: WorldPoint,
+    drawables: &mut HashMap<WorldSquare, OffsetSquareDrawable>,
+    portals: &PortalGeometry,
+) {
+    for portal in portals.iter_portals() {
+        let entrance = portal.entrance();
+        if !floating_entity_straddles_face(pos, entrance) {
+            continue;
+        }
+        let Some(drawable) = drawables.remove(&entrance.stepped().square()) else {
+            continue;
+        };
+        let transform = portal.get_transform();
+        let quarter_turns = transform.rotation().quarter_turns();
+        drawables.insert(
+            transform.transform_pose(entrance.stepped()).square(),
+            drawable.remapped_to_square(quarter_turns),
+        );
     }
 }
 

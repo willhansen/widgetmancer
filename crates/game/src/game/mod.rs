@@ -307,6 +307,7 @@ impl Game {
                     e,
                     push_direction.step().to_f32() * push_length,
                 )
+                .0
             })
             .collect_vec();
         moved_drones
@@ -542,17 +543,21 @@ impl Game {
             .upgrades
             .iter()
             .for_each(|(&square, &upgrade)| self.graphics.draw_upgrade(square, upgrade));
-        self.death_cubes
-            .iter()
-            .for_each(|death_cube| self.graphics.draw_death_cube(death_cube));
+        self.death_cubes.iter().for_each(|death_cube| {
+            self.graphics
+                .draw_death_cube(death_cube, &self.portal_geometry)
+        });
         self.floating_hunter_drones.iter().for_each(|drone| {
             let sight_line_segments = self.portal_geometry.ray_to_naive_line_segments(
                 drone.position,
                 drone.sight_direction,
                 HUNTER_DRONE_SIGHT_RANGE,
             );
-            self.graphics
-                .draw_floating_hunter_drone(drone, &sight_line_segments);
+            self.graphics.draw_floating_hunter_drone(
+                drone,
+                &sight_line_segments,
+                &self.portal_geometry,
+            );
         });
         self.widgets.iter().for_each(|(&square, pushable)| {
             self.graphics

@@ -30,6 +30,25 @@ through the normal draw-buffer/FOV/screen machinery — portals, rotation,
 and compositing included (`OffsetSquareDrawable::rotated` just rotates the
 stored offset vector).
 
+## Straddling a portal
+
+When a floating square straddles a portal entrance face, the part beyond
+the face isn't at its absolute squares — it's visible at the portal's
+exit. Because portal faces lie on cell borders and a face is exactly one
+cell wide, the beyond-face part is always the content of the single cell
+`entrance.stepped()`, and the rigid portal transform maps cell centers to
+cell centers. So before compositing,
+`remap_floating_square_drawables_through_portals` (called from
+`Graphics::draw_floating_square`) moves that cell's drawable to the
+transformed square with its offset rotated (`forced_family` survives
+straight portals so the seam can't tear, and is dropped for rotated ones —
+same policy as `Drawable::rotated`). Only registered entrances are
+remapped: a one-way portal's exit face is not a window from behind
+(matching FOV and ray behavior), while two-way and double-sided portals
+register their reverse/back faces, so the same rule covers both traversal
+directions. Movement through portals is the model-side counterpart:
+`PortalGeometry::portal_aware_move` (portal_geometry.rs).
+
 ## The core problem: no glyph has fine resolution in both axes
 
 Block-element glyphs each commit their resolution to one axis or a coarse

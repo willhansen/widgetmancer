@@ -278,6 +278,29 @@ with each item so the context doesn't have to be re-discovered later.
 
 ## Done
 
+### 11. Floating squares travel through portals — 2026-09-23
+- **Evidence:** `slide_floating_entity_with_portal_awareness` was a
+  `// TODO: portal awareness` stub (realtime.rs); `tick_death_cubes`
+  integrated naively and killed along the straight naive segment; two
+  `#[ignore = "TODO"]` tests in game/tests.rs defined the wanted behavior
+  (drone moves through portal; straddling drone pokes through visually).
+- **Landed:** (1) `PortalGeometry::portal_aware_move` — continuous
+  segment-based portal traversal for movers (reuses
+  `first_inside_square_face_hit_by_ray` + `RigidTransform::transform_ray`,
+  exact crossings without the ray draw-back epsilon, 16-crossing guard
+  cap), returning end position, accumulated rotation, and traveled
+  sub-paths; (2) the slide funnel applies it (position + velocity
+  rotation), so drones, conveyor pushes, and floor-arrow pushes inherit
+  portal awareness; (3) `tick_death_cubes` routes through the funnel and
+  kills along each sub-path (stationary cubes still kill their own square);
+  (4) render-side straddle remap: the beyond-face cell of a straddling
+  square is moved through the entrance's portal transform
+  (`remap_floating_square_drawables_through_portals`, drawable.rs) —
+  an entrance-only rule that covers one-way, two-way, and double-sided
+  portals with no inverse transforms or transit tracking. Both TODO tests
+  un-ignored and passing. Suite: 509 passed / 9 skipped.
+  Full log: [checkpoints/floating-entities-through-portals.md](checkpoints/floating-entities-through-portals.md).
+
 ### 10. Improve floating-square rendering quality — 2026-08
 - **Evidence:** post-item-9 evaluation found (a) a 0.25×1/6 silhouette notch
   from one wrong hand-written entry in `hextant_block_by_offset`

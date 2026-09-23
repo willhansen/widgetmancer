@@ -15,12 +15,14 @@ use crate::game::{
 use crate::graphics::drawable::{
     ArrowDrawable, BrailleDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum,
     OffsetSquareDrawable, SolidColorDrawable, TextDrawable,
+    remap_floating_square_drawables_through_portals,
 };
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen,
 };
 pub use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
+use crate::portal_geometry::PortalGeometry;
 use crate::{
     DoubleGlyphFunctions, PieceType, RIGHT_I,
 };
@@ -393,28 +395,36 @@ impl Graphics {
         self.draw_same_glyphs_at_squares(capture_only_square_glyphs(), &capture_only_squares);
     }
 
-    pub fn draw_death_cube(&mut self, death_cube: &DeathCube) {
+    pub fn draw_death_cube(&mut self, death_cube: &DeathCube, portals: &PortalGeometry) {
         let color = self.technicolor_at_time(Instant::now());
-        self.draw_floating_square(death_cube.id, death_cube.position(), color);
+        self.draw_floating_square(death_cube.id, death_cube.position(), color, portals);
     }
     pub fn draw_floating_hunter_drone(
         &mut self,
         drone: &FloatingHunterDrone,
         sight_line_segments: &Vec<WorldLine>,
+        portals: &PortalGeometry,
     ) {
         for line in sight_line_segments {
             self.draw_naive_braille_line(line.p1, line.p2, SIGHT_LINE_SEEKING_COLOR);
         }
-        self.draw_floating_square(drone.id, drone.position(), HUNTER_DRONE_COLOR);
+        self.draw_floating_square(drone.id, drone.position(), HUNTER_DRONE_COLOR, portals);
     }
 
-    fn draw_floating_square(&mut self, id: FloatingEntityId, pos: WorldPoint, color: RGB8) {
-        let (drawables, picked_family) =
+    fn draw_floating_square(
+        &mut self,
+        id: FloatingEntityId,
+        pos: WorldPoint,
+        color: RGB8,
+        portals: &PortalGeometry,
+    ) {
+        let (mut drawables, picked_family) =
             OffsetSquareDrawable::drawables_for_floating_square_at_point_biased(
                 pos,
                 color,
                 self.floating_entity_family_memory.get(&id).copied(),
             );
+        remap_floating_square_drawables_through_portals(pos, &mut drawables, portals);
         self.floating_entity_family_memory.insert(id, picked_family);
         self.floating_entities_drawn_this_frame.insert(id);
         drawables
@@ -670,7 +680,7 @@ mod tests {
         let cube = DeathCube::new(FloatingEntityId(0), WorldPoint::new(5.3, 4.7), WorldMove::zero());
 
         // drawn -> remembered, and the memory feeds the next frame's pick
-        g.draw_death_cube(&cube);
+        g.draw_death_cube(&cube, &PortalGeometry::default());
         assert!(g.floating_entity_family_memory.contains_key(&cube.id));
         g.display_headless();
         assert!(g.floating_entity_family_memory.contains_key(&cube.id));

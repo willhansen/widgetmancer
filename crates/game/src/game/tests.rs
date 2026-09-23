@@ -2490,7 +2490,6 @@
         let chars = drawable.unwrap().to_glyphs().chars();
         assert!(char_is_braille(chars[0]) || char_is_braille(chars[1]));
     }
-    #[ignore = "TODO"]
     #[test]
     fn test_hunter_drone_moves_through_portal() {
         let mut game = set_up_10x10_game();
@@ -2509,7 +2508,74 @@
         let drone = game.floating_hunter_drones[0];
         assert!(drone.position.x > drone_square.x as f32 + 2.0);
     }
-    #[ignore = "TODO"]
+
+    #[test]
+    fn test_death_cube_travels_through_portal_and_kills_along_bent_path() {
+        let mut game = set_up_10x10_game();
+        let entrance_square = point2(2, 2);
+        let exit_square = point2(7, 2);
+        game.place_single_sided_one_way_portal(
+            (entrance_square, STEP_UP).into(),
+            (exit_square, STEP_DOWN).into(),
+        );
+        // On the post-portal path — must be captured.
+        let piece_beyond_exit = exit_square + STEP_DOWN;
+        game.place_piece(Piece::new(Rook, game.default_enemy_faction), piece_beyond_exit);
+        // On the naive straight path — must NOT be captured.
+        let piece_on_naive_path = entrance_square + STEP_UP * 2;
+        game.place_piece(Piece::new(Rook, game.default_enemy_faction), piece_on_naive_path);
+
+        game.place_linear_death_cube(
+            entrance_square.to_f32() + vec2(0.0, 0.49),
+            STEP_UP.to_f32() * 4.0,
+        );
+        game.tick_death_cubes(Duration::from_secs_f32(0.5));
+
+        assert!(!game.pieces.contains_key(&piece_beyond_exit));
+        assert!(game.pieces.contains_key(&piece_on_naive_path));
+        let cube = game.death_cubes[0];
+        assert!((cube.position - point2(7.0, 0.51)).length() < 0.001);
+        assert_eq!(cube.velocity, STEP_DOWN.to_f32() * 4.0);
+    }
+
+    #[test]
+    fn test_hunter_drone_velocity_rotates_through_turning_portal() {
+        let mut game = set_up_10x10_game();
+        let entrance_square = point2(2, 2);
+        let exit_square = point2(7, 2);
+        game.place_floating_hunter_drone(
+            entrance_square.to_f32() + vec2(0.0, 0.49),
+            STEP_UP.to_f32(),
+            Angle::degrees(90.0),
+        );
+        game.place_single_sided_one_way_portal(
+            (entrance_square, STEP_UP).into(),
+            (exit_square, STEP_RIGHT).into(),
+        );
+        game.tick_realtime_effects(Duration::from_secs_f32(0.5));
+        let drone = game.floating_hunter_drones[0];
+        assert_eq!(drone.velocity, STEP_RIGHT.to_f32());
+        assert!((drone.position - point2(7.0, 2.0)).length() < 0.25);
+    }
+
+    #[test]
+    fn test_floor_arrows_push_hunter_drone_through_portal() {
+        let mut game = set_up_10x10_game();
+        let entrance_square = point2(2, 2);
+        let start_pos = entrance_square.to_f32() + vec2(0.0, -0.25);
+        game.place_floating_hunter_drone(start_pos, STEP_ZERO.to_f32(), Angle::degrees(0.0));
+        let exit_square = entrance_square + STEP_RIGHT * 5;
+        game.place_single_sided_one_way_portal(
+            (entrance_square, STEP_UP).into(),
+            (exit_square, STEP_DOWN).into(),
+        );
+        game.place_floor_push_arrow(entrance_square, STEP_UP.into());
+        game.tick_game_logic();
+        // Pushed up by 1.0: crosses the face after 0.75, emerges at the
+        // exit moving down with 0.25 left to travel.
+        let new_pos = game.floating_hunter_drones[0].position;
+        assert!((new_pos - point2(7.0, 2.25)).length() < 0.001);
+    }
     #[test]
     fn test_hunter_drone_visually_pokes_through_a_portal_a_little_bit() {
         let mut game = set_up_10x10_game();
@@ -2533,4 +2599,34 @@
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT * 5 + SCREEN_STEP_UP);
 
         assert_false!(glyphs.looks_solid());
+    }
+
+    #[test]
+    fn test_straddling_floating_square_remaps_through_portal_in_draw_buffer() {
+        let mut game = set_up_10x10_game();
+        let drone_square = point2(2, 2);
+        let exit_square = drone_square + STEP_RIGHT * 5;
+        game.place_single_sided_one_way_portal(
+            (drone_square, STEP_UP).into(),
+            (exit_square, STEP_DOWN).into(),
+        );
+        game.place_floating_hunter_drone(
+            drone_square.to_f32() + vec2(0.0, 0.49),
+            STEP_ZERO.to_f32(),
+            Angle::degrees(90.0),
+        );
+        game.draw_headless_now();
+
+        // The beyond-face cell's content moved to the exit square…
+        assert!(matches!(
+            game.graphics
+                .get_drawable_for_square_from_draw_buffer(exit_square),
+            Some(DrawableEnum::OffsetSquare(_))
+        ));
+        // …and is no longer drawn at its absolute (entrance-side) square.
+        assert!(!matches!(
+            game.graphics
+                .get_drawable_for_square_from_draw_buffer(drone_square + STEP_UP),
+            Some(DrawableEnum::OffsetSquare(_))
+        ));
     }

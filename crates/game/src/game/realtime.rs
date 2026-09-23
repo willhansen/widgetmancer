@@ -50,19 +50,43 @@ impl Game {
         });
     }
     pub fn tick_death_cubes(&mut self, duration: Duration) {
-        let mut kill_lines: Vec<(WorldSquare, WorldSquare)> = vec![];
-        for cube in &mut self.death_cubes {
-            let start_pos = cube.position;
-            cube.position += cube.velocity * duration.as_secs_f32();
-            let end_pos = cube.position;
-
-            let start_square = world_point_to_world_square(start_pos);
-            let end_square = world_point_to_world_square(end_pos);
-            kill_lines.push((start_square, end_square));
-        }
-        kill_lines.iter().for_each(|(start_square, end_square)| {
-            self.kill_along_line(*start_square, *end_square);
-        });
+        let (moved_cubes, kill_paths): (Vec<DeathCube>, Vec<Vec<WorldLine>>) = self
+            .death_cubes
+            .iter()
+            .map(|cube| {
+                self.slide_floating_entity_with_portal_awareness(
+                    cube,
+                    cube.velocity * duration.as_secs_f32(),
+                )
+            })
+            .unzip();
+        let kill_lines: Vec<(WorldSquare, WorldSquare)> = moved_cubes
+            .iter()
+            .zip(kill_paths)
+            .flat_map(|(cube, path)| {
+                // A stationary cube still kills its own square, matching the
+                // old naive path (Bresenham over start == end).
+                if path.is_empty() {
+                    let square = world_point_to_world_square(cube.position);
+                    vec![(square, square)]
+                } else {
+                    path.iter()
+                        .map(|segment| {
+                            (
+                                world_point_to_world_square(segment.p1),
+                                world_point_to_world_square(segment.p2),
+                            )
+                        })
+                        .collect()
+                }
+            })
+            .collect();
+        self.death_cubes = moved_cubes;
+        kill_lines
+            .into_iter()
+            .for_each(|(start_square, end_square)| {
+                self.kill_along_line(start_square, end_square);
+            });
         self.remove_death_cubes_that_are_off_board();
     }
 
@@ -112,10 +136,11 @@ impl Game {
                         vec_to_player_center.normalize() * clone_drone.velocity.length();
                 }
 
-                clone_drone = self.slide_floating_entity_with_portal_awareness(
+                let (moved_drone, _) = self.slide_floating_entity_with_portal_awareness(
                     &clone_drone,
                     drone.velocity * duration.as_secs_f32(),
                 );
+                clone_drone = moved_drone;
                 clone_drone.velocity =
                     self.reflect_off_board_edges(clone_drone.position, clone_drone.velocity);
 
@@ -129,11 +154,22 @@ impl Game {
         &self,
         floating_entity: &T,
         movement: WorldMove,
-    ) -> T {
-        // TODO: portal awareness
-        let mut clone_drone = floating_entity.clone();
-        clone_drone.set_position(clone_drone.position() + movement);
-        clone_drone
+    ) -> (T, Vec<WorldLine>) {
+        let (end_position, rotation, segments) = self
+            .portal_geometry
+            .portal_aware_move(floating_entity.position(), movement);
+        let mut moved_entity = floating_entity.clone();
+        moved_entity.set_position(end_position);
+        let quarter_turns = rotation.quarter_turns();
+        if quarter_turns != 0 {
+            // The mover's frame rotated with the portal; an unrotated
+            // velocity would fly off in the pre-portal direction.
+            moved_entity.set_velocity(rotated_n_quarter_turns_counter_clockwise(
+                moved_entity.velocity(),
+                quarter_turns,
+            ));
+        }
+        (moved_entity, segments)
     }
 
     pub(crate) fn reflect_off_board_edges(&self, pos: WorldPoint, vel: WorldMove) -> WorldMove {

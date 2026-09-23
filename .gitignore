@@ -18,3 +18,5 @@ Cargo.lock
 perf.*
 *.svg
 uftrace.data*
+
+gmon.out
