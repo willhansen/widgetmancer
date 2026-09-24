@@ -1556,6 +1556,13 @@ pub fn first_inside_square_face_hit_by_ray(
 
     let naive_end_point: WorldPoint = start + unit_vector_from_angle(angle).cast_unit() * range;
 
+    // A ray that doesn't displace its start (range below f32 resolution at
+    // this magnitude) can't reach any face — and would panic in
+    // WorldLine::from_ray's non-degenerate assert.
+    if naive_end_point == start {
+        return None;
+    }
+
     // Round (not truncate) the endpoints to squares: a segment running
     // along a row/column center picks up ~1e-7 of perpendicular drift from
     // axis-angle float noise, and truncating an endpoint like 4.999999

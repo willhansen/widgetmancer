@@ -1,7 +1,7 @@
 From 6a620b69cb6a387d3791d76f5dfe27400e180004 Mon Sep 17 00:00:00 2001
 From: boxed-pi <boxed-pi@localhost>
 Date: Wed, 23 Sep 2026 15:47:48 +0000
-Subject: [PATCH 2/4] Render straddling floating squares through portal
+Subject: [PATCH 2/5] Render straddling floating squares through portal
  entrances
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

@@ -1,7 +1,7 @@
 From 3a6ba59720df259c8098100a330e1a6ed1370d30 Mon Sep 17 00:00:00 2001
 From: boxed-pi <boxed-pi@localhost>
 Date: Wed, 23 Sep 2026 16:44:59 +0000
-Subject: [PATCH 3/4] Fix portal-face hit search truncating endpoint squares
+Subject: [PATCH 3/5] Fix portal-face hit search truncating endpoint squares
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

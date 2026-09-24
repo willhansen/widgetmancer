@@ -435,22 +435,34 @@ impl PortalGeometry {
         let mut segments = vec![];
         let mut crossings_left = MAX_PORTAL_CROSSINGS_PER_MOVE;
         while remaining > 0.0 && crossings_left > 0 {
+            let step_end = position + unit_vector_from_angle(angle).cast_unit() * remaining;
+            if step_end == position {
+                // Below f32 resolution at this magnitude (the real game
+                // loop's first tick runs with a ~nanosecond delta): the
+                // step can't cross any face, and the degenerate segment
+                // would panic in WorldLine::new's assert. Drop it.
+                break;
+            }
             if let Some((entrance, intersection_point)) =
                 self.first_portal_entrance_hit_by_ray(position, angle, remaining)
             {
                 crossings_left -= 1;
-                let segment = WorldLine::new(position, intersection_point);
-                remaining = (remaining - segment.length()).max(0.0);
-                segments.push(segment);
+                if intersection_point != position {
+                    // A zero-distance hit (exactly on a chained portal's
+                    // face) still transforms below — only the segment push
+                    // needs a non-degenerate line.
+                    let segment = WorldLine::new(position, intersection_point);
+                    remaining = (remaining - segment.length()).max(0.0);
+                    segments.push(segment);
+                }
 
                 let portal = self.get_portal_by_entrance(entrance).unwrap();
                 let transform = portal.get_transform();
                 rotation += transform.rotation();
                 (position, angle) = transform.transform_ray(intersection_point, angle);
             } else {
-                let end = position + unit_vector_from_angle(angle).cast_unit() * remaining;
-                segments.push(WorldLine::new(position, end));
-                position = end;
+                segments.push(WorldLine::new(position, step_end));
+                position = step_end;
                 remaining = 0.0;
             }
         }
@@ -612,5 +624,23 @@ mod tests {
         // Four 90° corners per lap; net rotation is a full turn = identity.
         assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
         assert_eq!(segments.len(), 5);
+    }
+    #[test]
+    fn test_portal_aware_move_sub_resolution_movement_is_dropped() {
+        // The real game loop's first tick runs with a ~nanosecond delta:
+        // movement ~2e-7 is below f32 resolution at these coordinates, and
+        // used to panic in WorldLine::new's non-degenerate assert while
+        // testing the entrance face of the square the mover sits in.
+        let mut portal_geometry = PortalGeometry::default();
+        portal_geometry.create_portal(
+            (WorldSquare::new(25, 13), STEP_UP).into(),
+            (WorldSquare::new(25, 18), STEP_DOWN).into(),
+        );
+        let start = point2(25.0, 12.75);
+        let (end, rotation, segments) =
+            portal_geometry.portal_aware_move(start, vec2(0.0, 2e-7));
+        assert_eq!(end, start);
+        assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
+        assert!(segments.is_empty());
     }
 }

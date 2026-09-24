@@ -2622,6 +2622,26 @@
         assert!((cube.position - seed).length() < 0.01);
         game.draw_headless_now();
     }
+
+    #[test]
+    fn test_racetrack_map_survives_first_tick_nanosecond_delta() {
+        // The real game loop's first delta is the ~nanoseconds between the
+        // prev-tick Instant::now() and the first loop iteration — cube
+        // movement underflows below f32 resolution, which used to panic in
+        // WorldLine::new while testing the shuttle cube's portal face.
+        let mut game = set_up_racetrack_game();
+        let positions_before: Vec<WorldPoint> =
+            game.death_cubes.iter().map(|cube| cube.position).collect();
+        game.tick_realtime_effects(Duration::from_nanos(50));
+        assert_eq!(
+            game.death_cubes.iter().map(|cube| cube.position).collect_vec(),
+            positions_before
+        );
+        // And the game keeps ticking normally afterwards.
+        game.tick_realtime_effects(Duration::from_secs_f32(0.021));
+        let cube = game.death_cubes[0];
+        assert!(cube.position.y > 8.0);
+    }
     #[test]
     fn test_hunter_drone_visually_pokes_through_a_portal_a_little_bit() {
         let mut game = set_up_10x10_game();

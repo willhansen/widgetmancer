@@ -121,6 +121,22 @@ away and silently miss portal faces on it. Fixed by rounding via
 `world_point_to_world_square` (matching `WorldLine::touched_squares`);
 this also affected drone sight rays and raycasts.
 
+Second catch: actually running the map (`./maps/racetrack.sh`) panicked
+on the first realtime tick — the game loop's first delta is the
+~nanoseconds between two adjacent `Instant::now()` calls, so cube
+movement (~2e-7) underflowed below f32 resolution at board coordinates.
+A cube sitting in a portal-entrance square then hit
+`WorldLine::from_ray` with a non-displacing range and panicked in
+`Line::new`'s `assert_ne!(p1, p2)` (the panic hook's output was invisible
+in the raw-mode terminal, so it looked like the game "didn't start").
+The demo map never hit this because the turret spawns no cubes until
+deltas are the healthy 21ms. Fixed by dropping sub-resolution steps in
+`portal_aware_move` and by making `first_inside_square_face_hit_by_ray`
+return None for non-displacing rays; covered by
+`test_portal_aware_move_sub_resolution_movement_is_dropped` and
+`test_racetrack_map_survives_first_tick_nanosecond_delta`, plus a pty
+probe confirming both maps keep rendering at full frame rate.
+
 ## Accepted edge cases
 
 - An entity spawned mid-portal at a corner where two entrance faces
