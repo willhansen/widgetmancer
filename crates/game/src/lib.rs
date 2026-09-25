@@ -62,6 +62,14 @@ pub fn set_up_input_thread() -> Receiver<(Instant, Event)> {
 pub fn do_everything(map_name: Option<String>) {
     let (width, height) = termion::terminal_size().unwrap();
     //let (width, height) = (40, 20);
+    // The racetrack map's exhibits span ~30x19 squares around the player,
+    // and the board is half the terminal width in squares, so that map
+    // needs at least a 96x26-character terminal.
+    let (width, height) = if map_name.as_deref() == Some("racetrack") {
+        (width.max(96), height.max(26))
+    } else {
+        (width, height)
+    };
     let mut game = Game::new(width, height, Instant::now());
     game.place_player(point2(width as i32 / 4, height as i32 / 2));
     let mut input_map = InputMap::new(width, height);

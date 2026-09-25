@@ -511,16 +511,21 @@ impl OffsetSquareDrawable {
     }
 }
 
-/// True when a 1×1 floating entity at `pos` crosses the plane of `face`
-/// within the face's lateral extent, i.e. part of it is sticking through
-/// that portal entrance.
-fn floating_entity_straddles_face(pos: WorldPoint, face: SquareWithOrthogonalDir) -> bool {
+/// The signed depth of a 1×1 floating entity at `pos` through the plane of
+/// `face`, when it straddles that plane within the face's lateral extent:
+/// negative when the entity is on the entrance square's side (its far
+/// part pokes through this entrance), positive when it is past the plane.
+/// None when it doesn't straddle.
+fn floating_entity_straddle_depth_along_face(
+    pos: WorldPoint,
+    face: SquareWithOrthogonalDir,
+) -> Option<f32> {
     let face_normal: WorldMove = face.direction().step().to_f32();
     let face_center: WorldPoint = face.square().to_f32() + face_normal * 0.5;
     let delta = pos - face_center;
     let along = delta.dot(face_normal);
     let lateral = (delta - face_normal * along).length();
-    along.abs() < 0.5 && lateral < 1.0
+    (along.abs() < 0.5 && lateral < 1.0).then_some(along)
 }
 
 /// Move the part of a floating square that sticks through a portal entrance
@@ -533,6 +538,9 @@ fn floating_entity_straddles_face(pos: WorldPoint, face: SquareWithOrthogonalDir
 /// portal's exit face is not a window from behind (matching FOV/ray
 /// behavior), while two-way and double-sided portals register their
 /// reverse/back faces, so those directions are covered by this same rule.
+/// A straddled plane moves exactly one cell — the part beyond the window
+/// from the entity's own side; the reverse-twin window on the far side is
+/// skipped.
 pub fn remap_floating_square_drawables_through_portals(
     pos: WorldPoint,
     drawables: &mut HashMap<WorldSquare, OffsetSquareDrawable>,
@@ -540,7 +548,16 @@ pub fn remap_floating_square_drawables_through_portals(
 ) {
     for portal in portals.iter_portals() {
         let entrance = portal.entrance();
-        if !floating_entity_straddles_face(pos, entrance) {
+        let Some(along) = floating_entity_straddle_depth_along_face(pos, entrance) else {
+            continue;
+        };
+        // Only the window whose side the entity is on moves the through
+        // part. Two-way and double-sided portals register both sides of
+        // the plane, and without this check each side's portal would
+        // teleport one of the entity's two straddling cells — leaving its
+        // actual position empty and rendering it fully at the far side
+        // instead of poking through.
+        if along >= 0.0 {
             continue;
         }
         let Some(drawable) = drawables.remove(&entrance.stepped().square()) else {

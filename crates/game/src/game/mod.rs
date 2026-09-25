@@ -18,7 +18,7 @@ use crate::graphics::*;
 use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
 use crate::piece::*;
-use crate::portal_geometry::PortalGeometry;
+use crate::portal_geometry::{PortalGeometry, RigidTransform};
 use crate::*;
 use terminal_rendering::*;
 use glyph_constants::named_colors::*;
@@ -790,6 +790,25 @@ impl Game {
         });
     }
 
+    /// A 3-wide, double-sided, two-way band around the given portal:
+    /// the portal itself plus one strafed copy either side. Strafed exits
+    /// are derived from the portal's own rigid transform — on a turning
+    /// portal the exit band strafes in a rotated direction, so strafing
+    /// both ends blindly (place_wide_portal) would produce an
+    /// incoherent band whose faces disagree about where it leads.
+    fn place_wide_corner_portal(
+        &mut self,
+        entrance: SquareWithOrthogonalDir,
+        exit: SquareWithOrthogonalDir,
+    ) {
+        let transform = RigidTransform::from_start_and_end_poses(entrance, exit.stepped_back());
+        (-1..=1).for_each(|i| {
+            let strafed_entrance = entrance.strafed_right_n(i);
+            let strafed_exit = transform.transform_pose(strafed_entrance).stepped();
+            self.place_double_sided_two_way_portal(strafed_entrance, strafed_exit);
+        });
+    }
+
     pub fn place_offset_rightward_double_sided_two_way_portal(
         &mut self,
         start_square: WorldSquare,
@@ -1036,20 +1055,33 @@ impl Game {
     }
 
     /// Verification map for floating entities through portals (ROADMAP
-    /// item 11). Two exhibits; every cube loops forever, so crossings
-    /// repeat indefinitely and nothing despawns:
+    /// item 11). Three exhibits; the lap and shuttle cubes loop forever,
+    /// so their crossings repeat indefinitely and nothing despawns:
     ///
-    /// - A four-corner "racetrack" of one-way 90° portals right of the
-    ///   player: cubes lap it counter-clockwise (up the left edge, right
-    ///   along the top, down the right edge, left along the bottom), each
-    ///   corner teleporting them onto the next edge with velocity rotated
-    ///   90°. Lap length 29 squares — at turret-cube speed (4/s) the three
-    ///   fast cubes put a corner crossing on screen every ~2.4s; the slow
-    ///   cube (1.5/s) straddles each face long enough to watch the
-    ///   poke-through rendering on both sides.
-    /// - A vertical "shuttle" left of the player: two 180° flip portals
-    ///   bounce a cube up and down (1 square up, 2 down), showing velocity
-    ///   reversal and the one-way exit tail.
+    /// - A four-corner "racetrack" of 3-wide, double-sided, two-way 90°
+    ///   portals right of the player: cubes lap it counter-clockwise (up
+    ///   the left edge, right along the top, down the right edge, left
+    ///   along the bottom), each corner teleporting them onto the next
+    ///   edge with velocity rotated 90°. Lap length 29 squares — at
+    ///   turret-cube speed (4/s) the three fast cubes put a corner
+    ///   crossing on screen every ~2.4s; the slow cube (1.5/s) straddles
+    ///   each face long enough to watch the poke-through rendering on
+    ///   both sides. Every portal is two-way, so the reverse twins sit
+    ///   exactly on each corner's emergence plane — the anti-bounce guard
+    ///   in `portal_aware_move` is what keeps the cubes lapping instead
+    ///   of ping-ponging there forever.
+    /// - A vertical "shuttle" left of the player: two 3-wide 180° flip
+    ///   portals bounce a cube up and down (1 square up, 2 down), showing
+    ///   velocity reversal and the exit tail.
+    /// - A long "L" portal far right: a 19-face vertical entrance wall
+    ///   (facing right) turning 90° onto a 19-face horizontal exit wall
+    ///   above the track, with ten stationary death cubes straddling
+    ///   every other entrance face, each a different fraction (k/11,
+    ///   9%..91%) of the way through — each cube's far side pokes out of
+    ///   the matching exit-wall face.
+    ///
+    /// The exhibits span ~30x19 squares around the player, so the game
+    /// clamps the terminal to at least 96x26 characters for this map.
     pub fn set_up_portal_cube_racetrack_map(&mut self) {
         let base = self.player_square();
 
@@ -1058,26 +1090,27 @@ impl Game {
         let top_row_y = base.y + 4;
         let bottom_row_y = base.y - 2;
 
-        // Each exit square is the first square past its corner on the next
-        // edge, facing along it — a cube emerges there moving in the next
-        // edge's direction.
+        // Each corner's entrance is the corner square's face along the
+        // incoming edge, its exit the first square past the corner on the
+        // next edge, facing along it — a cube emerges there moving in the
+        // next edge's direction. Widened into 3-square bands.
         // top-left corner: moving up → emerges moving right
-        self.place_single_sided_one_way_portal(
+        self.place_wide_corner_portal(
             (point2(left_edge_x, top_row_y), STEP_UP).into(),
             (point2(left_edge_x + 2, top_row_y), STEP_RIGHT).into(),
         );
         // top-right corner: moving right → emerges moving down
-        self.place_single_sided_one_way_portal(
+        self.place_wide_corner_portal(
             (point2(right_edge_x, top_row_y), STEP_RIGHT).into(),
             (point2(right_edge_x, top_row_y - 2), STEP_DOWN).into(),
         );
         // bottom-right corner: moving down → emerges moving left
-        self.place_single_sided_one_way_portal(
+        self.place_wide_corner_portal(
             (point2(right_edge_x, bottom_row_y), STEP_DOWN).into(),
             (point2(right_edge_x - 2, bottom_row_y), STEP_LEFT).into(),
         );
         // bottom-left corner: moving left → emerges moving up
-        self.place_single_sided_one_way_portal(
+        self.place_wide_corner_portal(
             (point2(left_edge_x, bottom_row_y), STEP_LEFT).into(),
             (point2(left_edge_x, bottom_row_y + 1), STEP_UP).into(),
         );
@@ -1101,19 +1134,50 @@ impl Game {
 
         let shuttle_x = base.x - 5;
         // moving up through the bottom portal → exits at the top moving down
-        self.place_single_sided_one_way_portal(
-            (point2(shuttle_x, bottom_row_y), STEP_UP).into(),
-            (point2(shuttle_x, top_row_y - 1), STEP_DOWN).into(),
-        );
         // moving down through the top portal → exits at the bottom moving up
-        self.place_single_sided_one_way_portal(
-            (point2(shuttle_x, bottom_row_y + 4), STEP_DOWN).into(),
-            (point2(shuttle_x, bottom_row_y), STEP_UP).into(),
-        );
+        (-1..=1).for_each(|d| {
+            self.place_double_sided_two_way_portal(
+                (point2(shuttle_x + d, bottom_row_y), STEP_UP).into(),
+                (point2(shuttle_x + d, top_row_y - 1), STEP_DOWN).into(),
+            );
+            self.place_double_sided_two_way_portal(
+                (point2(shuttle_x + d, bottom_row_y + 4), STEP_DOWN).into(),
+                (point2(shuttle_x + d, bottom_row_y), STEP_UP).into(),
+            );
+        });
         self.place_linear_death_cube(
             point2(shuttle_x as f32, bottom_row_y as f32 - 0.25),
             STEP_UP.to_f32() * 2.0,
         );
+
+        // The L portal: enter the vertical wall moving right anywhere
+        // along it, emerge from the horizontal wall above the track
+        // moving up — a 90° turn stretched over 19 squares (the map's
+        // corners do the same turn in one).
+        let l_entrance_x = base.x + 22;
+        let l_entrance_bottom_y = base.y - 9;
+        let l_exit_y = base.y + 7;
+        (0..19).for_each(|i| {
+            self.place_double_sided_two_way_portal(
+                (point2(l_entrance_x, l_entrance_bottom_y + i), STEP_RIGHT).into(),
+                (point2(base.x + 2 + i, l_exit_y), STEP_UP).into(),
+            );
+        });
+
+        // Ten stationary cubes straddling every other L-entrance face,
+        // spaced 2 squares apart, each a different fraction of the way
+        // through: cube k sits k/11 of the way past the face plane, so
+        // the poke-through rendering shows every depth at once. (Kills
+        // its own square each tick, by design for death cubes.)
+        (1..=10).for_each(|k| {
+            self.place_linear_death_cube(
+                point2(
+                    l_entrance_x as f32 + k as f32 / 11.0,
+                    (l_entrance_bottom_y + 2 * (k - 1)) as f32,
+                ),
+                vec2(0.0, 0.0),
+            );
+        });
     }
 
     fn place_dotted_thin_walls(&mut self, bars_top_left_root_square: WorldSquare) {

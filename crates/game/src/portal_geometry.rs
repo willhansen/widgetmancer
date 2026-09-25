@@ -19,6 +19,11 @@ use utility::{
 /// another entrance face could produce zero-length crossings forever).
 const MAX_PORTAL_CROSSINGS_PER_MOVE: u32 = 16;
 
+/// Nudge past a portal face that would bounce the mover straight back the
+/// way it came — the two-way reverse twins registered exactly on a portal's
+/// emergence plane. Mirrors the draw-back epsilon rays already use.
+const ANTI_BOUNCE_NUDGE: f32 = 0.001;
+
 #[derive(Hash, Clone, Copy, Debug)]
 pub struct RigidTransform {
     start_pose: SquareWithOrthogonalDir,
@@ -417,6 +422,11 @@ impl PortalGeometry {
     /// quarter-turn rotation applied (callers rotate the mover's velocity),
     /// and the straight sub-paths traveled (callers apply along-path
     /// effects, e.g. death-cube kill lines, to each sub-path).
+    ///
+    /// Two-way portals place their reverse twins exactly on the mover's
+    /// emergence plane; the anti-bounce guard below skips those immediate
+    /// return crossings so movers pass on instead of ping-ponging there
+    /// forever.
     pub fn portal_aware_move(
         &self,
         start: WorldPoint,
@@ -434,6 +444,27 @@ impl PortalGeometry {
         let mut rotation = QuarterTurnsAnticlockwise::default();
         let mut segments = vec![];
         let mut crossings_left = MAX_PORTAL_CROSSINGS_PER_MOVE;
+        // Anti-bounce guard: after a crossing, two-way portals register
+        // the mover's own emergence plane as entrances (the reverse
+        // twins), so the very next hit can be the face leading straight
+        // back — an infinite ping-pong that the crossings cap only
+        // truncates, never escapes. The computed hit distance on that
+        // plane is unusable for detection (the extended-line
+        // intersection formula cancels catastrophically at board-scale
+        // coordinates — the error grows as the remaining ray length
+        // shrinks), so the guard matches the hit by face identity: skip
+        // hits on the two emergence-plane faces when crossing them would
+        // land the mover back on the entrance plane it just left. A
+        // different, forward-chained portal registered on the emergence
+        // plane has a different landing and still crosses normally.
+        let mut last_crossed_entrance_plane: Option<(
+            SquareWithOrthogonalDir,
+            SquareWithOrthogonalDir,
+        )> = None;
+        let mut last_emergence_faces: Option<(
+            SquareWithOrthogonalDir,
+            SquareWithOrthogonalDir,
+        )> = None;
         while remaining > 0.0 && crossings_left > 0 {
             let step_end = position + unit_vector_from_angle(angle).cast_unit() * remaining;
             if step_end == position {
@@ -446,6 +477,24 @@ impl PortalGeometry {
             if let Some((entrance, intersection_point)) =
                 self.first_portal_entrance_hit_by_ray(position, angle, remaining)
             {
+                if let Some((emergence_near, emergence_far)) = last_emergence_faces {
+                    if entrance == emergence_near || entrance == emergence_far {
+                        if let Some((near_face, far_face)) = last_crossed_entrance_plane {
+                            let hit_portal = self.get_portal_by_entrance(entrance).unwrap();
+                            let landing_pose = hit_portal.exit().stepped_back();
+                            if landing_pose == near_face || landing_pose == far_face {
+                                // A face that returns us to the plane we
+                                // just left: step past it and keep this
+                                // leg going.
+                                let nudge = ANTI_BOUNCE_NUDGE.min(remaining);
+                                position =
+                                    position + unit_vector_from_angle(angle).cast_unit() * nudge;
+                                remaining = (remaining - nudge).max(0.0);
+                                continue;
+                            }
+                        }
+                    }
+                }
                 crossings_left -= 1;
                 if intersection_point != position {
                     // A zero-distance hit (exactly on a chained portal's
@@ -460,6 +509,10 @@ impl PortalGeometry {
                 let transform = portal.get_transform();
                 rotation += transform.rotation();
                 (position, angle) = transform.transform_ray(intersection_point, angle);
+                last_crossed_entrance_plane =
+                    Some((entrance, entrance.stepped().turned_back()));
+                last_emergence_faces =
+                    Some((portal.exit().stepped_back(), portal.exit().reversed()));
             } else {
                 segments.push(WorldLine::new(position, step_end));
                 position = step_end;
@@ -614,16 +667,70 @@ mod tests {
         // center (here y=5, moving left with ~1e-7 of drift from
         // sin(pi_f32)) used to have its naive endpoint truncated into the
         // wrong row, silently dropping the bottom-left crossing.
+        // Also the anti-bounce regression test: with double-sided two-way
+        // corners (as the racetrack map now places), the reverse twins sit
+        // exactly on each corner's emergence plane — without the guard the
+        // mover ping-pongs at the first corner and never laps.
         let mut pg = PortalGeometry::default();
-        pg.create_portal((point2(10, 11), STEP_UP).into(), (point2(12, 11), STEP_RIGHT).into());
-        pg.create_portal((point2(20, 11), STEP_RIGHT).into(), (point2(20, 9), STEP_DOWN).into());
-        pg.create_portal((point2(20, 5), STEP_DOWN).into(), (point2(18, 5), STEP_LEFT).into());
-        pg.create_portal((point2(10, 5), STEP_LEFT).into(), (point2(10, 6), STEP_UP).into());
+        pg.create_double_sided_two_way_portal(
+            (point2(10, 11), STEP_UP).into(),
+            (point2(12, 11), STEP_RIGHT).into(),
+        );
+        pg.create_double_sided_two_way_portal(
+            (point2(20, 11), STEP_RIGHT).into(),
+            (point2(20, 9), STEP_DOWN).into(),
+        );
+        pg.create_double_sided_two_way_portal(
+            (point2(20, 5), STEP_DOWN).into(),
+            (point2(18, 5), STEP_LEFT).into(),
+        );
+        pg.create_double_sided_two_way_portal(
+            (point2(10, 5), STEP_LEFT).into(),
+            (point2(10, 6), STEP_UP).into(),
+        );
         let (end, rotation, segments) = pg.portal_aware_move(point2(10.0, 8.0), vec2(0.0, 29.0));
         assert_about_eq_2d(end, point2(10.0, 8.0));
         // Four 90° corners per lap; net rotation is a full turn = identity.
         assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
         assert_eq!(segments.len(), 5);
+    }
+    #[test]
+    fn test_portal_aware_move_through_two_way_portal_keeps_going() {
+        // Two-way portals register reverse twins exactly on the mover's
+        // emergence plane; the anti-bounce guard must skip them so the
+        // mover continues its leg instead of ping-ponging between the two
+        // faces until the crossings cap truncates the move.
+        let mut pg = PortalGeometry::default();
+        pg.create_double_sided_two_way_portal(
+            (WorldSquare::new(2, 2), STEP_RIGHT).into(),
+            (WorldSquare::new(5, 2), STEP_RIGHT).into(),
+        );
+        let (end, rotation, segments) =
+            pg.portal_aware_move(point2(1.0, 2.0), vec2(6.0, 0.0));
+        // Straight through, 1.5 squares to the entrance + 4.5 past it.
+        assert_about_eq_2d(end, point2(9.0, 2.0));
+        assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
+        assert_eq!(segments.len(), 2);
+    }
+    #[test]
+    fn test_portal_aware_move_through_two_way_portal_reverse_works() {
+        // True two-way: entering the exit face from the far side must
+        // transport back to the entrance plane. The guard skips this
+        // leg's own emergence-plane twins (exactly as on the forward
+        // leg), so the mover ends up past the entrance plane having
+        // crossed exactly one portal face.
+        let mut pg = PortalGeometry::default();
+        pg.create_double_sided_two_way_portal(
+            (WorldSquare::new(2, 2), STEP_RIGHT).into(),
+            (WorldSquare::new(5, 2), STEP_RIGHT).into(),
+        );
+        let (end, rotation, segments) =
+            pg.portal_aware_move(point2(6.0, 2.0), vec2(-3.0, 0.0));
+        // 1.5 squares left to the exit face, then 1.5 more past the
+        // entrance face (which the twins of the reverse portal sit on).
+        assert_about_eq_2d(end, point2(1.0, 2.0));
+        assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
+        assert_eq!(segments.len(), 2);
     }
     #[test]
     fn test_portal_aware_move_sub_resolution_movement_is_dropped() {

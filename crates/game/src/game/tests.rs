@@ -2578,10 +2578,12 @@
     }
 
     fn set_up_racetrack_game() -> Game {
-        // Width is in terminal characters (2 per square): a 24x14-square
-        // board. The racetrack needs squares up to x = player.x + 14.
-        let mut game = Game::new(48, 14, Instant::now());
-        game.place_player(point2(6, 7));
+        // Mirrors the real game's 96x26-character minimum for this map
+        // (see do_everything): a 48x26-square board with the player at
+        // (24, 13). The racetrack needs squares up to player.x + 22 (the
+        // L portal's entrance wall) and player.y ± 9.
+        let mut game = Game::new(96, 26, Instant::now());
+        game.place_player(point2(24, 13));
         game.set_up_portal_cube_racetrack_map();
         game
     }
@@ -2589,7 +2591,7 @@
     #[test]
     fn test_racetrack_map_cubes_loop_back_after_one_lap() {
         let mut game = set_up_racetrack_game();
-        let seed = point2(10.0, 8.0); // left-edge fast cube, moving up
+        let seed = point2(28.0, 14.0); // left-edge fast cube, moving up
         // One lap = 29 squares; the fast cubes move at 4/s.
         game.tick_realtime_effects(Duration::from_secs_f32(7.25));
         let cube = game.death_cubes[0];
@@ -2600,7 +2602,7 @@
     #[test]
     fn test_racetrack_map_cubes_survive_frame_rate_ticks() {
         let mut game = set_up_racetrack_game();
-        let seed = point2(10.0, 8.0);
+        let seed = point2(28.0, 14.0);
         let frame = Duration::from_secs_f32(0.021);
         // 345 frames ~= one lap at the real tick cadence (~48 fps).
         for _ in 0..345 {
@@ -2608,14 +2610,15 @@
         }
         let cube = game.death_cubes[0];
         assert!((cube.position - seed).length() < 0.1);
-        assert_eq!(game.death_cubes.len(), 5);
+        // 5 lap/shuttle cubes + 10 stationary L-portal cubes.
+        assert_eq!(game.death_cubes.len(), 15);
         game.draw_headless_now();
     }
 
     #[test]
     fn test_shuttle_cube_oscillates() {
         let mut game = set_up_racetrack_game();
-        let seed = point2(1.0, 4.75); // shuttle cube, moving up
+        let seed = point2(19.0, 10.75); // shuttle cube, moving up
         // Oscillation period: 3 squares at speed 2 = 1.5s.
         game.tick_realtime_effects(Duration::from_secs_f32(1.5));
         let cube = game.death_cubes[4];
@@ -2640,7 +2643,7 @@
         // And the game keeps ticking normally afterwards.
         game.tick_realtime_effects(Duration::from_secs_f32(0.021));
         let cube = game.death_cubes[0];
-        assert!(cube.position.y > 8.0);
+        assert!(cube.position.y > 14.0);
     }
     #[test]
     fn test_hunter_drone_visually_pokes_through_a_portal_a_little_bit() {
@@ -2693,6 +2696,70 @@
         assert!(!matches!(
             game.graphics
                 .get_drawable_for_square_from_draw_buffer(drone_square + STEP_UP),
+            Some(DrawableEnum::OffsetSquare(_))
+        ));
+    }
+
+    #[test]
+    fn test_straddling_square_through_two_way_portal_keeps_bulk_in_place() {
+        let mut game = set_up_10x10_game();
+        let drone_square = point2(2, 2);
+        let exit_square = drone_square + STEP_RIGHT * 5;
+        game.place_double_sided_two_way_portal(
+            (drone_square, STEP_UP).into(),
+            (exit_square, STEP_DOWN).into(),
+        );
+        game.place_floating_hunter_drone(
+            drone_square.to_f32() + vec2(0.0, 0.49), // barely through the window
+            STEP_ZERO.to_f32(),
+            Angle::degrees(90.0),
+        );
+        game.draw_headless_now();
+
+        // The through-part still appears at the exit…
+        assert!(matches!(
+            game.graphics
+                .get_drawable_for_square_from_draw_buffer(exit_square),
+            Some(DrawableEnum::OffsetSquare(_))
+        ));
+        // …and the bulk stays at the entity's actual square: the twin
+        // window on the far side of the plane must not teleport it
+        // (regression — it used to land at exit_square + STEP_UP,
+        // emptying this square).
+        assert!(matches!(
+            game.graphics
+                .get_drawable_for_square_from_draw_buffer(drone_square),
+            Some(DrawableEnum::OffsetSquare(_))
+        ));
+        assert!(!matches!(
+            game.graphics
+                .get_drawable_for_square_from_draw_buffer(exit_square + STEP_UP),
+            Some(DrawableEnum::OffsetSquare(_))
+        ));
+    }
+
+    #[test]
+    fn test_racetrack_stationary_cubes_render_at_l_portal_wall() {
+        let mut game = set_up_racetrack_game();
+        game.draw_headless_now();
+
+        // West-side cubes (k/11 < 1/2): bulk cell at the entrance wall…
+        assert!(matches!(
+            game.graphics
+                .get_drawable_for_square_from_draw_buffer(point2(46, 4)),
+            Some(DrawableEnum::OffsetSquare(_))
+        ));
+        // …their poking slivers appear at the exit wall…
+        assert!(matches!(
+            game.graphics
+                .get_drawable_for_square_from_draw_buffer(point2(26, 20)),
+            Some(DrawableEnum::OffsetSquare(_))
+        ));
+        // …and east-side cubes (k/11 > 1/2) keep their bulk at the wall
+        // too.
+        assert!(matches!(
+            game.graphics
+                .get_drawable_for_square_from_draw_buffer(point2(47, 22)),
             Some(DrawableEnum::OffsetSquare(_))
         ));
     }
