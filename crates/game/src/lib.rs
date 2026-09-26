@@ -10,6 +10,7 @@ extern crate std;
 extern crate termion;
 
 use std::io::{stdin, stdout, Write};
+use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -25,7 +26,7 @@ use terminal_rendering::glyph::*;
 use utility::*;
 
 use crate::game::Game;
-use crate::game::snapshot::{write_snapshot, InputRecord, SNAPSHOT_KEY};
+use crate::game::snapshot::{load_snapshot_game, write_snapshot, InputRecord, SNAPSHOT_KEY};
 use crate::inputmap::InputMap;
 use crate::piece::PieceType;
 
@@ -71,7 +72,7 @@ pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
     }
 }
 
-pub fn do_everything(map_name: Option<String>) {
+pub fn do_everything(map_name: Option<String>, load_path: Option<PathBuf>) {
     let (width, height) = termion::terminal_size().unwrap();
     //let (width, height) = (40, 20);
     // The racetrack map's exhibits span ~30x19 squares around the player,
@@ -82,8 +83,22 @@ pub fn do_everything(map_name: Option<String>) {
     } else {
         (width, height)
     };
-    let mut game = Game::new(width, height, Instant::now());
-    game.place_player(point2(width as i32 / 4, height as i32 / 2));
+
+    let mut game = match &load_path {
+        Some(dir) => match load_snapshot_game(dir) {
+            Ok(game) => game,
+            Err(error) => {
+                eprintln!("Could not load snapshot: {error}");
+                return;
+            }
+        },
+        None => {
+            let mut game = Game::new(width, height, Instant::now());
+            game.place_player(point2(width as i32 / 4, height as i32 / 2));
+            set_up_map_by_name(&mut game, map_name.as_deref());
+            game
+        }
+    };
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
@@ -108,7 +123,6 @@ pub fn do_everything(map_name: Option<String>) {
     //game.set_up_labyrinth(&mut rng);
     // game.set_up_columns();
     // game.set_up_simple_portal_map();
-    set_up_map_by_name(&mut game, map_name.as_deref());
     // game.set_up_portal_across_wall_map(2, 0);
     // game.set_up_simple_freestanding_portal();
     // game.place_dense_horizontal_portals(

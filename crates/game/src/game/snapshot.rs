@@ -2,14 +2,21 @@
 //! input history as of a moment during play. Triggered by pressing 'p' so a
 //! transient rendering bug can be captured from a live session.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::time::{Duration, Instant};
 
+use euclid::Angle;
+use serde::Deserialize;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
-use crate::game::Game;
-use crate::piece::{Faction, Piece};
+use crate::game::{DeathCube, FloatingEntityId, FloatingHunterDrone, Game, IncubatingPawn, Player, Widget};
+use crate::piece::{Faction, Piece, PieceType, Upgrade};
 use terminal_rendering::glyph::Glyph;
-use utility::coordinate_frame_conversions::{WorldMove, WorldPoint, WorldSquare, WorldStep};
+use utility::coordinate_frame_conversions::{
+    BoardSize, WorldMove, WorldPoint, WorldSquare, WorldStep,
+};
+use utility::{KingWorldStep, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir};
 
 pub const SNAPSHOT_KEY: Key = Key::Char('p');
 
@@ -366,11 +373,313 @@ fn string_json(value: &str) -> String {
     out
 }
 
+// --- Loading -----------------------------------------------------------------
+//
+// The writer above emits a flat, JSON-friendly projection of `Game`. Loading
+// mirrors that projection with a DTO whose fields are only plain JSON shapes
+// (arrays, numbers, strings); no internal game type derives serde. The DTO is
+// then applied through the same `place_*` builders the map set-up code uses.
+
+#[derive(Deserialize)]
+struct SnapshotData {
+    #[serde(default)]
+    running: bool,
+    board_width: u32,
+    board_height: u32,
+    turn_count: u32,
+    world_time_seconds: f32,
+    player: Option<PlayerDto>,
+    #[serde(default)]
+    pieces: Vec<PieceDto>,
+    #[serde(default)]
+    blocks: Vec<[i32; 2]>,
+    #[serde(default)]
+    upgrades: Vec<UpgradeDto>,
+    #[serde(default)]
+    conveyor_belts: Vec<DirectedDto>,
+    #[serde(default)]
+    floor_push_arrows: Vec<DirectedDto>,
+    #[serde(default)]
+    widgets: Vec<WidgetDto>,
+    #[serde(default)]
+    incubating_pawns: Vec<IncubatingDto>,
+    #[serde(default)]
+    death_cubes: Vec<CubeDto>,
+    #[serde(default)]
+    floating_hunter_drones: Vec<DroneDto>,
+    #[serde(default)]
+    portals: Vec<PortalDto>,
+    screen: ScreenDto,
+}
+
+#[derive(Deserialize)]
+struct PlayerDto {
+    position: [i32; 2],
+    faced_direction: [i32; 2],
+    blink_range: u32,
+}
+
+#[derive(Deserialize)]
+struct PieceDto {
+    square: [i32; 2],
+    #[serde(rename = "type")]
+    piece_type: String,
+    faction: FactionDto,
+    faced_direction: Option<[i32; 2]>,
+}
+
+#[derive(Deserialize)]
+struct UpgradeDto {
+    square: [i32; 2],
+    #[serde(rename = "type")]
+    upgrade_type: String,
+}
+
+#[derive(Deserialize)]
+struct DirectedDto {
+    square: [i32; 2],
+    direction: [i32; 2],
+}
+
+#[derive(Deserialize)]
+struct WidgetDto {
+    square: [i32; 2],
+    val: u32,
+}
+
+#[derive(Deserialize)]
+struct IncubatingDto {
+    square: [i32; 2],
+    age_in_turns: u32,
+    faction: FactionDto,
+}
+
+#[derive(Deserialize)]
+struct CubeDto {
+    id: u64,
+    position: [f32; 2],
+    velocity: [f32; 2],
+}
+
+#[derive(Deserialize)]
+struct DroneDto {
+    id: u64,
+    position: [f32; 2],
+    velocity: [f32; 2],
+    sight_direction_degrees: f32,
+}
+
+#[derive(Deserialize)]
+struct PortalDto {
+    entrance: PoseDto,
+    exit: PoseDto,
+}
+
+#[derive(Deserialize)]
+struct PoseDto {
+    square: [i32; 2],
+    direction: [i32; 2],
+}
+
+#[derive(Deserialize)]
+struct ScreenDto {
+    terminal_width: u16,
+    terminal_height: u16,
+    rotation_quarter_turns: i32,
+}
+
+/// Factions serialize either as a bare name (`"red_pawn"`) or as an enemy
+/// object (`{"enemy": 0}`), so serde needs an untagged union here.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum FactionDto {
+    Name(String),
+    Enemy { enemy: u32 },
+}
+
+impl FactionDto {
+    fn to_faction(&self) -> Faction {
+        match self {
+            FactionDto::Name(name) => match name.as_str() {
+                "unaligned" => Faction::Unaligned,
+                "red_pawn" => Faction::RedPawn,
+                "death_cube" => Faction::DeathCube,
+                other => panic!("Unknown faction '{other}' in snapshot"),
+            },
+            FactionDto::Enemy { enemy } => Faction::Enemy(*enemy),
+        }
+    }
+
+    fn enemy_id(&self) -> Option<u32> {
+        match self {
+            FactionDto::Enemy { enemy } => Some(*enemy),
+            FactionDto::Name(_) => None,
+        }
+    }
+}
+
+fn square_from_array(value: [i32; 2]) -> WorldSquare {
+    WorldSquare::new(value[0], value[1])
+}
+
+fn step_from_array(value: [i32; 2]) -> WorldStep {
+    WorldStep::new(value[0], value[1])
+}
+
+fn point_from_array(value: [f32; 2]) -> WorldPoint {
+    WorldPoint::new(value[0], value[1])
+}
+
+fn move_from_array(value: [f32; 2]) -> WorldMove {
+    WorldMove::new(value[0], value[1])
+}
+
+fn pose_from_dto(pose: &PoseDto) -> SquareWithOrthogonalDir {
+    SquareWithOrthogonalDir::from_square_and_step(
+        square_from_array(pose.square),
+        step_from_array(pose.direction),
+    )
+}
+
+/// Read a snapshot directory's `game_state.json` and rebuild the `Game` it
+/// describes. `start_time` anchors the reconstructed world clock, so passing
+/// `Instant::now()` resumes realtime effects from the captured elapsed time.
+pub(crate) fn load_snapshot_game(dir: &Path) -> Result<Game, String> {
+    let path = dir.join("game_state.json");
+    let contents = std::fs::read_to_string(&path)
+        .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+    let data: SnapshotData = serde_json::from_str(&contents)
+        .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
+    Ok(Game::from_snapshot(data, Instant::now()))
+}
+
+impl Game {
+    /// Rebuild a game from the DTO emitted by `game_state_json`. Transient
+    /// visual state (in-flight animations, selectors, mouse smoothing) is
+    /// intentionally not restored; only persistent model state is.
+    fn from_snapshot(data: SnapshotData, start_time: Instant) -> Game {
+        let mut game =
+            Game::new(data.screen.terminal_width, data.screen.terminal_height, start_time);
+
+        // The terminal-derived board size can differ from the captured one
+        // (maps like `racetrack` clamp the terminal), so trust the snapshot.
+        game.board_size = BoardSize::new(data.board_width, data.board_height);
+        game.running = data.running;
+        game.turn_count = data.turn_count;
+        game.world_start_time = start_time;
+        game.world_time = start_time + Duration::from_secs_f32(data.world_time_seconds.max(0.0));
+        game.graphics
+            .screen
+            .set_rotation(QuarterTurnsAnticlockwise::new(data.screen.rotation_quarter_turns));
+
+        if let Some(player) = data.player {
+            game.player_optional = Some(Player {
+                position: square_from_array(player.position),
+                faced_direction: KingWorldStep::new(step_from_array(player.faced_direction)),
+                blink_range: player.blink_range,
+            });
+        }
+
+        // Non-overlapping by construction, but order matches the emptiness
+        // guards on `place_block`/`place_upgrade`/`place_piece`.
+        for &square in &data.blocks {
+            game.place_block(square_from_array(square));
+        }
+        for upgrade in &data.upgrades {
+            let upgrade_type = Upgrade::from_str(&upgrade.upgrade_type)
+                .unwrap_or_else(|_| panic!("Unknown upgrade '{}' in snapshot", upgrade.upgrade_type));
+            game.place_upgrade(upgrade_type, square_from_array(upgrade.square));
+        }
+        for piece in &data.pieces {
+            let piece_type = PieceType::from_str(&piece.piece_type)
+                .unwrap_or_else(|_| panic!("Unknown piece type '{}' in snapshot", piece.piece_type));
+            let mut new_piece = Piece::new(piece_type, piece.faction.to_faction());
+            if let Some(direction) = piece.faced_direction {
+                new_piece.set_faced_direction(KingWorldStep::new(step_from_array(direction)));
+            }
+            game.place_piece(new_piece, square_from_array(piece.square));
+        }
+        for belt in &data.conveyor_belts {
+            game.place_conveyor_belt(
+                square_from_array(belt.square),
+                step_from_array(belt.direction),
+            );
+        }
+        for arrow in &data.floor_push_arrows {
+            game.place_floor_push_arrow(
+                square_from_array(arrow.square),
+                step_from_array(arrow.direction),
+            );
+        }
+        for widget in &data.widgets {
+            game.place_widget(Widget::new(widget.val), square_from_array(widget.square));
+        }
+        for pawn in &data.incubating_pawns {
+            game.incubating_pawns.insert(
+                square_from_array(pawn.square),
+                IncubatingPawn {
+                    age_in_turns: pawn.age_in_turns,
+                    faction: pawn.faction.to_faction(),
+                },
+            );
+        }
+        for cube in &data.death_cubes {
+            game.death_cubes.push(DeathCube::new(
+                FloatingEntityId(cube.id),
+                point_from_array(cube.position),
+                move_from_array(cube.velocity),
+            ));
+        }
+        for drone in &data.floating_hunter_drones {
+            game.floating_hunter_drones.push(FloatingHunterDrone::new(
+                FloatingEntityId(drone.id),
+                point_from_array(drone.position),
+                move_from_array(drone.velocity),
+                Angle::degrees(drone.sight_direction_degrees),
+            ));
+        }
+        // Every registered portal face is dumped, so replaying each as an
+        // entrance reconstructs the exact entrance->exit map.
+        for portal in &data.portals {
+            game.portal_geometry
+                .create_portal(pose_from_dto(&portal.entrance), pose_from_dto(&portal.exit));
+        }
+
+        // Counters aren't serialized; recover them from the highest id in use
+        // so future spawns don't collide with loaded entities/factions.
+        let next_floating_entity_id = data
+            .death_cubes
+            .iter()
+            .map(|cube| cube.id)
+            .chain(data.floating_hunter_drones.iter().map(|drone| drone.id))
+            .max();
+        game.next_floating_entity_id = next_floating_entity_id.map_or(0, |id| id + 1);
+
+        let next_faction_id = data
+            .pieces
+            .iter()
+            .map(|piece| piece.faction.enemy_id())
+            .chain(
+                data.incubating_pawns
+                    .iter()
+                    .map(|pawn| pawn.faction.enemy_id()),
+            )
+            .flatten()
+            .max();
+        if let Some(id) = next_faction_id {
+            game.faction_factory.ensure_id_at_least(id + 1);
+        }
+
+        game
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::utils_for_tests::set_up_game_with_player;
-    use utility::STEP_RIGHT;
+    use euclid::vec2;
+    use utility::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
 
     #[test]
     fn game_state_json_includes_world_features() {
@@ -422,5 +731,59 @@ mod tests {
         assert!(json.contains("\"value\": \"q\""));
         assert!(json.contains("\"action\": \"press\""));
         assert!(json.contains("\"x\": 3"));
+    }
+
+    #[test]
+    fn snapshot_round_trips_through_serialize_and_load() {
+        let mut game = set_up_game_with_player();
+        game.set_up_simple_portal_map();
+        let base = game.player_square();
+        game.place_piece(Piece::pawn(), base + STEP_RIGHT);
+        game.place_piece(Piece::arrow(STEP_UP.into()), base + STEP_LEFT);
+        game.place_block(base + STEP_DOWN);
+        game.place_upgrade(Upgrade::BlinkRange, base + STEP_DOWN * 2);
+        game.place_conveyor_belt(base + STEP_DOWN * 3, STEP_RIGHT);
+        game.place_floor_push_arrow(base + STEP_DOWN * 4, STEP_LEFT);
+        game.place_widget(Widget::new(3), base + STEP_DOWN * 5);
+        game.place_linear_death_cube(base.to_f32() + vec2(0.5, 0.5), vec2(1.0, 0.0));
+        game.place_floating_hunter_drone(
+            base.to_f32() + vec2(1.5, 1.5),
+            vec2(0.0, 1.0),
+            Angle::radians(0.5),
+        );
+        game.incubating_pawns.insert(
+            base + STEP_RIGHT * 2,
+            IncubatingPawn {
+                age_in_turns: 4,
+                faction: Faction::RedPawn,
+            },
+        );
+        // Zero the clock so the two snapshots have nothing to drift on.
+        game.world_time = game.world_start_time;
+
+        let json = game_state_json(&game, Some("test"));
+        let data: SnapshotData = serde_json::from_str(&json).expect("parse snapshot");
+        let loaded = Game::from_snapshot(data, game.graphics().start_time());
+
+        assert_eq!(game_state_json(&loaded, Some("test")), json);
+    }
+
+    #[test]
+    fn loaded_snapshot_reproduces_rendered_screen() {
+        let mut game = set_up_game_with_player();
+        game.set_up_simple_portal_map();
+        game.place_piece(Piece::pawn(), game.player_square() + STEP_RIGHT);
+        game.world_time = game.world_start_time;
+
+        let start_time = game.graphics().start_time();
+        game.draw_headless_at_duration_from_start(std::time::Duration::ZERO);
+        let before = screen_text(&game);
+        let json = game_state_json(&game, Some("test"));
+
+        let data: SnapshotData = serde_json::from_str(&json).expect("parse snapshot");
+        let mut loaded = Game::from_snapshot(data, start_time);
+        loaded.draw_headless_at_duration_from_start(std::time::Duration::ZERO);
+
+        assert_eq!(screen_text(&loaded), before);
     }
 }

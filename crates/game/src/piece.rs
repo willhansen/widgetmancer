@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use strum_macros::Display;
 use strum_macros::EnumIter;
+use strum_macros::EnumString;
 
 use terminal_rendering::glyph::DoubleGlyph;
 use crate::piece::PieceType::*;
@@ -13,12 +14,12 @@ use crate::graphics::game_colors::*;
 
 pub const MAX_PIECE_RANGE: u32 = 5;
 
-#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter, EnumString)]
 pub enum Upgrade {
     BlinkRange,
 }
 
-#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter, Hash)]
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter, Hash, EnumString)]
 pub enum PieceType {
     OmniDirectionalPawn,
     TurningPawn,
@@ -64,6 +65,11 @@ impl FactionFactory {
         let faction = Faction::Enemy(self.id_of_next_faction);
         self.id_of_next_faction += 1;
         faction
+    }
+    /// Raise the next-faction counter so ids recovered from a loaded snapshot
+    /// are never handed out again.
+    pub fn ensure_id_at_least(&mut self, next_id: u32) {
+        self.id_of_next_faction = self.id_of_next_faction.max(next_id);
     }
 }
 

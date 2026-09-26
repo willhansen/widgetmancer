@@ -18,3 +18,10 @@ Press `p` while playing to dump the current game state, rendered screen, and
 input history into the (gitignored) `snapshot/` directory at the repo root.
 This is meant for capturing transient rendering bugs from a live session.
 
+Load a snapshot back and keep playing with `cargo run --release -- --load snapshot`
+(or `--load <dir>`). The persistent world state (player, pieces, blocks,
+portals, floating entities, turn/world clock) is restored, so the session
+continues where it left off. Transient visuals that are not serialized
+(in-flight animations, selectors) reset. Snapshots can be combined with
+`--map` only when not loading.
+
