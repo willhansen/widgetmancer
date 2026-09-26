@@ -8,6 +8,106 @@ with each item so the context doesn't have to be re-discovered later.
 
 ---
 
+## Debug tooling wishlist — rendering & FOV
+
+Captured while designing tooling for the portal-depth partial-visibility
+artifact (`issues/black-block-deep-in-portal/PORTAL_FOV_DEPTH_ARTIFACT.md`),
+whose write-up names its own blocker: "no supported way to dump FOV internals
+for a loaded snapshot." Ordered by leverage, not implementation order. This is
+a wishlist; promote entries into numbered `Open` items (or fold into item 6)
+when scheduled.
+
+Motivating failure mode: not a crash, but an emergent property of
+(1) portal-recursive FOV with accumulated frame transforms/view arcs
+(`crates/game/src/fov_stuff.rs`), (2) a layered draw buffer composited through
+visibility/tint (`graphics.rs`, `graphics/drawable.rs`), (3) floating-point
+positions and unbiased glyph picks (`crates/terminal_rendering`), and
+(4) ambient nondeterminism. So the ideal tooling is introspective,
+deterministic, and provenance-oriented — not a step debugger (none is
+installed anyway: no gdb/lldb/rr/perf/valgrind).
+
+### W.A. Virtual clock + deterministic replay
+- **What:** a single injectable logical clock for sim + render, plus a recorded
+  tick schedule. `Game::draw(time)` already threads a frame time, but it is not
+  the only clock a frame depends on.
+- **Leaks (evidence):** sim time = wall time: loop measures real deltas
+  (`lib.rs:140-145,165`) → `tick_realtime_effects(delta)` → `world_time += delta`
+  (`game/realtime.rs:24`); `Game::new` ignores its `start_time` for the world
+  clock (`game/mod.rs:139-140` vs `:122`); render reads wall clock —
+  `draw_death_cube` calls `technicolor_at_time(Instant::now())`
+  (`graphics.rs:399`, defeating the `time` argument at `:435`); animations
+  anchor `start_time: Instant::now()` at construction (~9 files,
+  `piece_death_animation.rs:18`), and `static_board::start_time()` returns
+  `Instant::now()` per call (`static_board.rs:23`); `--load` rebases to
+  `Instant::now()` (`game/snapshot.rs:553`).
+- **Ideal:** `LogicalTime(Duration)` newtype (serializable/constructible, unlike
+  `std::time::Instant`) for `world_time`, `Graphics::start_time`, and animation
+  start times; one `now` per tick feeding both sim and draw; wall clock read
+  only at the driver seam in `lib.rs` and the input thread. Snapshot serializes
+  absolute logical time so load restores the clock.
+- **Replay promise:** `(game_state.json + input_history.json + tick schedule)`
+  → byte-identical ANSI frame at any index.
+- **Overlap:** item 6 step 2 already calls for auditing wall-clock reads; W.A is
+  that audit generalized to the render path and made load-safe.
+
+### W.B. "Explain this cell" provenance query — highest leverage
+- **What:** given a screen-buffer cell (e.g. the issue's `(49,37)`), return the
+  ordered contributions: drawable, absolute world square,
+  `PositionedSquareVisibilityInFov`/`portal_depth`, transform/rotation, tint
+  alpha (`0.1 * depth`, `fov_stuff.rs:760`), and why that glyph/color won.
+- **Anchors:** `SquareVisibility::as_string` (`fov_stuff.rs:131`);
+  `PositionedSquareVisibilityInFov` is `pub` + `Debug` (`:215`);
+  `screen_text`/`graphics.screen` (`game/snapshot.rs:62`); the issue's observed
+  cell table is exactly what this query would produce mechanically.
+- **Answers:** "why does it look like that once loaded?" in one query.
+
+### W.C. Portal-space / FOV tracing
+- **What:** dump the FOV recursion as a tree — per depth: incoming `view_arc`,
+  `transformed_center`, portal transform, `visible_arc_of_portal`, resulting
+  visibilities. Plus a "hall of mirrors" unfolded map showing the view arc and
+  shadow half-plane per depth, and a depth heatmap.
+- **Anchors:** recursion at `fov_stuff.rs:~831`, portal block `:909-993`
+  (`transform_arc(view_arc.intersection(portal_view_arc))`, `transformed_center`
+  at `:938-943`); no depth cap; `player_field_of_view` private (`game/mod.rs:1371`);
+  `load_snapshot_game` `pub(crate)` (`snapshot.rs:547`) — reachable from an
+  in-crate `#[cfg(test)]` dump without API changes.
+- **Tests the issue's hypothesis:** cumulative arc shrink / missing depth cap at
+  depth 3.
+
+### W.D. Differential + invariant oracles
+- **What:** a reference FOV (ray-cast in unwrapped portal coordinates) to diff
+  against the recursive one, and per-frame debug invariants, e.g. "no
+  `OUT_OF_SIGHT`-background partial where a lower depth treats the same absolute
+  square as fully visible," plus FOV monotonicity.
+
+### W.E. Automated snapshot minimizer
+- **What:** shrink `snapshot/` state (drop entities/blocks, narrow player
+  position) while preserving the artifact. Turns the 70×78 map into a minimal
+  regression repro.
+
+### W.F. Headless golden/diff harness
+- **What:** `--load <dir> --render-headless --diff snapshot/screen.txt` with
+  per-cell glyph/fg/bg diffs and `--bless`; promote
+  `loaded_snapshot_reproduces_rendered_screen` (`snapshot.rs:771`) into a
+  reusable CLI. Headless only; no TTY needed
+  (`draw_headless_at_duration_from_start`, `game/mod.rs:490`).
+
+### W.G. Live overlay — nice-to-have
+- Toggle FOV arcs, portal-depth heatmap, screen-center markers, draw order, and
+  ideal-vs-actual coverage in the running TUI; hover a cell for W.B. Extends the
+  existing `floating-square-debug` tool (`floating-square-debug/README.md`).
+
+### Mapping to `black-block-deep-in-portal`
+| Item | Role |
+|---|---|
+| W.A | prove load == capture; rule out nondeterminism before blaming FOV |
+| W.B + W.C | test the no-depth-cap / arc-accumulation hypothesis |
+| W.D | encode the fix as an invariant |
+| W.E | minimal regression state |
+| W.F | lock it in as a golden test |
+
+---
+
 ## Open
 
 ### 2. Remove globally suppressed warnings
