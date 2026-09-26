@@ -787,3 +787,296 @@ mod tests {
         assert_eq!(screen_text(&loaded), before);
     }
 }
+
+/// Headless snapshot tooling, enabled with the `debug-tools` feature (see
+/// `crates/game/src/bin/snapshot_tool.rs`). Lives in a descendant module of
+/// `snapshot`, so it can reach the private DTO/loader without widening the
+/// crate's normal public surface.
+#[cfg(feature = "debug-tools")]
+pub mod debug {
+    use std::path::{Path, PathBuf};
+    use std::time::{Duration, Instant};
+
+    use regex::Regex;
+    use rgb::RGB8;
+
+    use super::{
+        game_state_json, load_snapshot_game, screen_text, snapshot_dir, Game, SnapshotData,
+    };
+
+    /// Render `dir/game_state.json` headless at the captured world time and
+    /// return the ANSI grid. Rendering at the captured elapsed time is what
+    /// makes time-dependent visuals (e.g. death-cube technicolor) reproduce.
+    pub fn render_snapshot_headless(dir: &Path) -> Result<String, String> {
+        let path = dir.join("game_state.json");
+        let contents = std::fs::read_to_string(&path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+        let data: SnapshotData = serde_json::from_str(&contents)
+            .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
+        let elapsed = Duration::from_secs_f32(data.world_time_seconds.max(0.0));
+        let mut game = Game::from_snapshot(data, Instant::now());
+        game.draw_headless_at_duration_from_start(elapsed);
+        Ok(screen_text(&game))
+    }
+
+    /// The repo-root `snapshot/` directory.
+    pub fn default_snapshot_dir() -> PathBuf {
+        snapshot_dir()
+    }
+
+    /// Re-serialize a loaded game's persistent state (for round-trip checks).
+    pub fn game_state_json_of(game: &Game, map_name: Option<&str>) -> String {
+        game_state_json(game, map_name)
+    }
+
+    /// Load a snapshot directory into a live `Game` (resumes realtime effects).
+    pub fn load_snapshot_dir(dir: &Path) -> Result<Game, String> {
+        load_snapshot_game(dir)
+    }
+
+    /// One terminal cell as encoded in `screen.txt`: character + fg/bg RGB.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct Cell {
+        pub character: char,
+        pub fg: RGB8,
+        pub bg: RGB8,
+    }
+
+    /// Parse the ANSI stream written by `screen_text` back into a row-major
+    /// grid. `Glyph::bg_transparent` is not encoded in the text, so it is not
+    /// represented here (and is ignored by all comparisons).
+    pub fn parse_screen_text(text: &str) -> Result<Vec<Vec<Cell>>, String> {
+        let cell_re = Regex::new(
+            r"\x1b\[48;2;(\d+);(\d+);(\d+)m\x1b\[38;2;(\d+);(\d+);(\d+)m(.)\x1b\[49m\x1b\[39m",
+        )
+        .map_err(|error| format!("bad cell regex: {error}"))?;
+
+        let mut grid = Vec::new();
+        for (row, line) in text.split('\n').enumerate() {
+            if line.is_empty() {
+                continue;
+            }
+            let mut cells = Vec::new();
+            for caps in cell_re.captures_iter(line) {
+                let num =
+                    |i: usize| caps[i].parse::<u8>().map_err(|e| format!("bad color component: {e}"));
+                let bg = RGB8::new(num(1)?, num(2)?, num(3)?);
+                let fg = RGB8::new(num(4)?, num(5)?, num(6)?);
+                let character = caps[7]
+                    .chars()
+                    .next()
+                    .ok_or_else(|| format!("row {row}: empty glyph capture"))?;
+                cells.push(Cell {
+                    character,
+                    fg,
+                    bg,
+                });
+            }
+            if cells.is_empty() {
+                return Err(format!(
+                    "row {row}: no cells parsed (not a screen_text stream?)"
+                ));
+            }
+            grid.push(cells);
+        }
+        Ok(grid)
+    }
+
+    pub fn parse_screen_text_file(path: &Path) -> Result<Vec<Vec<Cell>>, String> {
+        let text = std::fs::read_to_string(path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+        parse_screen_text(&text)
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub struct CellDiff {
+        pub row: usize,
+        pub col: usize,
+        pub expected: Cell,
+        pub actual: Cell,
+    }
+
+    /// Cells that differ, in row-major order.
+    pub fn diff_cells(expected: &[Vec<Cell>], actual: &[Vec<Cell>]) -> Vec<CellDiff> {
+        let mut diffs = Vec::new();
+        for (row, (exp_row, act_row)) in expected.iter().zip(actual.iter()).enumerate() {
+            for (col, (exp, act)) in exp_row.iter().zip(act_row.iter()).enumerate() {
+                if exp != act {
+                    diffs.push(CellDiff {
+                        row,
+                        col,
+                        expected: *exp,
+                        actual: *act,
+                    });
+                }
+            }
+        }
+        diffs
+    }
+
+    fn show_cell(cell: &Cell) -> String {
+        format!(
+            "{:?} fg({},{},{}) bg({},{},{})",
+            cell.character, cell.fg.r, cell.fg.g, cell.fg.b, cell.bg.r, cell.bg.g, cell.bg.b
+        )
+    }
+
+    /// Human-readable diff report: per-row character overlay (first `MAX_ROWS`)
+    /// plus explicit cell diffs (first `MAX_CELLS`).
+    pub fn render_diff_report(expected: &[Vec<Cell>], actual: &[Vec<Cell>]) -> String {
+        const MAX_ROWS: usize = 60;
+        const MAX_CELLS: usize = 200;
+
+        let mut out = String::new();
+        if expected.len() != actual.len() {
+            out.push_str(&format!(
+                "row count differs: expected {} got {}\n",
+                expected.len(),
+                actual.len()
+            ));
+        }
+        let width = expected.first().map_or(0, Vec::len);
+        if actual.first().map_or(0, Vec::len) != width {
+            out.push_str(&format!(
+                "col count differs: expected {} got {}\n",
+                width,
+                actual.first().map_or(0, Vec::len)
+            ));
+        }
+
+        let diffs = diff_cells(expected, actual);
+        out.push_str(&format!("{} differing cells\n", diffs.len()));
+
+        let mut rows_with_diffs: Vec<usize> = diffs.iter().map(|d| d.row).collect();
+        rows_with_diffs.dedup();
+        for row in rows_with_diffs.iter().take(MAX_ROWS) {
+            if let (Some(exp), Some(act)) = (expected.get(*row), actual.get(*row)) {
+                let chars =
+                    |cells: &[Cell]| cells.iter().map(|c| c.character).collect::<String>();
+                let markers: String = (0..width)
+                    .map(|col| {
+                        let same = exp
+                            .get(col)
+                            .zip(act.get(col))
+                            .map_or(true, |(a, b)| a == b);
+                        if same {
+                            ' '
+                        } else {
+                            '^'
+                        }
+                    })
+                    .collect();
+                out.push_str(&format!("row {row}\n"));
+                out.push_str(&format!("  exp {}\n", chars(exp)));
+                out.push_str(&format!("  got {}\n", chars(act)));
+                out.push_str(&format!("      {markers}\n"));
+            }
+        }
+
+        for diff in diffs.iter().take(MAX_CELLS) {
+            out.push_str(&format!(
+                "  ({row}, {col}) exp: {exp}\n           got: {act}\n",
+                row = diff.row,
+                col = diff.col,
+                exp = show_cell(&diff.expected),
+                act = show_cell(&diff.actual),
+            ));
+        }
+        if diffs.len() > MAX_CELLS {
+            out.push_str(&format!("  ... {} more\n", diffs.len() - MAX_CELLS));
+        }
+        out
+    }
+
+    /// Compare a headless render against `dir/screen.txt`.
+    pub fn diff_snapshot(dir: &Path) -> Result<(bool, String), String> {
+        let rendered = render_snapshot_headless(dir)?;
+        let expected = parse_screen_text_file(&dir.join("screen.txt"))?;
+        let actual = parse_screen_text(&rendered)?;
+        let matches = expected == actual;
+        Ok((matches, render_diff_report(&expected, &actual)))
+    }
+
+    /// Overwrite `dir/screen.txt` with a headless render (canonization).
+    pub fn bless_snapshot(dir: &Path) -> Result<PathBuf, String> {
+        let rendered = render_snapshot_headless(dir)?;
+        let path = dir.join("screen.txt");
+        std::fs::write(&path, rendered)
+            .map_err(|error| format!("Could not write {}: {error}", path.display()))?;
+        Ok(path)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::utils_for_tests::set_up_game_with_player;
+
+        /// The parser must recover exactly the character/fg/bg trio the screen
+        /// buffer held (transparency is not encoded, and is not compared).
+        #[test]
+        fn screen_text_round_trips_through_parser() {
+            let mut game = set_up_game_with_player();
+            game.draw_headless_at_duration_from_start(Duration::ZERO);
+
+            let text = screen_text(&game);
+            let parsed = parse_screen_text(&text).expect("parse screen_text");
+
+            let screen = &game.graphics().screen;
+            let width = screen.terminal_width as usize;
+            let height = screen.terminal_height as usize;
+            let expected: Vec<Vec<Cell>> = (0..height)
+                .map(|y| {
+                    (0..width)
+                        .map(|x| {
+                            let glyph = screen.screen_buffer[x][y];
+                            Cell {
+                                character: glyph.character,
+                                fg: glyph.fg_color,
+                                bg: glyph.bg_color,
+                            }
+                        })
+                        .collect()
+                })
+                .collect();
+
+            assert_eq!(parsed, expected);
+        }
+
+        #[test]
+        fn diff_report_is_empty_for_identical_grids() {
+            let grid = parse_screen_text(
+                "\x1b[48;2;0;0;0m\x1b[38;2;255;255;255m \x1b[49m\x1b[39m",
+            )
+            .expect("parse single cell");
+            assert!(diff_cells(&grid, &grid).is_empty());
+            assert_eq!(render_diff_report(&grid, &grid), "0 differing cells\n");
+        }
+
+        /// A headless render must not depend on wall-clock reads: two loads of
+        /// the same state, rendered at the captured time, must be byte-equal.
+        /// Guards against re-introducing `Instant::now()` in the render path.
+        #[test]
+        fn headless_render_is_deterministic_across_loads() {
+            use euclid::vec2;
+            use utility::coordinate_frame_conversions::WorldPoint;
+
+            let mut game = set_up_game_with_player();
+            game.place_linear_death_cube(WorldPoint::new(5.5, 4.5), vec2(1.0, 0.0));
+            game.world_time = game.world_start_time;
+
+            let json = game_state_json(&game, Some("test"));
+            let dir = std::env::temp_dir().join(format!(
+                "widgetmancer_snapshot_determinism_{}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&dir).expect("create temp snapshot dir");
+            std::fs::write(dir.join("game_state.json"), json).expect("write game_state.json");
+
+            let first = render_snapshot_headless(&dir).expect("first render");
+            let second = render_snapshot_headless(&dir).expect("second render");
+            std::fs::remove_dir_all(&dir).ok();
+
+            assert_eq!(first, second);
+        }
+    }
+}

@@ -108,10 +108,6 @@ impl Graphics {
         self.start_time
     }
 
-    fn time_since_start(&self) -> Duration {
-        Instant::now().duration_since(self.start_time)
-    }
-
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
         return if self
             .screen
@@ -395,8 +391,13 @@ impl Graphics {
         self.draw_same_glyphs_at_squares(capture_only_square_glyphs(), &capture_only_squares);
     }
 
-    pub fn draw_death_cube(&mut self, death_cube: &DeathCube, portals: &PortalGeometry) {
-        let color = self.technicolor_at_time(Instant::now());
+    pub fn draw_death_cube(
+        &mut self,
+        death_cube: &DeathCube,
+        portals: &PortalGeometry,
+        time: Instant,
+    ) {
+        let color = self.technicolor_at_time(time);
         self.draw_floating_square(death_cube.id, death_cube.position(), color, portals);
     }
     pub fn draw_floating_hunter_drone(
@@ -680,7 +681,8 @@ mod tests {
         let cube = DeathCube::new(FloatingEntityId(0), WorldPoint::new(5.3, 4.7), WorldMove::zero());
 
         // drawn -> remembered, and the memory feeds the next frame's pick
-        g.draw_death_cube(&cube, &PortalGeometry::default());
+        let time = g.start_time();
+        g.draw_death_cube(&cube, &PortalGeometry::default(), time);
         assert!(g.floating_entity_family_memory.contains_key(&cube.id));
         g.display_headless();
         assert!(g.floating_entity_family_memory.contains_key(&cube.id));

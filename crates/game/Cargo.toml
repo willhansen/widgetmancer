@@ -3,6 +3,33 @@ name = "game"
 version = "0.0.0"
 edition.workspace = true
 
+# Explicit bin list so snapshot_tool can be feature-gated. Keep autobins off to
+# avoid duplicate-target warnings with the entries below.
+autobins = false
+
+[[bin]]
+name = "game"
+path = "src/main.rs"
+
+[[bin]]
+name = "portal_playground"
+path = "src/bin/portal_playground.rs"
+
+[[bin]]
+name = "map_diagram"
+path = "src/bin/map_diagram.rs"
+
+[[bin]]
+name = "snapshot_tool"
+path = "src/bin/snapshot_tool.rs"
+required-features = ["debug-tools"]
+
+[features]
+default = []
+# Headless snapshot render/diff tooling (W.F) and the introspection helpers it
+# shares with later W.B/W.C work. Off by default; no release-surface change.
+debug-tools = []
+
 [dependencies]
 # external
 approx = "0.5.1"

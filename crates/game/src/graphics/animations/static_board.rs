@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 pub struct StaticBoard {
     board_size: BoardSize,
     floor_color_enum: FloorColorEnum,
+    start_time: Instant,
 }
 
 impl StaticBoard {
@@ -13,14 +14,16 @@ impl StaticBoard {
         StaticBoard {
             board_size,
             floor_color_enum,
+            start_time: Instant::now(),
         }
     }
 }
 
 impl Animation for StaticBoard {
     fn start_time(&self) -> Instant {
-        // TODO: is this even applicable?
-        Instant::now()
+        // Stable per instance. The board render ignores time (duration is zero),
+        // so this only needs to stop reporting a fresh wall-clock value per call.
+        self.start_time
     }
     fn duration(&self) -> Duration {
         Duration::from_secs_f32(0.0)

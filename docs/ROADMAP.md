@@ -49,6 +49,17 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   → byte-identical ANSI frame at any index.
 - **Overlap:** item 6 step 2 already calls for auditing wall-clock reads; W.A is
   that audit generalized to the render path and made load-safe.
+- **Partial (2026-09):** first leaks landed. `draw_death_cube` now takes the
+  frame `time` (removed its `Instant::now()`); `Game::new` seeds
+  `world_start_time`/`world_time` from its `start_time` argument; `StaticBoard`
+  stores a stable `start_time`; dead `Graphics::time_since_start` removed. The
+  headless render now reproduces the checked-in snapshot except for the ~2ms
+  wall-clock skew the pre-fix capture baked into death-cube technicolor.
+  **Remaining (L):** the `LogicalTime(Duration)` replacement for `Instant` in
+  `Game`/`Graphics`/`Animation` + serialization, seeded/serialized RNG
+  (`realtime.rs:45,47`, `combat.rs:87`, `piece.rs:151`), and driver-loop
+  single-seam clock. This is API-breaking across ~69 `Instant` references and
+  test helpers — do as its own branch with W.F as the gate.
 
 ### W.B. "Explain this cell" provenance query — highest leverage
 - **What:** given a screen-buffer cell (e.g. the issue's `(49,37)`), return the
@@ -91,6 +102,18 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   `loaded_snapshot_reproduces_rendered_screen` (`snapshot.rs:771`) into a
   reusable CLI. Headless only; no TTY needed
   (`draw_headless_at_duration_from_start`, `game/mod.rs:490`).
+- **Landed (2026-09):** `game` gains a default-off `debug-tools` feature and
+  `pub mod game::snapshot::debug` (descendant module, so it reaches the private
+  DTO/loader without widening the crate's API). New bin
+  `crates/game/src/bin/snapshot_tool.rs`:
+  `render <dir>` / `diff <dir> [ref]` / `bless <dir>` / `cells <dir>`, with an
+  ANSI `screen_text` parser and per-cell diff report. Manifest switches to
+  explicit `[[bin]]` entries + `autobins = false`; `snapshot_tool` has
+  `required-features = ["debug-tools"]`. Tests: parser round-trip against the
+  screen buffer; a cross-load render determinism guard. The repo snapshot now
+  matches the headless render except the retired wall-clock skew (W.A).
+  **Gate:** run
+  `cargo run -p game --features debug-tools --bin snapshot_tool -- diff snapshot/`.
 
 ### W.G. Live overlay — nice-to-have
 - Toggle FOV arcs, portal-depth heatmap, screen-center markers, draw order, and

@@ -136,8 +136,8 @@ impl Game {
             portal_geometry: PortalGeometry::default(),
             floating_hunter_drones: vec![],
             next_floating_entity_id: 0,
-            world_start_time: Instant::now(),
-            world_time: Instant::now(),
+            world_start_time: start_time,
+            world_time: start_time,
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
@@ -547,7 +547,7 @@ impl Game {
             .for_each(|(&square, &upgrade)| self.graphics.draw_upgrade(square, upgrade));
         self.death_cubes.iter().for_each(|death_cube| {
             self.graphics
-                .draw_death_cube(death_cube, &self.portal_geometry)
+                .draw_death_cube(death_cube, &self.portal_geometry, time)
         });
         self.floating_hunter_drones.iter().for_each(|drone| {
             let sight_line_segments = self.portal_geometry.ray_to_naive_line_segments(
