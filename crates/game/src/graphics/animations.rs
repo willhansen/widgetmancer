@@ -1,6 +1,7 @@
 use ambassador::{delegatable_trait, Delegate};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 use num::clamp;
 
@@ -27,14 +28,15 @@ pub type AnimationList = Vec<AnimationEnum>;
 
 #[delegatable_trait]
 pub trait Animation: Clone {
-    fn start_time(&self) -> Instant;
+    fn start_time(&self) -> LogicalTime;
+    fn set_start_time(&mut self, time: LogicalTime);
     fn duration(&self) -> Duration;
-    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph>;
+    fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph>;
 
     /// Default: the solid output as fully opaque. Override to emit real alpha.
     fn double_glyphs_with_transparency_at_time(
         &self,
-        time: Instant,
+        time: LogicalTime,
     ) -> HashMap<WorldSquare, DoubleGlyphWithTransparency> {
         self.double_glyphs_at_time(time)
             .into_iter()
@@ -49,22 +51,22 @@ pub trait Animation: Clone {
         self.double_glyphs_at_time(self.start_time() + duration)
     }
 
-    fn finished_at_time(&self, time: Instant) -> bool {
+    fn finished_at_time(&self, time: LogicalTime) -> bool {
         self.fraction_done_at_time(time) == 1.0
     }
 
-    fn fraction_done_at_time(&self, time: Instant) -> f32 {
+    fn fraction_done_at_time(&self, time: LogicalTime) -> f32 {
         clamp(
             time.duration_since(self.start_time()).as_secs_f32() / self.duration().as_secs_f32(),
             0.0,
             1.0,
         )
     }
-    fn fraction_remaining_at_time(&self, time: Instant) -> f32 {
+    fn fraction_remaining_at_time(&self, time: LogicalTime) -> f32 {
         1.0 - self.fraction_done_at_time(time)
     }
 
-    fn age_at_time(&self, time: Instant) -> Duration {
+    fn age_at_time(&self, time: LogicalTime) -> Duration {
         time.duration_since(self.start_time())
     }
 }

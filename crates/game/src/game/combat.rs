@@ -84,7 +84,7 @@ impl Game {
                     Angle::radians(rotation_if_uniform),
                 )
                 .cast_unit()
-                + rand_radial_offset(random_spread_radius).cast_unit();
+                + seeded_rand_radial_offset(&mut self.rng, random_spread_radius).cast_unit();
             let line = WorldLine::new(line_start.to_f32(), line_end);
 
             for square in line.touched_squares() {

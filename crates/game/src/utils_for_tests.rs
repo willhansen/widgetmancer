@@ -1,5 +1,4 @@
-use std::time::Instant;
-
+use crate::LogicalTime;
 use euclid::point2;
 
 use crate::game::Game;
@@ -8,7 +7,7 @@ use utility::coordinate_frame_conversions::*;
 use utility::{LEFT_I, RIGHT_I, STEP_LEFT, STEP_UP, UP_I};
 
 pub fn set_up_nxm_game(rows: u32, cols: u32) -> Game {
-    Game::new(cols as u16 * 2, rows as u16, Instant::now())
+    Game::new(cols as u16 * 2, rows as u16, LogicalTime::ZERO)
 }
 
 pub fn set_up_nxn_game(board_size: u32) -> Game {
@@ -25,8 +24,8 @@ pub fn set_up_game_with_player() -> Game {
     game
 }
 
-pub fn set_up_game_at_time() -> (Game, Instant) {
-    let start_time = Instant::now();
+pub fn set_up_game_at_time() -> (Game, LogicalTime) {
+    let start_time = LogicalTime::ZERO;
     (Game::new(20, 10, start_time), start_time)
 }
 
@@ -47,7 +46,7 @@ pub fn set_up_player_facing_pawn_on_left() -> Game {
 }
 
 pub fn set_up_player_facing_n_pawns_m_blocks_up(num_pawns: i32, blocks_up: i32) -> Game {
-    let mut game = Game::new(20, 10 + blocks_up as u16, Instant::now());
+    let mut game = Game::new(20, 10 + blocks_up as u16, LogicalTime::ZERO);
     game.place_player(point2(5, 5));
     game.raw_set_player_faced_direction(STEP_UP.into());
     let line_start: WorldSquare =

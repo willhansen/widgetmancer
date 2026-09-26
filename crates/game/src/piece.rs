@@ -148,10 +148,9 @@ impl Piece {
             .collect()
     }
 
-    pub fn random_subordinate_type() -> PieceType {
-        let mut rng = get_new_rng();
+    pub fn random_subordinate_type<R: rand::Rng>(rng: &mut R) -> PieceType {
         let options = vec![OmniDirectionalPawn, Knight, Bishop, Rook, Queen];
-        *random_choice(&mut rng, &options)
+        *random_choice(rng, &options)
     }
 
     pub fn glyphs(&self) -> DoubleGlyph {

@@ -42,6 +42,7 @@ ntest = "0.9.0"
 num = "0.4"
 ordered-float = "3.3.0"
 rand = "0.8.4"
+rand_chacha = { version = "0.3", features = ["serde1"] }
 rgb = "0.8.34"
 strum = "0.24"
 strum_macros = "0.24"

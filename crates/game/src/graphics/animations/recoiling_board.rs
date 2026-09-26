@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::f32::consts::PI;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 use euclid::Length;
 use crate::graphics::*;
@@ -9,7 +10,7 @@ use crate::graphics::*;
 pub struct RecoilingBoardAnimation {
     board_size: BoardSize,
     orthogonal_shot_direction: OrthogonalWorldStep,
-    start_time: Instant,
+    start_time: LogicalTime,
     floor_color_enum: FloorColorEnum,
 }
 
@@ -33,7 +34,7 @@ impl RecoilingBoardAnimation {
         RecoilingBoardAnimation {
             board_size,
             orthogonal_shot_direction: orthogonalized_step.into(),
-            start_time: Instant::now(),
+            start_time: LogicalTime::ZERO,
             floor_color_enum,
         }
     }
@@ -85,14 +86,17 @@ impl RecoilingBoardAnimation {
 }
 
 impl Animation for RecoilingBoardAnimation {
-    fn start_time(&self) -> Instant {
+    fn start_time(&self) -> LogicalTime {
         self.start_time
+    }
+    fn set_start_time(&mut self, time: LogicalTime) {
+        self.start_time = time;
     }
     fn duration(&self) -> Duration {
         RecoilingBoardAnimation::RECOIL_DURATION
     }
 
-    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+    fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph> {
         let age = time.duration_since(self.start_time);
 
         let offset_distance_in_squares: f32 =

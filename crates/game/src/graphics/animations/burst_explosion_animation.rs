@@ -3,32 +3,36 @@ use euclid::Angle;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use std::f32::consts::{PI, TAU};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BurstExplosionAnimation {
     position: WorldPoint,
-    start_time: Instant,
+    start_time: LogicalTime,
 }
 
 impl BurstExplosionAnimation {
     pub fn new(position: WorldPoint) -> BurstExplosionAnimation {
         BurstExplosionAnimation {
             position,
-            start_time: Instant::now(),
+            start_time: LogicalTime::ZERO,
         }
     }
 }
 
 impl Animation for BurstExplosionAnimation {
-    fn start_time(&self) -> Instant {
+    fn start_time(&self) -> LogicalTime {
         self.start_time
+    }
+    fn set_start_time(&mut self, time: LogicalTime) {
+        self.start_time = time;
     }
     fn duration(&self) -> Duration {
         Duration::from_millis(500)
     }
 
-    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+    fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph> {
         // rather arbitrary
         let hash = ((self.position.x * PI + self.position.y) * 1000.0)
             .abs()

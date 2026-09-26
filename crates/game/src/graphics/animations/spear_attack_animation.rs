@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 use euclid::vec2;
 
@@ -10,7 +11,7 @@ pub struct SpearAttackAnimation {
     start_square: WorldSquare,
     direction: KingWorldStep,
     range: u32,
-    start_time: Instant,
+    start_time: LogicalTime,
 }
 
 impl SpearAttackAnimation {
@@ -23,7 +24,7 @@ impl SpearAttackAnimation {
             start_square,
             direction,
             range,
-            start_time: Instant::now(),
+            start_time: LogicalTime::ZERO,
         }
     }
 
@@ -48,14 +49,17 @@ impl SpearAttackAnimation {
 }
 
 impl Animation for SpearAttackAnimation {
-    fn start_time(&self) -> Instant {
+    fn start_time(&self) -> LogicalTime {
         self.start_time
+    }
+    fn set_start_time(&mut self, time: LogicalTime) {
+        self.start_time = time;
     }
     fn duration(&self) -> Duration {
         Duration::from_millis(500)
     }
 
-    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+    fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph> {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
         let _sweep_degrees = 10.0;

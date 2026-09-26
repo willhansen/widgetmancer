@@ -2,32 +2,36 @@ use crate::graphics::*;
 use euclid::Angle;
 use std::collections::HashMap;
 use std::f32::consts::TAU;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SelectorAnimation {
     square: WorldSquare,
-    start_time: Instant,
+    start_time: LogicalTime,
 }
 
 impl SelectorAnimation {
     pub fn new(square: WorldSquare) -> SelectorAnimation {
         SelectorAnimation {
             square,
-            start_time: Instant::now(),
+            start_time: LogicalTime::ZERO,
         }
     }
 }
 
 impl Animation for SelectorAnimation {
-    fn start_time(&self) -> Instant {
+    fn start_time(&self) -> LogicalTime {
         self.start_time
+    }
+    fn set_start_time(&mut self, time: LogicalTime) {
+        self.start_time = time;
     }
     fn duration(&self) -> Duration {
         Duration::from_secs_f32(1.0)
     }
 
-    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+    fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph> {
         let num_dots = DOTS_IN_SELECTOR;
         let radius_in_squares = 1.0; //f32::sqrt(2.0) / 2.0;
 
@@ -46,7 +50,7 @@ impl Animation for SelectorAnimation {
         }
         Glyph::points_to_braille_double_glyphs(points, SELECTOR_COLOR)
     }
-    fn finished_at_time(&self, _time: Instant) -> bool {
+    fn finished_at_time(&self, _time: LogicalTime) -> bool {
         false
     }
 }

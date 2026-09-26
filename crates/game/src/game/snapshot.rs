@@ -4,7 +4,9 @@
 
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use crate::LogicalTime;
 
 use euclid::Angle;
 use serde::Deserialize;
@@ -136,6 +138,7 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
         ("death_cubes", death_cubes_json(game)),
         ("floating_hunter_drones", hunter_drones_json(game)),
         ("portals", portals_json(game)),
+        ("rng_state", rng_state_json(game)),
         ("screen", screen_state_json(game)),
     ];
 
@@ -194,8 +197,13 @@ fn hunter_drones_json(game: &Game) -> String {
     }))
 }
 
-fn portals_json(game: &Game) -> String {
-    let mut portals: Vec<_> = game.portal_geometry.iter_portals().collect();
+/// The gameplay RNG state, as an embedded JSON string. Serialized so a loaded
+/// snapshot resumes the exact random stream (roadmap W.A).
+fn rng_state_json(game: &Game) -> String {
+    string_json(&serde_json::to_string(&game.rng).expect("serialize rng state"))
+}
+
+fn portals_json(game: &Game) -> String {    let mut portals: Vec<_> = game.portal_geometry.iter_portals().collect();
     portals.sort_by_key(|portal| {
         let entrance = portal.entrance().square();
         let exit = portal.exit().square();
@@ -409,6 +417,10 @@ struct SnapshotData {
     floating_hunter_drones: Vec<DroneDto>,
     #[serde(default)]
     portals: Vec<PortalDto>,
+    /// Opaque serde-JSON encoding of the `ChaCha8Rng` state. Absent in older
+    /// snapshots, which fall back to the default seed.
+    #[serde(default)]
+    rng_state: Option<String>,
     screen: ScreenDto,
 }
 
@@ -550,14 +562,14 @@ pub(crate) fn load_snapshot_game(dir: &Path) -> Result<Game, String> {
         .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
     let data: SnapshotData = serde_json::from_str(&contents)
         .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
-    Ok(Game::from_snapshot(data, Instant::now()))
+    Ok(Game::from_snapshot(data, LogicalTime::ZERO))
 }
 
 impl Game {
     /// Rebuild a game from the DTO emitted by `game_state_json`. Transient
     /// visual state (in-flight animations, selectors, mouse smoothing) is
     /// intentionally not restored; only persistent model state is.
-    fn from_snapshot(data: SnapshotData, start_time: Instant) -> Game {
+    fn from_snapshot(data: SnapshotData, start_time: LogicalTime) -> Game {
         let mut game =
             Game::new(data.screen.terminal_width, data.screen.terminal_height, start_time);
 
@@ -566,6 +578,14 @@ impl Game {
         game.board_size = BoardSize::new(data.board_width, data.board_height);
         game.running = data.running;
         game.turn_count = data.turn_count;
+        // Restore the RNG stream (falls back to the seeded default for older
+        // snapshots that predate rng_state).
+        if let Some(rng_state) = &data.rng_state {
+            match serde_json::from_str(rng_state) {
+                Ok(rng) => game.rng = rng,
+                Err(error) => panic!("Unknown rng_state in snapshot: {error}"),
+            }
+        }
         game.world_start_time = start_time;
         game.world_time = start_time + Duration::from_secs_f32(data.world_time_seconds.max(0.0));
         game.graphics
@@ -795,7 +815,8 @@ mod tests {
 #[cfg(feature = "debug-tools")]
 pub mod debug {
     use std::path::{Path, PathBuf};
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
+    use crate::LogicalTime;
 
     use regex::Regex;
     use rgb::RGB8;
@@ -814,7 +835,7 @@ pub mod debug {
         let data: SnapshotData = serde_json::from_str(&contents)
             .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
         let elapsed = Duration::from_secs_f32(data.world_time_seconds.max(0.0));
-        let mut game = Game::from_snapshot(data, Instant::now());
+        let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
         game.draw_headless_at_duration_from_start(elapsed);
         Ok(screen_text(&game))
     }
@@ -832,6 +853,159 @@ pub mod debug {
     /// Load a snapshot directory into a live `Game` (resumes realtime effects).
     pub fn load_snapshot_dir(dir: &Path) -> Result<Game, String> {
         load_snapshot_game(dir)
+    }
+
+    /// Portal-recursion trace for the loaded snapshot's player (roadmap W.C).
+    pub fn fov_trace_report(dir: &Path) -> Result<String, String> {
+        let game = load_snapshot_game(dir)?;
+        let (_fov, trace) = game.player_field_of_view_traced();
+        Ok(trace.to_tree_string())
+    }
+
+    /// The same trace as JSON.
+    pub fn fov_trace_json(dir: &Path) -> Result<String, String> {
+        let game = load_snapshot_game(dir)?;
+        let (_fov, trace) = game.player_field_of_view_traced();
+        Ok(trace.to_json())
+    }
+
+    /// Explain a screen-buffer cell of a loaded snapshot (roadmap W.B).
+    pub fn explain_cell(dir: &Path, x: usize, y: usize) -> Result<String, String> {
+        let path = dir.join("game_state.json");
+        let contents = std::fs::read_to_string(&path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+        let data: SnapshotData = serde_json::from_str(&contents)
+            .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
+        let elapsed = Duration::from_secs_f32(data.world_time_seconds.max(0.0));
+        let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
+        game.draw_headless_at_duration_from_start(elapsed);
+        Ok(game.explain_screen_cell(x, y))
+    }
+
+    /// FOV self-consistency violations for the loaded snapshot's player
+    /// (roadmap W.D). Empty output means no violations.
+    pub fn fov_invariants_report(dir: &Path) -> Result<String, String> {
+        let game = load_snapshot_game(dir)?;
+        let violations = game.fov_invariant_violations();
+        if violations.is_empty() {
+            return Ok("no FOV visibility-consistency violations\n".to_string());
+        }
+        let mut out = format!("{} FOV visibility-consistency violations:\n", violations.len());
+        for violation in &violations {
+            out.push_str(&format!("  {violation}\n"));
+        }
+        Ok(out)
+    }
+
+    /// `true` if the headless render puts an `OUT_OF_SIGHT`-tinted (red-on-
+    /// black, g=b=0) partial at buffer square `(sx, sy)`.
+    fn artifact_present_at(game: &Game, sx: usize, sy: usize) -> bool {
+        let screen = &game.graphics.screen;
+        let x = sx * 2;
+        if x >= screen.terminal_width as usize || sy >= screen.terminal_height as usize {
+            return false;
+        }
+        let bg = screen.screen_buffer[x][sy].bg_color;
+        bg.r > 0 && bg.g == 0 && bg.b == 0
+    }
+
+    fn render_value_at_captured_time(
+        value: &serde_json::Value,
+    ) -> Result<Game, String> {
+        let data: SnapshotData = serde_json::from_value(value.clone())
+            .map_err(|error| format!("invalid snapshot value: {error}"))?;
+        let elapsed = Duration::from_secs_f32(data.world_time_seconds.max(0.0));
+        let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
+        game.draw_headless_at_duration_from_start(elapsed);
+        Ok(game)
+    }
+
+    /// Greedily shrink a snapshot's entity collections while preserving the
+    /// `OUT_OF_SIGHT` partial at `(sx, sy)` (roadmap W.E). Portals are left
+    /// intact (they are the bug's cause); everything else is removed one item
+    /// at a time, repeatedly, until no further removal keeps the artifact.
+    /// Returns the minimized JSON and its path. `CAP` bounds renders so the
+    /// tool stays usable on large maps.
+    pub fn minimize_snapshot(
+        dir: &Path,
+        sx: usize,
+        sy: usize,
+        out_path: &Path,
+    ) -> Result<String, String> {
+        const CAP: usize = 4000;
+        const COLLECTIONS: &[&str] = &[
+            "pieces",
+            "blocks",
+            "upgrades",
+            "conveyor_belts",
+            "floor_push_arrows",
+            "widgets",
+            "incubating_pawns",
+            "death_cubes",
+            "floating_hunter_drones",
+        ];
+
+        let path = dir.join("game_state.json");
+        let contents = std::fs::read_to_string(&path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+        let mut value: serde_json::Value = serde_json::from_str(&contents)
+            .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
+
+        let holds = |candidate: &serde_json::Value| -> bool {
+            render_value_at_captured_time(candidate)
+                .map(|game| artifact_present_at(&game, sx, sy))
+                .unwrap_or(false)
+        };
+        let mut renders = std::cell::Cell::new(0usize);
+        let holds_counted = |candidate: &serde_json::Value| {
+            renders.set(renders.get() + 1);
+            if renders.get() > CAP {
+                return false;
+            }
+            holds(candidate)
+        };
+
+        if !holds_counted(&value) {
+            return Err(format!(
+                "no OUT_OF_SIGHT partial at square ({sx},{sy}) in the original snapshot"
+            ));
+        }
+
+        for key in COLLECTIONS {
+            loop {
+                let len = value
+                    .get(*key)
+                    .and_then(|array| array.as_array())
+                    .map_or(0, Vec::len);
+                let mut removed_any = false;
+                for index in (0..len).rev() {
+                    if renders.get() > CAP {
+                        break;
+                    }
+                    let mut candidate = value.clone();
+                    if let Some(array) = candidate.get_mut(*key).and_then(|v| v.as_array_mut()) {
+                        array.remove(index);
+                    }
+                    if holds_counted(&candidate) {
+                        value = candidate;
+                        removed_any = true;
+                    }
+                }
+                if !removed_any {
+                    break;
+                }
+            }
+        }
+
+        let minimized = serde_json::to_string_pretty(&value)
+            .map_err(|error| format!("Could not serialize minimized snapshot: {error}"))?;
+        std::fs::write(out_path, &minimized)
+            .map_err(|error| format!("Could not write {}: {error}", out_path.display()))?;
+        Ok(format!(
+            "minimized in {} renders (cap {CAP}); wrote {}",
+            renders.get(),
+            out_path.display()
+        ))
     }
 
     /// One terminal cell as encoded in `screen.txt`: character + fg/bg RGB.
@@ -1077,6 +1251,42 @@ pub mod debug {
             std::fs::remove_dir_all(&dir).ok();
 
             assert_eq!(first, second);
+        }
+
+        #[test]
+        fn explain_screen_cell_reports_fov_depth_and_final_glyph() {
+            let mut game = set_up_game_with_player();
+            game.set_up_simple_portal_map();
+            game.draw_headless_at_duration_from_start(Duration::ZERO);
+
+            // Explain the player's own buffer square.
+            let left_cell = game
+                .graphics()
+                .screen
+                .world_square_to_left_screen_buffer_character_square(game.player_square());
+            let report =
+                game.explain_screen_cell((left_cell.x / 2) as usize, left_cell.y as usize);
+
+            assert!(report.contains("final:"), "{report}");
+            assert!(report.contains("depth 0"), "{report}");
+            assert!(report.contains("fov visibilities:"), "{report}");
+        }
+
+        #[test]
+        fn minimize_reports_error_when_no_artifact() {
+            let game = set_up_game_with_player();
+            let json = game_state_json(&game, Some("test"));
+            let dir = std::env::temp_dir().join(format!(
+                "widgetmancer_minimize_none_{}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&dir).expect("create temp dir");
+            std::fs::write(dir.join("game_state.json"), json).expect("write snapshot");
+
+            let result = minimize_snapshot(&dir, 0, 0, &dir.join("min.json"));
+            std::fs::remove_dir_all(&dir).ok();
+
+            assert!(result.is_err(), "expected no-artifact error, got {result:?}");
         }
     }
 }

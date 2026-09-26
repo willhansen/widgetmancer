@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use euclid::Angle;
 use num::clamp;
+use rand::Rng;
 
 use crate::piece::PieceType::*;
 use crate::*;
@@ -42,9 +43,10 @@ impl Game {
         let chance_to_fire_this_tick = clamp(CUBES_PER_SECOND * delta.as_secs_f32(), 0.0, 1.0);
 
         turret_squares.iter().for_each(|square| {
-            let should_fire = random_event(chance_to_fire_this_tick);
+            let should_fire = self.rng.gen_range(0.0..=1.0) < chance_to_fire_this_tick;
             if should_fire {
-                let direction = random_unit_vector();
+                let direction =
+                    unit_vector_from_angle(Angle::degrees(self.rng.gen_range(0.0..360.0)));
                 self.place_linear_death_cube(square.to_f32(), (direction * CUBE_SPEED).cast_unit());
             }
         });

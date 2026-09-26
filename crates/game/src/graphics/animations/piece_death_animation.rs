@@ -3,32 +3,36 @@ use euclid::vec2;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use std::f32::consts::PI;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct PieceDeathAnimation {
     square: WorldSquare,
-    start_time: Instant,
+    start_time: LogicalTime,
 }
 
 impl PieceDeathAnimation {
     pub fn new(square: WorldSquare) -> PieceDeathAnimation {
         PieceDeathAnimation {
             square,
-            start_time: Instant::now(),
+            start_time: LogicalTime::ZERO,
         }
     }
 }
 
 impl Animation for PieceDeathAnimation {
-    fn start_time(&self) -> Instant {
+    fn start_time(&self) -> LogicalTime {
         self.start_time
+    }
+    fn set_start_time(&mut self, time: LogicalTime) {
+        self.start_time = time;
     }
     fn duration(&self) -> Duration {
         Duration::from_secs_f32(5.0)
     }
 
-    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+    fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph> {
         assert!(!self.finished_at_time(time));
 
         // rather arbitrary

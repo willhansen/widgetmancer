@@ -8,6 +8,9 @@
 //!   diff   <dir> [ref]    compare render against ref (default <dir>/screen.txt)
 //!   bless  <dir>          overwrite <dir>/screen.txt with the render
 //!   cells  <dir>          print the parsed reference grid as plain characters
+//!   fov-trace <dir>       print the player's portal-recursion FOV trace
+//!   fov-trace-json <dir>  the same trace as JSON
+//!   explain <dir> X Y     explain how screen cell (X,Y) got its glyph
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -78,6 +81,76 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        "fov-trace" => match debug::fov_trace_report(&dir) {
+            Ok(report) => {
+                print!("{report}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        "fov-trace-json" => match debug::fov_trace_json(&dir) {
+            Ok(json) => {
+                println!("{json}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        "minimize" => {
+            let (Some(x), Some(y)) = (args.get(2), args.get(3)) else {
+                return usage();
+            };
+            let out_path = args
+                .get(4)
+                .map(PathBuf::from)
+                .unwrap_or_else(|| dir.join("minimized.json"));
+            match (x.parse::<usize>(), y.parse::<usize>()) {
+                (Ok(x), Ok(y)) => match debug::minimize_snapshot(&dir, x, y, &out_path) {
+                    Ok(report) => {
+                        println!("{report}");
+                        ExitCode::SUCCESS
+                    }
+                    Err(error) => {
+                        eprintln!("error: {error}");
+                        ExitCode::FAILURE
+                    }
+                },
+                _ => usage(),
+            }
+        }
+        "invariants" => match debug::fov_invariants_report(&dir) {
+            Ok(report) => {
+                print!("{report}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        "explain" => {
+            let (Some(x), Some(y)) = (args.get(2), args.get(3)) else {
+                return usage();
+            };
+            match (x.parse::<usize>(), y.parse::<usize>()) {
+                (Ok(x), Ok(y)) => match debug::explain_cell(&dir, x, y) {
+                    Ok(report) => {
+                        print!("{report}");
+                        ExitCode::SUCCESS
+                    }
+                    Err(error) => {
+                        eprintln!("error: {error}");
+                        ExitCode::FAILURE
+                    }
+                },
+                _ => usage(),
+            }
+        }
         _ => usage(),
     }
 }

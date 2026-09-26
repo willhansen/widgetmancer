@@ -828,6 +828,166 @@ impl Iterator for OctantFOVSquareSequenceIter {
     }
 }
 
+/// A square whose visibility disagrees across the portal-recursion views that
+/// reach it (roadmap W.D).
+#[derive(Debug, Clone)]
+pub struct FovInvariantViolation {
+    pub relative_square: WorldStep,
+    pub absolute_square: WorldSquare,
+    pub detail: String,
+}
+
+impl std::fmt::Display for FovInvariantViolation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "rel({},{}) abs({},{}): {}",
+            self.relative_square.x,
+            self.relative_square.y,
+            self.absolute_square.x,
+            self.absolute_square.y,
+            self.detail
+        )
+    }
+}
+
+/// Check FOV self-consistency (roadmap W.D). The invariant that catches the
+/// portal-depth partial-visibility artifact: a given absolute square must not
+/// be *fully* visible in one portal view (depth) while being only *partially*
+/// visible in another — visibility is a property of the square and the
+/// viewpoint, not of the path the portal recursion took to reach it.
+pub fn fov_visibility_consistency_violations(
+    fov: &FieldOfViewResult,
+) -> Vec<FovInvariantViolation> {
+    let [lower, upper] = fov.relative_limits_lower_left_and_upper_right();
+    // Group *across* all relative squares: the bug is that the same absolute
+    // square is fully visible via one relative square/depth and partially via
+    // another.
+    let mut by_absolute: HashMap<WorldSquare, (bool, bool, Vec<WorldStep>)> = HashMap::new();
+    for x in lower[0]..=upper[0] {
+        for y in lower[1]..=upper[1] {
+            let relative_square = WorldStep::new(x, y);
+            for visibility in fov.visibilities_of_relative_square(relative_square) {
+                let entry = by_absolute
+                    .entry(visibility.absolute_square())
+                    .or_insert((false, false, Vec::new()));
+                if visibility.square_visibility_in_absolute_frame().is_fully_visible() {
+                    entry.0 = true;
+                } else {
+                    entry.1 = true;
+                    entry.2.push(relative_square);
+                }
+            }
+        }
+    }
+
+    let mut violations = Vec::new();
+    for (absolute_square, (has_full, has_partial, partial_relatives)) in by_absolute {
+        if has_full && has_partial {
+            for relative_square in partial_relatives {
+                violations.push(FovInvariantViolation {
+                    relative_square,
+                    absolute_square,
+                    detail: "square is fully visible via one portal depth/relative square but partially visible via another".to_string(),
+                });
+            }
+        }
+    }
+    violations
+}
+/// One portal-recursion step recorded by [`FovTrace`]. Captures the values
+/// that are otherwise only local to the recursion, so an artifact can be
+/// traced across depths (roadmap W.C).
+#[derive(Debug, Clone)]
+pub struct FovTraceNode {
+    pub depth: u32,
+    pub relative_square: WorldStep,
+    pub absolute_square: WorldSquare,
+    pub octant: Octant,
+    pub view_arc: AngleInterval,
+    pub visible_arc_of_portal: Option<AngleInterval>,
+    pub transformed_visible_arc_of_portal: Option<AngleInterval>,
+    pub transformed_center_square: Option<WorldSquare>,
+    pub transformed_center_direction: Option<OrthogonalWorldStep>,
+    pub rotation_quarter_turns: i32,
+}
+
+/// Flat, depth-tagged record of a portal-recursive FOV computation. Nodes are
+/// pushed as portals are crossed; `depth` lets callers reconstruct the tree.
+#[derive(Debug, Clone, Default)]
+pub struct FovTrace {
+    pub nodes: Vec<FovTraceNode>,
+}
+
+impl FovTrace {
+    /// Indented, one line per node. Arc widths are shown in degrees.
+    pub fn to_tree_string(&self) -> String {
+        let mut out = String::new();
+        for node in &self.nodes {
+            let indent = "  ".repeat(node.depth as usize);
+            out.push_str(&format!(
+                "{indent}depth {} rel({},{}) abs({},{}) octant {:?} view_arc [{:.3}..{:.3}]deg",
+                node.depth,
+                node.relative_square.x,
+                node.relative_square.y,
+                node.absolute_square.x,
+                node.absolute_square.y,
+                node.octant,
+                node.view_arc.clockwise_end().to_degrees(),
+                node.view_arc.anticlockwise_end().to_degrees(),
+            ));
+            if let Some(arc) = node.transformed_visible_arc_of_portal {
+                out.push_str(&format!(
+                    " via_portal_arc [{:.3}..{:.3}]deg",
+                    arc.clockwise_end().to_degrees(),
+                    arc.anticlockwise_end().to_degrees(),
+                ));
+            }
+            if let Some(center) = node.transformed_center_square {
+                out.push_str(&format!(
+                    " center({},{}) rot {}",
+                    center.x, center.y, node.rotation_quarter_turns
+                ));
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Minimal JSON array of nodes, for `snapshot_tool`/external tooling.
+    pub fn to_json(&self) -> String {
+        let nodes: Vec<String> = self
+            .nodes
+            .iter()
+            .map(|node| {
+                let opt_arc = |arc: Option<AngleInterval>| match arc {
+                    Some(arc) => format!(
+                        "[{}, {}]",
+                        arc.clockwise_end().to_degrees(),
+                        arc.anticlockwise_end().to_degrees()
+                    ),
+                    None => "null".to_string(),
+                };
+                format!(
+                    "{{\"depth\": {}, \"relative\": [{}, {}], \"absolute\": [{}, {}], \"octant\": {:?}, \"rotation\": {}, \"view_arc\": [{}, {}], \"visible_arc_of_portal\": {}, \"transformed_visible_arc_of_portal\": {}}}",
+                    node.depth,
+                    node.relative_square.x,
+                    node.relative_square.y,
+                    node.absolute_square.x,
+                    node.absolute_square.y,
+                    node.octant,
+                    node.rotation_quarter_turns,
+                    node.view_arc.clockwise_end().to_degrees(),
+                    node.view_arc.anticlockwise_end().to_degrees(),
+                    opt_arc(node.visible_arc_of_portal),
+                    opt_arc(node.transformed_visible_arc_of_portal),
+                )
+            })
+            .collect();
+        format!("[{}]", nodes.join(", "))
+    }
+}
+
 pub fn field_of_view_within_arc_in_single_octant(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
@@ -838,6 +998,8 @@ pub fn field_of_view_within_arc_in_single_octant(
     octant: Octant,
     view_arc: AngleInterval,
     starting_step_in_fov_sequence: u32,
+    depth: u32,
+    mut trace: Option<&mut FovTrace>,
 ) -> FieldOfViewResult {
     let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(center_square, key_direction);
 
@@ -947,6 +1109,26 @@ pub fn field_of_view_within_arc_in_single_octant(
                         center_offset,
                         transform.rotation().quarter_turns(),
                     );
+                    if let Some(trace) = trace.as_deref_mut() {
+                        // One node per portal crossing, describing the sub-view
+                        // entered: `depth` is the child level, `view_arc` is the
+                        // child's incoming (transformed) arc, and
+                        // `visible_arc_of_portal` is the arc in the parent frame.
+                        trace.nodes.push(FovTraceNode {
+                            depth: depth + 1,
+                            relative_square,
+                            absolute_square,
+                            octant,
+                            view_arc: transformed_visible_arc_of_portal,
+                            visible_arc_of_portal: Some(visible_arc_of_portal),
+                            transformed_visible_arc_of_portal: Some(
+                                transformed_visible_arc_of_portal,
+                            ),
+                            transformed_center_square: Some(transformed_center.square()),
+                            transformed_center_direction: Some(transformed_center.direction()),
+                            rotation_quarter_turns: transform.rotation().quarter_turns(),
+                        });
+                    }
                     let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
@@ -957,6 +1139,8 @@ pub fn field_of_view_within_arc_in_single_octant(
                         transform.transform_octant(octant),
                         transformed_visible_arc_of_portal,
                         next_step_in_fov_sequence,
+                        depth + 1,
+                        trace.as_deref_mut(),
                     );
                     fov_result.transformed_sub_fovs.push(sub_arc_fov);
                 },
@@ -1004,6 +1188,8 @@ pub fn field_of_view_within_arc_in_single_octant(
                         octant,
                         new_sub_arc,
                         next_step_in_fov_sequence,
+                        depth,
+                        trace.as_deref_mut(),
                     );
                     fov_result = fov_result.combined_with(&sub_arc_fov);
                 });
@@ -1021,6 +1207,26 @@ pub fn single_octant_field_of_view(
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
 ) -> FieldOfViewResult {
+    single_octant_field_of_view_traced(
+        center_square,
+        center_offset,
+        radius,
+        octant,
+        sight_blockers,
+        portal_geometry,
+        None,
+    )
+}
+
+pub fn single_octant_field_of_view_traced(
+    center_square: WorldSquare,
+    center_offset: WorldMove,
+    radius: u32,
+    octant: Octant,
+    sight_blockers: &HashSet<WorldSquare>,
+    portal_geometry: &PortalGeometry,
+    mut trace: Option<&mut FovTrace>,
+) -> FieldOfViewResult {
     assert!(center_offset.x.abs() <= 0.5);
     assert!(center_offset.y.abs() <= 0.5);
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
@@ -1035,6 +1241,8 @@ pub fn single_octant_field_of_view(
         octant,
         AngleInterval::from_octant(octant),
         0,
+        0,
+        trace.as_deref_mut(),
     );
     fov_result.add_fully_visible_square(STEP_ZERO);
     fov_result
@@ -1053,11 +1261,44 @@ pub fn portal_aware_field_of_view_from_square(
     )
 }
 
+pub fn portal_aware_field_of_view_from_square_traced(
+    center_square: WorldSquare,
+    radius: u32,
+    sight_blockers: &SquareSet,
+    portal_geometry: &PortalGeometry,
+) -> (FieldOfViewResult, FovTrace) {
+    let mut trace = FovTrace::default();
+    let fov = portal_aware_field_of_view_from_point_traced(
+        center_square.to_f32(),
+        radius,
+        sight_blockers,
+        portal_geometry,
+        Some(&mut trace),
+    );
+    (fov, trace)
+}
+
 pub fn portal_aware_field_of_view_from_point(
     center_point: WorldPoint,
     radius: u32,
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
+) -> FieldOfViewResult {
+    portal_aware_field_of_view_from_point_traced(
+        center_point,
+        radius,
+        sight_blockers,
+        portal_geometry,
+        None,
+    )
+}
+
+fn portal_aware_field_of_view_from_point_traced(
+    center_point: WorldPoint,
+    radius: u32,
+    sight_blockers: &SquareSet,
+    portal_geometry: &PortalGeometry,
+    mut trace: Option<&mut FovTrace>,
 ) -> FieldOfViewResult {
     // Split into square and offset to avoid rounding issues with all the rotations the center
     // point is going to go through.  Don't want incosistencies if a rotation causes just enough
@@ -1071,13 +1312,14 @@ pub fn portal_aware_field_of_view_from_point(
         .fold(
             FieldOfViewResult::new_empty_fov_at_square(center_square),
             |fov_result_accumulator: FieldOfViewResult, octant_number: i32| {
-                let new_fov_result = single_octant_field_of_view(
+                let new_fov_result = single_octant_field_of_view_traced(
                     center_square,
                     center_offset,
                     radius,
                     Octant::new(octant_number),
                     sight_blockers,
                     portal_geometry,
+                    trace.as_deref_mut(),
                 );
                 let combined_fov = fov_result_accumulator.combined_with(&new_fov_result);
                 combined_fov
@@ -1799,6 +2041,8 @@ mod tests {
             Octant::new(0),
             view_arc,
             0,
+            0,
+            None,
         );
 
         let should_be_visible_relative_squares: StepSet =
@@ -1882,6 +2126,56 @@ mod tests {
             fov_result.transformed_sub_fovs[0].center_square,
             portal_exit.square() + STEP_UP * 2
         );
+    }
+
+    #[test]
+    fn test_fov_trace_records_portal_depth_and_arcs() {        let mut portal_geometry = PortalGeometry::default();
+        let center = point2(-15, 50);
+        let portal_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+            center + STEP_RIGHT,
+            STEP_RIGHT.into(),
+        );
+        let portal_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+            center + STEP_DOWN_LEFT * 15,
+            STEP_DOWN.into(),
+        );
+        portal_geometry.create_portal(portal_entrance, portal_exit);
+
+        let mut trace = FovTrace::default();
+        let _ = single_octant_field_of_view_traced(
+            center,
+            Default::default(),
+            3,
+            Octant::new(0),
+            &Default::default(),
+            &portal_geometry,
+            Some(&mut trace),
+        );
+
+        assert!(!trace.nodes.is_empty());
+        let depth1 = trace
+            .nodes
+            .iter()
+            .find(|node| node.depth == 1)
+            .expect("a depth-1 portal crossing");
+        // The child arc is a narrowed sub-arc of the 45-degree starting octant.
+        assert!(depth1.view_arc.width().radians > 0.0);
+        assert!(depth1.view_arc.width().radians <= std::f32::consts::FRAC_PI_4);
+        assert!(depth1.transformed_visible_arc_of_portal.is_some());
+        assert!(depth1.transformed_center_square.is_some());
+        assert!(!trace.to_tree_string().is_empty());
+        assert!(trace.to_json().starts_with('['));
+    }
+
+    #[test]
+    fn test_fov_consistency_invariant_holds_without_portals() {
+        let fov = portal_aware_field_of_view_from_square(
+            point2(0, 0),
+            10,
+            &Default::default(),
+            &PortalGeometry::default(),
+        );
+        assert!(fov_visibility_consistency_violations(&fov).is_empty());
     }
 
     #[test]

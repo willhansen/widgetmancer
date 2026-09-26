@@ -34,9 +34,12 @@ pub mod fov_stuff;
 pub mod game;
 pub mod graphics;
 mod inputmap;
+pub mod logical_time;
 pub mod piece;
 pub mod portal_geometry;
 pub mod utils_for_tests;
+
+pub use logical_time::LogicalTime;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
@@ -93,7 +96,7 @@ pub fn do_everything(map_name: Option<String>, load_path: Option<PathBuf>) {
             }
         },
         None => {
-            let mut game = Game::new(width, height, Instant::now());
+            let mut game = Game::new(width, height, LogicalTime::ZERO);
             game.place_player(point2(width as i32 / 4, height as i32 / 2));
             set_up_map_by_name(&mut game, map_name.as_deref());
             game
@@ -137,21 +140,22 @@ pub fn do_everything(map_name: Option<String>, load_path: Option<PathBuf>) {
     // game.set_up_vs_weak_with_pillars_and_turret_and_upgrades();
     //game.set_up_vs_arrows();
 
-    let mut prev_tick_start_time = Instant::now();
+    // The one place real time enters the simulation. Everything downstream
+    // consumes `LogicalTime` derived from this epoch (roadmap W.A).
+    let epoch = Instant::now();
+    let mut prev_logical_time = LogicalTime::ZERO;
     let mut input_history: Vec<InputRecord> = Vec::new();
     let mut snapshot_requested = false;
     while game.running() {
-        let tick_start_time = Instant::now();
-        let delta = tick_start_time - prev_tick_start_time;
-        prev_tick_start_time = tick_start_time;
-        //let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
-        //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
+        let logical_now = LogicalTime::from_duration(epoch.elapsed());
+        let delta = logical_now.saturating_duration_since(prev_logical_time);
+        prev_logical_time = logical_now;
+        // Stamp animations spawned while handling this iteration's input.
+        game.borrow_graphics_mut().set_current_time(logical_now);
 
         while let Ok((event_time, event)) = event_receiver.try_recv() {
             input_history.push(InputRecord {
-                millis_from_start: event_time
-                    .duration_since(game.graphics().start_time())
-                    .as_millis(),
+                millis_from_start: event_time.duration_since(epoch).as_millis(),
                 event: event.clone(),
             });
             if event == Event::Key(SNAPSHOT_KEY) {
@@ -163,7 +167,7 @@ pub fn do_everything(map_name: Option<String>, load_path: Option<PathBuf>) {
             game.tick_game_logic();
         }
         game.tick_realtime_effects(delta);
-        game.draw(&mut wrapped_terminal, Instant::now());
+        game.draw(&mut wrapped_terminal, logical_now);
 
         // Dump after drawing so the snapshot captures the frame the player saw.
         if snapshot_requested {

@@ -26,7 +26,7 @@
 
     #[test]
     fn test_try_set_player_on_block_is_fail() {
-        let mut game = Game::new(20, 10, Instant::now());
+        let mut game = Game::new(20, 10, LogicalTime::ZERO);
         game.place_player(point2(5, 5));
         game.place_block(point2(3, 3));
         assert!(game.try_set_player_position(point2(3, 3)).is_err());
@@ -1669,7 +1669,7 @@
             game.place_double_sided_two_way_portal(entrance, exit);
         });
 
-        game.populate_draw_buffer(Instant::now());
+        game.populate_draw_buffer(LogicalTime::ZERO);
 
         let rel_square = STEP_RIGHT * 3 + STEP_UP;
         let player_fov = game.player_field_of_view();
@@ -2582,7 +2582,7 @@
         // (see do_everything): a 48x26-square board with the player at
         // (24, 13). The racetrack needs squares up to player.x + 22 (the
         // L portal's entrance wall) and player.y ± 9.
-        let mut game = Game::new(96, 26, Instant::now());
+        let mut game = Game::new(96, 26, LogicalTime::ZERO);
         game.place_player(point2(24, 13));
         game.set_up_portal_cube_racetrack_map();
         game
@@ -2629,7 +2629,7 @@
     #[test]
     fn test_racetrack_map_survives_first_tick_nanosecond_delta() {
         // The real game loop's first delta is the ~nanoseconds between the
-        // prev-tick Instant::now() and the first loop iteration — cube
+        // prev-tick LogicalTime::ZERO and the first loop iteration — cube
         // movement underflows below f32 resolution, which used to panic in
         // WorldLine::new while testing the shuttle cube's portal face.
         let mut game = set_up_racetrack_game();
@@ -2767,7 +2767,7 @@
     fn set_up_hallways_game() -> Game {
         // Same 96x26-character clamp the real game uses for racetrack; the
         // hallways map is compact but the diagram binary reuses this size.
-        let mut game = Game::new(96, 26, Instant::now());
+        let mut game = Game::new(96, 26, LogicalTime::ZERO);
         game.place_player(point2(24, 13));
         game.set_up_portal_pair_hallways_map();
         game

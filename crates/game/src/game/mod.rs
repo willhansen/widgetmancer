@@ -1,17 +1,20 @@
 use std::collections::HashMap;
 use std::io::Write;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use euclid::*;
 use getset::CopyGetters;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use rgb::RGB8;
 use strum::IntoEnumIterator;
 
 use crate::fov_stuff::{
-    portal_aware_field_of_view_from_square, FieldOfViewResult,
+    portal_aware_field_of_view_from_square, portal_aware_field_of_view_from_square_traced,
+    FieldOfViewResult, FovTrace,
 };
 use crate::graphics::drawable::TextDrawable;
 use crate::graphics::*;
@@ -108,12 +111,20 @@ pub struct Game {
     portal_geometry: PortalGeometry,
     floating_hunter_drones: Vec<FloatingHunterDrone>,
     next_floating_entity_id: u64,
-    world_start_time: Instant,
-    world_time: Instant,
+    /// Deterministic source for gameplay randomness (turret fire, shotgun
+    /// spread, random subordinate spawns). Seeded at construction and
+    /// serialized in snapshots so a loaded game resumes the same stream.
+    rng: ChaCha8Rng,
+    world_start_time: LogicalTime,
+    world_time: LogicalTime,
 }
 
+/// Fixed seed for the gameplay RNG. Bump only with a snapshot-format note;
+/// changing it changes replay output.
+pub const GAME_RNG_SEED: u64 = 5;
+
 impl Game {
-    pub fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Game {
+    pub fn new(terminal_width: u16, terminal_height: u16, start_time: LogicalTime) -> Game {
         let board_size = BoardSize::new(terminal_width as u32 / 2, terminal_height as u32);
         let mut game = Game {
             board_size,
@@ -136,6 +147,7 @@ impl Game {
             portal_geometry: PortalGeometry::default(),
             floating_hunter_drones: vec![],
             next_floating_entity_id: 0,
+            rng: ChaCha8Rng::seed_from_u64(GAME_RNG_SEED),
             world_start_time: start_time,
             world_time: start_time,
         };
@@ -492,15 +504,17 @@ impl Game {
         self.draw(&mut None, draw_time);
     }
     pub fn draw_headless_now(&mut self) {
-        self.draw(&mut None, Instant::now());
+        let now = self.world_time;
+        self.draw(&mut None, now);
     }
 
-    pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
+    pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: LogicalTime) {
+        self.graphics.set_current_time(time);
         self.populate_draw_buffer(time);
         self.update_screen_from_draw_buffer(&mut writer);
     }
 
-    pub fn populate_draw_buffer(&mut self, time: Instant) {
+    pub fn populate_draw_buffer(&mut self, time: LogicalTime) {
         self.graphics.clear_draw_buffer();
         self.graphics.draw_static_board(self.board_size);
         self.graphics.draw_board_animation(time);
@@ -590,7 +604,13 @@ impl Game {
                 .load_screen_buffer_from_absolute_positions_in_draw_buffer();
         }
 
+        self.graphics.draw_debug_overlays();
         self.graphics.display(&mut writer);
+    }
+
+    /// Toggle the live debug overlays (roadmap W.G).
+    pub fn set_debug_overlay(&mut self, flags: DebugOverlayFlags) {
+        self.graphics.debug_overlay = flags;
     }
 
     fn is_player_at(&self, square: WorldSquare) -> bool {
@@ -1376,6 +1396,98 @@ impl Game {
             &self.blocks.blocks,
             &self.portal_geometry,
         )
+    }
+
+    /// The player's FOV plus the flat portal-recursion trace (roadmap W.C).
+    #[cfg(feature = "debug-tools")]
+    pub fn player_field_of_view_traced(&self) -> (FieldOfViewResult, FovTrace) {
+        let start_square = self.player_square();
+        portal_aware_field_of_view_from_square_traced(
+            start_square,
+            PLAYER_SIGHT_RADIUS,
+            &self.blocks.blocks,
+            &self.portal_geometry,
+        )
+    }
+
+    /// FOV self-consistency violations for the current player view (roadmap
+    /// W.D). Empty means no square is fully visible in one portal depth while
+    /// partially visible in another.
+    #[cfg(feature = "debug-tools")]
+    pub fn fov_invariant_violations(&self) -> Vec<crate::fov_stuff::FovInvariantViolation> {
+        let (fov, _trace) = self.player_field_of_view_traced();
+        crate::fov_stuff::fov_visibility_consistency_violations(&fov)
+    }
+
+    /// Explain how a screen-buffer square got its glyph (roadmap W.B).    ///
+    /// `(square_x, y)` uses the same buffer coordinates as the screen's square
+    /// addressing (one world square = two character columns): the left glyph
+    /// column is `square_x * 2`. Reports the final color, the world square it
+    /// maps to, and every FOV visibility (absolute square, portal depth,
+    /// rotation, partial mask) that could have contributed, plus the
+    /// draw-buffer drawable at each.
+    #[cfg(feature = "debug-tools")]
+    pub fn explain_screen_cell(&self, square_x: usize, y: usize) -> String {
+        let screen = &self.graphics.screen;
+        let x = square_x * 2;
+        if x >= screen.terminal_width as usize || y >= screen.terminal_height as usize {
+            return format!(
+                "cell (square {square_x}, row {y}) is out of bounds (terminal {}x{})",
+                screen.terminal_width, screen.terminal_height
+            );
+        }
+
+        let glyph = screen.screen_buffer[x][y];
+        let buffer_square = ScreenBufferCharacterSquare::new(x as i32, y as i32);
+        let world_square = screen.screen_buffer_character_square_to_world_square(buffer_square);
+
+        let (fov, _trace) = self.player_field_of_view_traced();
+        let relative_square = world_square - fov.root_square();
+        let visibilities = fov.visibilities_of_relative_square(relative_square);
+
+        let mut out = String::new();
+        out.push_str(&format!(
+            "cell (square {square_x}, row {y}) left_col {x} world({},{}) rel({},{}) fov_center({},{}):\n",
+            world_square.x,
+            world_square.y,
+            relative_square.x,
+            relative_square.y,
+            fov.root_square().x,
+            fov.root_square().y,
+        ));
+        out.push_str(&format!(
+            "  final: {:?} fg({},{},{}) bg({},{},{})\n",
+            glyph.character,
+            glyph.fg_color.r,
+            glyph.fg_color.g,
+            glyph.fg_color.b,
+            glyph.bg_color.r,
+            glyph.bg_color.g,
+            glyph.bg_color.b,
+        ));
+        out.push_str(&format!("  fov visibilities: {}\n", visibilities.len()));
+        for visibility in &visibilities {
+            let absolute = visibility.absolute_square();
+            let draw_buffer_drawable = self
+                .graphics
+                .get_drawable_for_square_from_draw_buffer(absolute)
+                .map(|drawable| format!("{drawable:?}"))
+                .unwrap_or_else(|| "<none>".to_string());
+            out.push_str(&format!(
+                "    depth {} abs({},{}) rot {} abs_vis {:?} rel_vis {:?}\n",
+                visibility.portal_depth(),
+                absolute.x,
+                absolute.y,
+                visibility.portal_rotation_from_relative_to_absolute().quarter_turns(),
+                visibility.square_visibility_in_absolute_frame().as_string(),
+                visibility.square_visibility_in_relative_frame().as_string(),
+            ));
+            out.push_str(&format!("      draw_buffer: {draw_buffer_drawable}\n"));
+        }
+        if visibilities.is_empty() {
+            out.push_str("    (no FOV visibility maps to this cell)\n");
+        }
+        out
     }
 
     pub fn get_color_for_faction(&self, faction: Faction) -> RGB8 {

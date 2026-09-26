@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::f32::consts::PI;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 use ::num::ToPrimitive;
 use rand::SeedableRng;
@@ -12,7 +13,7 @@ use crate::graphics::*;
 pub struct BlinkAnimation {
     start_square: WorldSquare,
     end_square: WorldSquare,
-    start_time: Instant,
+    start_time: LogicalTime,
 }
 
 impl BlinkAnimation {
@@ -20,21 +21,24 @@ impl BlinkAnimation {
         BlinkAnimation {
             start_square,
             end_square,
-            start_time: Instant::now(),
+            start_time: LogicalTime::ZERO,
         }
     }
 }
 
 impl Animation for BlinkAnimation {
-    fn start_time(&self) -> Instant {
+    fn start_time(&self) -> LogicalTime {
         self.start_time
+    }
+    fn set_start_time(&mut self, time: LogicalTime) {
+        self.start_time = time;
     }
 
     fn duration(&self) -> Duration {
         Duration::from_secs_f32(1.0)
     }
 
-    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+    fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph> {
         // pretty arbitrary
         let hash = ((self.start_square.x as f32 * PI + self.start_square.y as f32) * 1000.0
             + self.end_square.x as f32 * 4.23746287
@@ -109,7 +113,7 @@ impl Animation for BlinkAnimation {
     /// them (checkerboard, overlays, off-board void) instead of toward black.
     fn double_glyphs_with_transparency_at_time(
         &self,
-        time: Instant,
+        time: LogicalTime,
     ) -> HashMap<WorldSquare, DoubleGlyphWithTransparency> {
         const FADE_OUT_SECONDS: f32 = 0.25;
         let age = time.duration_since(self.start_time);

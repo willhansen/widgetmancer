@@ -441,12 +441,12 @@ impl<U: Copy> Line<f32, U> {
         points
     }
 
-    pub fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> Point2D<f32, U> {
+    pub fn seeded_random_point_on_line<R: rand::Rng>(&self, rng: &mut R) -> Point2D<f32, U> {
         let t = rng.gen_range(0.0..=1.0);
         self.lerp(t)
     }
 
-    pub fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> Point2D<f32, U> {
+    pub fn seeded_random_point_near_line<R: rand::Rng>(&self, rng: &mut R, radius: f32) -> Point2D<f32, U> {
         // TODO: make more uniform
         self.seeded_random_point_on_line(rng) + seeded_rand_radial_offset(rng, radius).cast_unit()
     }
@@ -842,7 +842,7 @@ pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
     is_orthogonal(v) || is_diagonal(v)
 }
 
-pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> default::Vector2D<f32> {
+pub fn seeded_rand_radial_offset<R: rand::Rng>(rng: &mut R, radius: f32) -> default::Vector2D<f32> {
     let mut v = vec2(10.0, 10.0);
     while v.square_length() > 1.0 {
         v.x = rng.gen_range(-1.0..=1.0);
@@ -884,7 +884,7 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
         .unwrap()
 }
 
-pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
+pub fn random_choice<'a, R: rand::Rng, T>(rng: &'a mut R, v: &'a Vec<T>) -> &'a T {
     v.get(rng.gen_range(0..v.len())).unwrap()
 }
 

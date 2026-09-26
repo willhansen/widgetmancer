@@ -52,10 +52,8 @@ impl Game {
                 if square == king_square {
                     continue;
                 }
-                self.place_piece(
-                    Piece::new(Piece::random_subordinate_type(), faction),
-                    square,
-                );
+                let piece_type = Piece::random_subordinate_type(&mut self.rng);
+                self.place_piece(Piece::new(piece_type, faction), square);
             }
         }
     }
@@ -159,7 +157,7 @@ impl Game {
             .collect()
     }
 
-    pub fn random_empty_square(&self, rng: &mut StdRng) -> Result<WorldSquare, ()> {
+    pub fn random_empty_square<R: rand::Rng>(&self, rng: &mut R) -> Result<WorldSquare, ()> {
         let num_attempts = 40;
         for _ in 0..num_attempts {
             let rand_pos = WorldSquare::new(
@@ -173,7 +171,7 @@ impl Game {
         Err(())
     }
 
-    pub fn place_piece_randomly(&mut self, piece: Piece, rng: &mut StdRng) -> WorldSquare {
+    pub fn place_piece_randomly<R: rand::Rng>(&mut self, piece: Piece, rng: &mut R) -> WorldSquare {
         let rand_pos = self
             .random_empty_square(rng)
             .expect("failed to get random square");
@@ -181,7 +179,7 @@ impl Game {
         return rand_pos;
     }
 
-    pub fn place_block_randomly(&mut self, rng: &mut StdRng) {
+    pub fn place_block_randomly<R: rand::Rng>(&mut self, rng: &mut R) {
         let rand_pos = self
             .random_empty_square(rng)
             .expect("failed to get random square");

@@ -1,12 +1,13 @@
 use crate::graphics::*;
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 #[derive(Clone)]
 pub struct StaticBoard {
     board_size: BoardSize,
     floor_color_enum: FloorColorEnum,
-    start_time: Instant,
+    start_time: LogicalTime,
 }
 
 impl StaticBoard {
@@ -14,22 +15,25 @@ impl StaticBoard {
         StaticBoard {
             board_size,
             floor_color_enum,
-            start_time: Instant::now(),
+            start_time: LogicalTime::ZERO,
         }
     }
 }
 
 impl Animation for StaticBoard {
-    fn start_time(&self) -> Instant {
+    fn start_time(&self) -> LogicalTime {
         // Stable per instance. The board render ignores time (duration is zero),
         // so this only needs to stop reporting a fresh wall-clock value per call.
         self.start_time
+    }
+    fn set_start_time(&mut self, time: LogicalTime) {
+        self.start_time = time;
     }
     fn duration(&self) -> Duration {
         Duration::from_secs_f32(0.0)
     }
 
-    fn double_glyphs_at_time(&self, _time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+    fn double_glyphs_at_time(&self, _time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph> {
         let mut glyphs = HashMap::new();
         for x in 0..self.board_size.width {
             for y in 0..self.board_size.height {
@@ -41,7 +45,7 @@ impl Animation for StaticBoard {
         glyphs
     }
 
-    fn finished_at_time(&self, _time: Instant) -> bool {
+    fn finished_at_time(&self, _time: LogicalTime) -> bool {
         false
     }
 }
@@ -54,7 +58,7 @@ mod tests {
     fn static_board_emits_double_glyphs_by_world_square() {
         let floor_color = RGB8::new(1, 2, 3);
         let animation = StaticBoard::new(BoardSize::new(3, 2), FloorColorEnum::Solid(floor_color));
-        let glyphs = animation.double_glyphs_at_time(Instant::now());
+        let glyphs = animation.double_glyphs_at_time(LogicalTime::ZERO);
         let expected_glyph = Glyph::new(' ', BLACK, floor_color);
 
         assert_eq!(glyphs.len(), 6);

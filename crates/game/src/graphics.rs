@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::io::Write;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use crate::LogicalTime;
 
 use euclid::*;
 use rgb::RGB8;
@@ -72,7 +73,11 @@ pub struct Graphics {
     active_animations: Vec<AnimationEnum>,
     board_animation: Option<AnimationEnum>,
     selectors: Vec<SelectorAnimation>,
-    start_time: Instant,
+    start_time: LogicalTime,
+    /// Logical time of the frame currently being built. Animations spawned by
+    /// game logic between frames are stamped with this so their phase is
+    /// deterministic and independent of the wall clock (roadmap W.A).
+    current_time: LogicalTime,
     floor_color_enum: FloorColorEnum,
     pub tint_portals: bool,
     render_portals_with_line_of_sight: bool,
@@ -83,10 +88,22 @@ pub struct Graphics {
     /// `display()` are swept, so despawned entities cannot leak.
     floating_entity_family_memory: HashMap<FloatingEntityId, usize>,
     floating_entities_drawn_this_frame: HashSet<FloatingEntityId>,
+    /// Debug-only render overlays (roadmap W.G). Off by default; harmless when
+    /// off, so no feature gate is needed.
+    pub debug_overlay: DebugOverlayFlags,
+}
+
+/// Toggles for the live debug overlay.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DebugOverlayFlags {
+    /// Mark the screen-center square with a magenta cross.
+    pub screen_center: bool,
+    /// Mark the screen origin (top-left world square) with a magenta corner.
+    pub screen_origin: bool,
 }
 
 impl Graphics {
-    pub fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
+    pub fn new(terminal_width: u16, terminal_height: u16, start_time: LogicalTime) -> Graphics {
         let mut g = Graphics {
             screen: Screen::new(terminal_width, terminal_height),
             draw_buffer: HashMap::default(),
@@ -94,18 +111,26 @@ impl Graphics {
             board_animation: None,
             selectors: vec![],
             start_time,
+            current_time: LogicalTime::ZERO,
             floor_color_enum: FloorColorEnum::Function(Graphics::big_chess_pattern),
             tint_portals: true,
             render_portals_with_line_of_sight: true,
             floating_entity_family_memory: HashMap::new(),
             floating_entities_drawn_this_frame: HashSet::new(),
+            debug_overlay: DebugOverlayFlags::default(),
         };
         g.screen.fill_screen_buffer(BLACK);
         g
     }
 
-    pub fn start_time(&self) -> Instant {
+    pub fn start_time(&self) -> LogicalTime {
         self.start_time
+    }
+
+    /// Set the logical time animations spawned this frame should be stamped
+    /// with. Called by the render path and by the driver before input handling.
+    pub fn set_current_time(&mut self, time: LogicalTime) {
+        self.current_time = time;
     }
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
@@ -395,7 +420,7 @@ impl Graphics {
         &mut self,
         death_cube: &DeathCube,
         portals: &PortalGeometry,
-        time: Instant,
+        time: LogicalTime,
     ) {
         let color = self.technicolor_at_time(time);
         self.draw_floating_square(death_cube.id, death_cube.position(), color, portals);
@@ -433,7 +458,7 @@ impl Graphics {
             .for_each(|(&square, drawable)| self.draw_drawable_to_draw_buffer(square, drawable));
     }
 
-    pub fn technicolor_at_time(&self, time: Instant) -> RGB8 {
+    pub fn technicolor_at_time(&self, time: LogicalTime) -> RGB8 {
         let duration_from_start = time.duration_since(self.start_time);
         let period = Duration::from_secs_f32(1.0);
         let period_fraction =
@@ -466,37 +491,44 @@ impl Graphics {
         })
     }
 
+    /// Push an active animation stamped with the current frame's logical time.
+    fn push_animation(&mut self, mut animation: AnimationEnum) {
+        animation.set_start_time(self.current_time);
+        self.active_animations.push(animation);
+    }
+
+    /// Set the board animation stamped with the current frame's logical time.
+    fn set_board_animation(&mut self, mut animation: AnimationEnum) {
+        animation.set_start_time(self.current_time);
+        self.board_animation = Some(animation);
+    }
+
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
-        self.active_animations
-            .push(AnimationEnum::SimpleLaser(SimpleLaserAnimation::new(
-                start, end,
-            )));
+        self.push_animation(AnimationEnum::SimpleLaser(SimpleLaserAnimation::new(
+            start, end,
+        )));
     }
     pub fn add_floaty_laser(&mut self, start: WorldPoint, end: WorldPoint) {
-        self.active_animations
-            .push(AnimationEnum::FloatyLaser(FloatyLaserAnimation::new(
-                start, end,
-            )));
+        self.push_animation(AnimationEnum::FloatyLaser(FloatyLaserAnimation::new(
+            start, end,
+        )));
     }
 
     pub fn do_smite_animation(&mut self, square: WorldSquare) {
-        self.active_animations
-            .push(AnimationEnum::Smite(SmiteAnimation::new(square)));
+        self.push_animation(AnimationEnum::Smite(SmiteAnimation::new(square)));
     }
 
     pub fn start_burst_explosion(&mut self, point: WorldPoint) {
-        self.active_animations
-            .push(AnimationEnum::BurstExplosion(BurstExplosionAnimation::new(
-                point,
-            )));
+        self.push_animation(AnimationEnum::BurstExplosion(BurstExplosionAnimation::new(
+            point,
+        )));
     }
     pub fn start_circle_attack_animation(&mut self, square: WorldSquare, radius: f32) {
-        self.active_animations
-            .push(AnimationEnum::CircleAttack(CircleAttackAnimation::new(
-                square.to_f32(),
-                radius,
-            )));
-        self.board_animation = Some(AnimationEnum::RadialShockwave(RadialShockwave::new(
+        self.push_animation(AnimationEnum::CircleAttack(CircleAttackAnimation::new(
+            square.to_f32(),
+            radius,
+        )));
+        self.set_board_animation(AnimationEnum::RadialShockwave(RadialShockwave::new(
             square,
             self.floor_color_enum.clone(),
         )));
@@ -507,30 +539,26 @@ impl Graphics {
         direction: KingWorldStep,
         range: u32,
     ) {
-        self.active_animations
-            .push(AnimationEnum::SpearAttack(SpearAttackAnimation::new(
-                start_square,
-                direction,
-                range,
-            )));
+        self.push_animation(AnimationEnum::SpearAttack(SpearAttackAnimation::new(
+            start_square,
+            direction,
+            range,
+        )));
     }
 
     pub fn start_piece_death_animation_at(&mut self, square: WorldSquare) {
-        self.active_animations
-            .push(AnimationEnum::PieceDeath(PieceDeathAnimation::new(square)));
+        self.push_animation(AnimationEnum::PieceDeath(PieceDeathAnimation::new(square)));
     }
 
     pub fn do_blink_animation(&mut self, start_square: WorldSquare, end_square: WorldSquare) {
-        self.active_animations
-            .push(AnimationEnum::Blink(BlinkAnimation::new(
-                start_square,
-                end_square,
-            )));
+        self.push_animation(AnimationEnum::Blink(BlinkAnimation::new(
+            start_square,
+            end_square,
+        )));
     }
 
     pub fn add_selector(&mut self, square: WorldSquare) {
-        self.active_animations
-            .push(AnimationEnum::Selector(SelectorAnimation::new(square)));
+        self.push_animation(AnimationEnum::Selector(SelectorAnimation::new(square)));
     }
     pub fn draw_paths(&mut self, paths: Vec<SquareList>) {
         let mut path_squares = HashSet::<WorldSquare>::new();
@@ -541,11 +569,39 @@ impl Graphics {
     }
 
     pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {
-        self.board_animation = Some(AnimationEnum::RecoilingBoard(RecoilingBoardAnimation::new(
+        self.set_board_animation(AnimationEnum::RecoilingBoard(RecoilingBoardAnimation::new(
             board_size,
             shot_direction,
             self.floor_color_enum.clone(),
         )));
+    }
+
+    /// Overwrite one screen character cell (debug overlay helper).
+    fn mark_screen_char(&mut self, pos: ScreenBufferCharacterSquare, character: char) {
+        let width = self.screen.terminal_width as i32;
+        let height = self.screen.terminal_height as i32;
+        if pos.x < 0 || pos.y < 0 || pos.x >= width || pos.y >= height {
+            return;
+        }
+        let existing = self.screen.screen_buffer[pos.x as usize][pos.y as usize];
+        self.screen.screen_buffer[pos.x as usize][pos.y as usize] =
+            Glyph::new(character, RGB8::new(255, 0, 255), existing.bg_color);
+    }
+
+    /// Debug-only overlays applied after the FOV composite (roadmap W.G).
+    /// No-op unless a flag is set.
+    pub fn draw_debug_overlays(&mut self) {
+        if self.debug_overlay.screen_center {
+            let center = self.screen.screen_center_as_screen_buffer_character_square();
+            self.mark_screen_char(center, '✛');
+        }
+        if self.debug_overlay.screen_origin {
+            let origin_square = self.screen.screen_origin_as_world_square();
+            let origin = self
+                .screen
+                .world_square_to_left_screen_buffer_character_square(origin_square);
+            self.mark_screen_char(origin, '⌜');
+        }
     }
 
     pub fn draw_static_board(&mut self, board_size: BoardSize) {
@@ -556,18 +612,18 @@ impl Graphics {
         })
     }
 
-    pub fn draw_board_animation(&mut self, time: Instant) {
+    pub fn draw_board_animation(&mut self, time: LogicalTime) {
         if let Some(board_animation) = &self.board_animation {
             self.draw_animation(&board_animation.clone(), time);
         }
     }
 
-    fn draw_animation(&mut self, animation: &AnimationEnum, time: Instant) {
+    fn draw_animation(&mut self, animation: &AnimationEnum, time: LogicalTime) {
         let glyph_map = animation.double_glyphs_with_transparency_at_time(time);
         self.draw_transparent_glyphs_at_squares(glyph_map);
     }
 
-    fn draw_animations(&mut self, animations: AnimationList, time: Instant) {
+    fn draw_animations(&mut self, animations: AnimationList, time: LogicalTime) {
         animations
             .into_iter()
             .for_each(|animation| self.draw_animation(&animation, time))
@@ -577,7 +633,7 @@ impl Graphics {
         in_order[i as usize % in_order.len()]
     }
 
-    pub fn draw_non_board_animations(&mut self, time: Instant) {
+    pub fn draw_non_board_animations(&mut self, time: LogicalTime) {
         let mut glyphs_to_draw = vec![];
         for animation in &self.active_animations {
             glyphs_to_draw.push(animation.double_glyphs_with_transparency_at_time(time));
@@ -591,7 +647,7 @@ impl Graphics {
         }
     }
 
-    pub fn remove_finished_animations(&mut self, time: Instant) {
+    pub fn remove_finished_animations(&mut self, time: LogicalTime) {
         if let Some(board_animation) = &mut self.board_animation {
             if board_animation.finished_at_time(time) {
                 self.board_animation = None;
@@ -631,9 +687,14 @@ impl Graphics {
     }
 
     pub fn select_squares(&mut self, squares: Vec<WorldSquare>) {
+        let time = self.current_time;
         self.selectors = squares
             .into_iter()
-            .map(|square| SelectorAnimation::new(square))
+            .map(|square| {
+                let mut selector = SelectorAnimation::new(square);
+                selector.set_start_time(time);
+                selector
+            })
             .collect();
     }
 }
@@ -668,11 +729,24 @@ mod tests {
     use super::*;
 
     fn set_up_graphics() -> Graphics {
-        Graphics::new(40, 20, Instant::now())
+        Graphics::new(40, 20, LogicalTime::ZERO)
     }
 
     fn set_up_graphics_with_nxn_world_squares(board_length: u16) -> Graphics {
-        Graphics::new(board_length * 2, board_length, Instant::now())
+        Graphics::new(board_length * 2, board_length, LogicalTime::ZERO)
+    }
+
+    #[test]
+    fn test_debug_overlay_marks_screen_center() {
+        let mut g = set_up_graphics();
+        g.debug_overlay.screen_center = true;
+        g.draw_debug_overlays();
+
+        let center = g.screen.screen_center_as_screen_buffer_character_square();
+        assert_eq!(
+            g.screen.screen_buffer[center.x as usize][center.y as usize].character,
+            '✛'
+        );
     }
 
     #[test]
@@ -729,7 +803,7 @@ mod tests {
         g.load_screen_buffer_from_absolute_positions_in_draw_buffer();
         let glyph1 = g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0];
         g.add_simple_laser(point2(0.0, 0.0), point2(10.0, 0.0));
-        g.draw_non_board_animations(Instant::now());
+        g.draw_non_board_animations(LogicalTime::ZERO);
         g.load_screen_buffer_from_absolute_positions_in_draw_buffer();
         //g.print_output_buffer();
         let glyph2 = g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0];
@@ -740,9 +814,9 @@ mod tests {
 
     #[test]
     fn test_draw_on_far_right_square_in_odd_width_terminal() {
-        let mut g = Graphics::new(41, 20, Instant::now());
+        let mut g = Graphics::new(41, 20, LogicalTime::ZERO);
         g.add_simple_laser(point2(0.0, 0.0), point2(50.0, 0.0));
-        g.draw_non_board_animations(Instant::now());
+        g.draw_non_board_animations(LogicalTime::ZERO);
     }
 
     #[test]

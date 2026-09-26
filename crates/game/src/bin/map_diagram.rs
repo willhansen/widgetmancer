@@ -4,7 +4,7 @@
 //! Usage: cargo run -p game --bin map_diagram -- [demo|racetrack|hallways]
 
 use std::env;
-use std::time::Instant;
+use game::LogicalTime;
 
 use euclid::point2;
 
@@ -17,7 +17,7 @@ fn main() {
     // The racetrack map spans far enough right that a 96x26-character
     // terminal (48x26 squares, player at 24,13) is the smallest that holds
     // it; this is the same size `do_everything` clamps to.
-    let mut game = Game::new(96, 26, Instant::now());
+    let mut game = Game::new(96, 26, LogicalTime::ZERO);
     game.place_player(point2(24, 13));
     set_up_map_by_name(&mut game, Some(&map_name));
 

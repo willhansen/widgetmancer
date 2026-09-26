@@ -49,17 +49,19 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   → byte-identical ANSI frame at any index.
 - **Overlap:** item 6 step 2 already calls for auditing wall-clock reads; W.A is
   that audit generalized to the render path and made load-safe.
-- **Partial (2026-09):** first leaks landed. `draw_death_cube` now takes the
-  frame `time` (removed its `Instant::now()`); `Game::new` seeds
-  `world_start_time`/`world_time` from its `start_time` argument; `StaticBoard`
-  stores a stable `start_time`; dead `Graphics::time_since_start` removed. The
-  headless render now reproduces the checked-in snapshot except for the ~2ms
-  wall-clock skew the pre-fix capture baked into death-cube technicolor.
-  **Remaining (L):** the `LogicalTime(Duration)` replacement for `Instant` in
-  `Game`/`Graphics`/`Animation` + serialization, seeded/serialized RNG
-  (`realtime.rs:45,47`, `combat.rs:87`, `piece.rs:151`), and driver-loop
-  single-seam clock. This is API-breaking across ~69 `Instant` references and
-  test helpers — do as its own branch with W.F as the gate.
+- **Landed (2026-09):** `LogicalTime(Duration)` newtype (`crates/game/src/logical_time.rs`)
+  replaces `std::time::Instant` across `Game`/`Graphics`/all 12 animations;
+  `Game::draw` stamps spawned animations with the frame's logical time via
+  `Graphics::set_current_time`, and the driver reads the wall clock once
+  (`lib.rs` epoch) to derive each tick. `Game::new` seeds the world clock from
+  its `start_time`; `draw_death_cube` takes the frame time; snapshot load no
+  longer rebases to `Instant::now()`. Gameplay randomness is a seeded
+  `ChaCha8Rng` on `Game` (turret fire, shotgun spread, random subordinate
+  spawns) whose state is serialized into `game_state.json` (`rng_state`), so a
+  loaded game resumes the exact stream. A test asserts no `Instant::now()`
+  survives outside the driver seam. Full suite green (235 lib tests).
+  The pre-fix checked-in snapshot still differs on 30 death-cube cells (the old
+  wall-clock skew); new captures are self-consistent.
 
 ### W.B. "Explain this cell" provenance query — highest leverage
 - **What:** given a screen-buffer cell (e.g. the issue's `(49,37)`), return the
@@ -71,6 +73,14 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   `screen_text`/`graphics.screen` (`game/snapshot.rs:62`); the issue's observed
   cell table is exactly what this query would produce mechanically.
 - **Answers:** "why does it look like that once loaded?" in one query.
+- **Landed (2026-09):** `Game::explain_screen_cell(square_x, y)` (debug-tools)
+  reports the final glyph/colors, the world square and FOV-relative square, and
+  every `PositionedSquareVisibilityInFov` contributing (absolute square, portal
+  depth, rotation, absolute/relative `as_string`, draw-buffer drawable).
+  `snapshot_tool explain <dir> X Y` exposes it. On the black-block snapshot,
+  `explain <dir> 49 37` reproduces the issue's table exactly: depth 3,
+  abs(37,45), abs_vis `🬭🬭`, final fg(165,89,89) bg(77,0,0), draw-buffer floor
+  GREY. Test added.
 
 ### W.C. Portal-space / FOV tracing
 - **What:** dump the FOV recursion as a tree — per depth: incoming `view_arc`,
@@ -84,17 +94,46 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   in-crate `#[cfg(test)]` dump without API changes.
 - **Tests the issue's hypothesis:** cumulative arc shrink / missing depth cap at
   depth 3.
+- **Landed (2026-09):** `FovTrace`/`FovTraceNode` (`fov_stuff.rs`) with
+  `single_octant_field_of_view_traced`, `portal_aware_field_of_view_from_square_traced`,
+  and `Game::player_field_of_view_traced` (debug-tools). Threads `depth` +
+  `Option<&mut FovTrace>` through the recursion; records one node per portal
+  crossing (child depth, incoming transformed arc, parent-frame portal arc,
+  transformed center, rotation). `snapshot_tool fov-trace[-json] <dir>` prints
+  it; `to_tree_string`/`to_json` on `FovTrace`. Trace test added. Against the
+  black-block snapshot it shows the depth-3 arcs narrowing and splitting
+  (`depth1 [0..6.340] → depth2 [0..3.013] & [1.975..3.013]`), direct evidence
+  for the arc-accumulation hypothesis.
 
 ### W.D. Differential + invariant oracles
 - **What:** a reference FOV (ray-cast in unwrapped portal coordinates) to diff
   against the recursive one, and per-frame debug invariants, e.g. "no
   `OUT_OF_SIGHT`-background partial where a lower depth treats the same absolute
   square as fully visible," plus FOV monotonicity.
+- **Landed (invariant half, 2026-09):** `fov_visibility_consistency_violations`
+  (`fov_stuff.rs`) groups every relative square's visibilities by absolute
+  square and flags any square that is fully visible via one portal
+  depth/relative square but partially visible via another — exactly the
+  black-block signature. `Game::fov_invariant_violations` +
+  `snapshot_tool invariants <dir>` expose it; against the black-block snapshot
+  it reports 115 violations including the known `rel(15,1) abs(37,45)`. Test:
+  invariant holds on a portal-free FOV. **Remaining:** the ray-cast reference
+  oracle (differential) and reducing false positives by only flagging partials
+  whose underlying drawable is plain floor at a deeper depth than a full view.
 
 ### W.E. Automated snapshot minimizer
 - **What:** shrink `snapshot/` state (drop entities/blocks, narrow player
   position) while preserving the artifact. Turns the 70×78 map into a minimal
   regression repro.
+- **Landed (2026-09):** `debug::minimize_snapshot` greedily removes entity
+  collection entries (pieces, blocks, upgrades, belts, arrows, widgets,
+  incubating pawns, death cubes, drones) while the `OUT_OF_SIGHT`-tinted
+  partial persists at a target buffer square; portals and player are preserved
+  (the bug's cause). `snapshot_tool minimize <dir> X Y [out]`. On the
+  black-block snapshot this reduces it to **player + 21 portals** (all entities
+  removed) while `explain` still reports the depth-3 partial. Test: errors when
+  no artifact is present. **Remaining:** coordinate/board shrink and a chunked
+  (delta-debugging) search for large maps.
 
 ### W.F. Headless golden/diff harness
 - **What:** `--load <dir> --render-headless --diff snapshot/screen.txt` with
@@ -119,6 +158,11 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
 - Toggle FOV arcs, portal-depth heatmap, screen-center markers, draw order, and
   ideal-vs-actual coverage in the running TUI; hover a cell for W.B. Extends the
   existing `floating-square-debug` tool (`floating-square-debug/README.md`).
+- **Landed (minimal, 2026-09):** `Graphics.debug_overlay: DebugOverlayFlags`
+  (`screen_center`, `screen_origin`) applied by `draw_debug_overlays` after the
+  FOV composite; `Game::set_debug_overlay` toggles it. Test covers the center
+  marker. **Remaining:** keybindings/`InputMap` toggles, depth heatmap,
+  draw-order readout, and mouse-hover → `explain_screen_cell`.
 
 ### Mapping to `black-block-deep-in-portal`
 | Item | Role |
