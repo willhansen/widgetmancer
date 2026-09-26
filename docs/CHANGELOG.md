@@ -15,6 +15,21 @@ Implemented the debug-tooling wishlist from the front of
 [ROADMAP.md](ROADMAP.md), motivated by the portal-depth partial-visibility
 artifact in `issues/black-block-deep-in-portal/`. All workspace tests green.
 
+### game: virtual-screen crop + review transcript for the minimizer (W.E)
+The minimizer now anchors the artifact to the player (relative square + portal
+depth + absolute square) instead of a fixed buffer cell, so it survives a
+resize. New early step crops the virtual screen to the `{player, artifact}`
+bounding box plus a margin (default 4 squares), changing only
+`screen.terminal_width/height` (board and world coordinates untouched; rejected
+if the artifact would leave the buffer). Entity removal then runs as before.
+`snapshot_tool minimize` gains `--review[=<path>]` (screen-by-screen transcript:
+frame, then a one-line change summary, then the next frame), `--review-explain`
+(embed the full explain block per step), `--review-plain` (strip ANSI), and
+`--crop-margin`/`--no-screen-crop`. On the black-block snapshot: 141×78 → 73×11,
+then the three death cubes removed, artifact intact throughout. Tests:
+crop geometry, anchor derivation error, review-step formatting; full game suite
+green (238 lib tests).
+
 ### docs: drop export guidance from AGENTS.md
 Removed the extra review-pause export note from `AGENTS.md` and the matching
 changelog reference.

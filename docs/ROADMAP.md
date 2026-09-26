@@ -128,12 +128,20 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
 - **Landed (2026-09):** `debug::minimize_snapshot` greedily removes entity
   collection entries (pieces, blocks, upgrades, belts, arrows, widgets,
   incubating pawns, death cubes, drones) while the `OUT_OF_SIGHT`-tinted
-  partial persists at a target buffer square; portals and player are preserved
-  (the bug's cause). `snapshot_tool minimize <dir> X Y [out]`. On the
-  black-block snapshot this reduces it to **player + 21 portals** (all entities
-  removed) while `explain` still reports the depth-3 partial. Test: errors when
-  no artifact is present. **Remaining:** coordinate/board shrink and a chunked
-  (delta-debugging) search for large maps.
+  partial persists; portals and player are preserved (the bug's cause). The
+  artifact is anchored to the player (relative square + portal depth + absolute
+  square) so it survives a resize. An **early virtual-screen crop** shrinks
+  `screen.terminal_width/height` to the `{player, artifact}` bounding box plus
+  margin (default 4), touching nothing else; rejected if the artifact would
+  leave the buffer. `snapshot_tool minimize <dir> X Y [out]` with
+  `--review[=<path>]` (screen-by-screen transcript: frame → one-line change →
+  next frame), `--review-explain`, `--review-plain`, `--crop-margin`,
+  `--no-screen-crop`. On the black-block snapshot: 141×78 → **73×11**, then all
+  entities removed → **player + 21 portals**, artifact intact. Tests: crop
+  geometry, anchor-derivation error, review-step formatting, no-artifact error.
+  **Remaining:** board/coordinate shrink (deliberately deferred — translation
+  is near a visual no-op, floor pattern is mod-6, and it risks `place_piece`
+  panics), and a chunked (delta-debugging) search for large maps.
 
 ### W.F. Headless golden/diff harness
 - **What:** `--load <dir> --render-headless --diff snapshot/screen.txt` with

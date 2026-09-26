@@ -814,12 +814,15 @@ mod tests {
 /// crate's normal public surface.
 #[cfg(feature = "debug-tools")]
 pub mod debug {
+    use std::io::Write;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
     use crate::LogicalTime;
 
     use regex::Regex;
     use rgb::RGB8;
+    use terminal_rendering::ScreenBufferCharacterSquare;
+    use utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
 
     use super::{
         game_state_json, load_snapshot_game, screen_text, snapshot_dir, Game, SnapshotData,
@@ -897,21 +900,8 @@ pub mod debug {
         Ok(out)
     }
 
-    /// `true` if the headless render puts an `OUT_OF_SIGHT`-tinted (red-on-
-    /// black, g=b=0) partial at buffer square `(sx, sy)`.
-    fn artifact_present_at(game: &Game, sx: usize, sy: usize) -> bool {
-        let screen = &game.graphics.screen;
-        let x = sx * 2;
-        if x >= screen.terminal_width as usize || sy >= screen.terminal_height as usize {
-            return false;
-        }
-        let bg = screen.screen_buffer[x][sy].bg_color;
-        bg.r > 0 && bg.g == 0 && bg.b == 0
-    }
-
-    fn render_value_at_captured_time(
-        value: &serde_json::Value,
-    ) -> Result<Game, String> {
+    /// Render `dir/game_state.json`'s value headless at the captured world time.
+    fn render_value_at_captured_time(value: &serde_json::Value) -> Result<Game, String> {
         let data: SnapshotData = serde_json::from_value(value.clone())
             .map_err(|error| format!("invalid snapshot value: {error}"))?;
         let elapsed = Duration::from_secs_f32(data.world_time_seconds.max(0.0));
@@ -920,19 +910,269 @@ pub mod debug {
         Ok(game)
     }
 
-    /// Greedily shrink a snapshot's entity collections while preserving the
-    /// `OUT_OF_SIGHT` partial at `(sx, sy)` (roadmap W.E). Portals are left
-    /// intact (they are the bug's cause); everything else is removed one item
-    /// at a time, repeatedly, until no further removal keeps the artifact.
-    /// Returns the minimized JSON and its path. `CAP` bounds renders so the
-    /// tool stays usable on large maps.
-    pub fn minimize_snapshot(
+    /// The artifact to preserve while minimizing, anchored to the player so it
+    /// survives a virtual-screen resize (the screen is player-centered).
+    #[derive(Clone, Copy, Debug)]
+    pub struct ArtifactAnchor {
+        pub relative_square: WorldStep,
+        pub depth: u32,
+        pub absolute_square: WorldSquare,
+    }
+
+    impl std::fmt::Display for ArtifactAnchor {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "rel({},{}) depth {} abs({},{})",
+                self.relative_square.x,
+                self.relative_square.y,
+                self.depth,
+                self.absolute_square.x,
+                self.absolute_square.y,
+            )
+        }
+    }
+
+    /// Derive the anchor from a buffer square `(sx, sy)`: its world square, its
+    /// player-relative offset, and the partial FOV visibility that draws it.
+    pub fn derive_artifact_anchor(
+        game: &Game,
+        sx: usize,
+        sy: usize,
+    ) -> Result<ArtifactAnchor, String> {
+        let screen = &game.graphics.screen;
+        let x = sx * 2;
+        if x >= screen.terminal_width as usize || sy >= screen.terminal_height as usize {
+            return Err(format!(
+                "cell (square {sx}, row {sy}) is out of bounds (terminal {}x{})",
+                screen.terminal_width, screen.terminal_height
+            ));
+        }
+        let buffer_square = ScreenBufferCharacterSquare::new(x as i32, sy as i32);
+        let world_square = screen.screen_buffer_character_square_to_world_square(buffer_square);
+        let (fov, _trace) = game.player_field_of_view_traced();
+        let relative_square = world_square - fov.root_square();
+        let visibility = fov
+            .visibilities_of_relative_square(relative_square)
+            .into_iter()
+            .find(|v| v.square_visibility_in_absolute_frame().is_partially_visible())
+            .ok_or_else(|| {
+                format!(
+                    "no partially-visible FOV square at buffer ({sx},{sy}) (world ({},{}))",
+                    world_square.x, world_square.y
+                )
+            })?;
+        Ok(ArtifactAnchor {
+            relative_square,
+            depth: visibility.portal_depth(),
+            absolute_square: visibility.absolute_square(),
+        })
+    }
+
+    /// `true` if the render still shows the anchored artifact: an
+    /// `OUT_OF_SIGHT`-tinted (red-on-black) partial at the anchor's cell, with
+    /// the same portal depth and absolute square.
+    fn artifact_present_at(game: &Game, anchor: &ArtifactAnchor) -> bool {
+        let screen = &game.graphics.screen;
+        let world = game.player_square() + anchor.relative_square;
+        let cell = screen.world_square_to_left_screen_buffer_character_square(world);
+        if cell.x < 0
+            || cell.y < 0
+            || cell.x >= screen.terminal_width as i32
+            || cell.y >= screen.terminal_height as i32
+        {
+            return false;
+        }
+        let bg = screen.screen_buffer[cell.x as usize][cell.y as usize].bg_color;
+        if !(bg.r > 0 && bg.g == 0 && bg.b == 0) {
+            return false;
+        }
+        let (fov, _trace) = game.player_field_of_view_traced();
+        fov.visibilities_of_relative_square(anchor.relative_square)
+            .into_iter()
+            .any(|v| {
+                v.portal_depth() == anchor.depth
+                    && v.absolute_square() == anchor.absolute_square
+                    && v.square_visibility_in_absolute_frame().is_partially_visible()
+            })
+    }
+
+    /// Short signature of the artifact's rendered cell + FOV identity.
+    fn artifact_signature(game: &Game, anchor: &ArtifactAnchor) -> String {
+        let screen = &game.graphics.screen;
+        let world = game.player_square() + anchor.relative_square;
+        let cell = screen.world_square_to_left_screen_buffer_character_square(world);
+        let in_bounds = cell.x >= 0
+            && cell.y >= 0
+            && cell.x < screen.terminal_width as i32
+            && cell.y < screen.terminal_height as i32;
+        let (fg, bg) = if in_bounds {
+            let glyph = screen.screen_buffer[cell.x as usize][cell.y as usize];
+            (glyph.fg_color, glyph.bg_color)
+        } else {
+            (RGB8::new(0, 0, 0), RGB8::new(0, 0, 0))
+        };
+        format!(
+            "{} fg({},{},{}) bg({},{},{})",
+            anchor, fg.r, fg.g, fg.b, bg.r, bg.g, bg.b
+        )
+    }
+
+    /// Candidate terminal size for a virtual-screen crop: the `{player,
+    /// artifact}` bounding box plus `margin_squares` on every side, never
+    /// larger than the current size.
+    pub fn screen_crop_candidate(
+        game: &Game,
+        anchor: &ArtifactAnchor,
+        margin_squares: u32,
+    ) -> (u16, u16) {
+        let screen = &game.graphics.screen;
+        let player = game.player_square();
+        let center = screen.screen_center_as_screen_buffer_character_square();
+        let artifact_cell =
+            screen.world_square_to_left_screen_buffer_character_square(player + anchor.relative_square);
+        let dx = (artifact_cell.x - center.x).unsigned_abs();
+        let dy = (artifact_cell.y - center.y).unsigned_abs();
+        let margin_chars = 2 * margin_squares; // one world square = two columns
+        let width = (2 * (dx + margin_chars) + 1).min(screen.terminal_width as u32) as u16;
+        let height = (2 * (dy + margin_squares) + 1).min(screen.terminal_height as u32) as u16;
+        (width, height)
+    }
+
+    const MINIMIZE_RENDER_CAP: usize = 4000;
+
+    /// Render a candidate and return it iff the anchored artifact survives.
+    fn try_candidate(
+        value: &serde_json::Value,
+        anchor: &ArtifactAnchor,
+        renders: &std::cell::Cell<usize>,
+    ) -> Option<Game> {
+        renders.set(renders.get() + 1);
+        if renders.get() > MINIMIZE_RENDER_CAP {
+            return None;
+        }
+        render_value_at_captured_time(value)
+            .ok()
+            .filter(|game| artifact_present_at(game, anchor))
+    }
+
+    fn strip_ansi(text: &str) -> String {
+        Regex::new(r"\x1b\[[0-9;]*m")
+            .expect("ansi regex")
+            .replace_all(text, "")
+            .into_owned()
+    }
+
+    fn review_frame(game: &Game, colors: bool) -> String {
+        let text = screen_text(game);
+        if colors {
+            text
+        } else {
+            strip_ansi(&text)
+        }
+    }
+
+    fn collection_counts(value: &serde_json::Value) -> String {
+        const KEYS: &[&str] = &[
+            "pieces",
+            "blocks",
+            "upgrades",
+            "conveyor_belts",
+            "floor_push_arrows",
+            "widgets",
+            "incubating_pawns",
+            "death_cubes",
+            "floating_hunter_drones",
+            "portals",
+        ];
+        KEYS.iter()
+            .filter_map(|key| {
+                let len = value
+                    .get(*key)
+                    .and_then(|v| v.as_array())
+                    .map_or(0, Vec::len);
+                (len > 0).then(|| format!("{key}={len}"))
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Format one accepted review step: a change summary, an optional full
+    /// explain block, then the frame.
+    pub fn format_review_step(
+        step: usize,
+        change: &str,
+        game: &Game,
+        anchor: &ArtifactAnchor,
+        explain: bool,
+        colors: bool,
+    ) -> String {
+        let mut out = format!(
+            "\n--- step {step} — {change}; artifact preserved: {} ---\n",
+            artifact_signature(game, anchor)
+        );
+        if explain {
+            let screen = &game.graphics.screen;
+            let world = game.player_square() + anchor.relative_square;
+            let cell = screen.world_square_to_left_screen_buffer_character_square(world);
+            out.push_str(&format!(
+                "explain (square {}, row {}):\n{}\n",
+                cell.x / 2,
+                cell.y,
+                game.explain_screen_cell((cell.x / 2) as usize, cell.y as usize)
+            ));
+        }
+        out.push_str(&review_frame(game, colors));
+        out
+    }
+
+    /// Options for the minimizer.
+    #[derive(Clone, Copy, Debug)]
+    pub struct MinimizeOptions {
+        pub screen_crop: bool,
+        pub crop_margin: u32,
+    }
+
+    impl Default for MinimizeOptions {
+        fn default() -> Self {
+            MinimizeOptions {
+                screen_crop: true,
+                crop_margin: 4,
+            }
+        }
+    }
+
+    /// Where and how to write the human-review transcript.
+    #[derive(Clone, Debug)]
+    pub struct MinimizeReview {
+        pub path: Option<PathBuf>,
+        pub explain: bool,
+        pub colors: bool,
+    }
+
+    impl Default for MinimizeReview {
+        fn default() -> Self {
+            MinimizeReview {
+                path: None,
+                explain: false,
+                colors: true,
+            }
+        }
+    }
+
+    /// Greedily shrink a snapshot while preserving the anchored artifact
+    /// (roadmap W.E). First crops the virtual screen to `{player, artifact}`
+    /// plus margin (early, so review frames stay small), then removes entity
+    /// entries one at a time. Portals and player are left intact. With
+    /// `review`, streams a screen-by-screen transcript.
+    pub fn minimize_snapshot_review(
         dir: &Path,
         sx: usize,
         sy: usize,
         out_path: &Path,
+        options: MinimizeOptions,
+        review: Option<MinimizeReview>,
     ) -> Result<String, String> {
-        const CAP: usize = 4000;
         const COLLECTIONS: &[&str] = &[
             "pieces",
             "blocks",
@@ -951,26 +1191,77 @@ pub mod debug {
         let mut value: serde_json::Value = serde_json::from_str(&contents)
             .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
 
-        let holds = |candidate: &serde_json::Value| -> bool {
-            render_value_at_captured_time(candidate)
-                .map(|game| artifact_present_at(&game, sx, sy))
-                .unwrap_or(false)
-        };
-        let mut renders = std::cell::Cell::new(0usize);
-        let holds_counted = |candidate: &serde_json::Value| {
-            renders.set(renders.get() + 1);
-            if renders.get() > CAP {
-                return false;
-            }
-            holds(candidate)
-        };
-
-        if !holds_counted(&value) {
+        let baseline_game = render_value_at_captured_time(&value)?;
+        let anchor = derive_artifact_anchor(&baseline_game, sx, sy)?;
+        if !artifact_present_at(&baseline_game, &anchor) {
             return Err(format!(
-                "no OUT_OF_SIGHT partial at square ({sx},{sy}) in the original snapshot"
+                "no OUT_OF_SIGHT partial for anchor {anchor} in the original snapshot"
             ));
         }
 
+        let colors = review.as_ref().map_or(true, |r| r.colors);
+        let explain = review.as_ref().is_some_and(|r| r.explain);
+        let mut writer: Option<Box<dyn Write>> = match &review {
+            None => None,
+            Some(r) => Some(match &r.path {
+                Some(path) => Box::new(
+                    std::fs::File::create(path).map_err(|error| {
+                        format!("Could not create {}: {error}", path.display())
+                    })?,
+                ),
+                None => Box::new(std::io::stdout()),
+            }),
+        };
+
+        if let Some(writer) = writer.as_mut() {
+            let screen = &baseline_game.graphics.screen;
+            writeln!(
+                writer,
+                "### MINIMIZE REVIEW — target buffer ({sx},{sy}); anchor {anchor}; terminal {}x{}",
+                screen.terminal_width, screen.terminal_height
+            )
+            .map_err(|error| error.to_string())?;
+            writeln!(writer, "### baseline: {}", collection_counts(&value))
+                .map_err(|error| error.to_string())?;
+            writer
+                .write_all(review_frame(&baseline_game, colors).as_bytes())
+                .map_err(|error| error.to_string())?;
+        }
+
+        let renders = std::cell::Cell::new(0usize);
+        let mut step = 0usize;
+
+        // Early virtual-screen crop.
+        if options.screen_crop {
+            let screen = &baseline_game.graphics.screen;
+            let (new_width, new_height) =
+                screen_crop_candidate(&baseline_game, &anchor, options.crop_margin);
+            if (new_width, new_height) != (screen.terminal_width, screen.terminal_height) {
+                let mut candidate = value.clone();
+                if let Some(screen_value) = candidate.get_mut("screen") {
+                    screen_value["terminal_width"] = serde_json::json!(new_width);
+                    screen_value["terminal_height"] = serde_json::json!(new_height);
+                }
+                if let Some(game) = try_candidate(&candidate, &anchor, &renders) {
+                    value = candidate;
+                    step += 1;
+                    let change = format!(
+                        "screen crop {}x{} -> {new_width}x{new_height} (margin {} squares)",
+                        screen.terminal_width, screen.terminal_height, options.crop_margin
+                    );
+                    if let Some(writer) = writer.as_mut() {
+                        writer
+                            .write_all(
+                                format_review_step(step, &change, &game, &anchor, explain, colors)
+                                    .as_bytes(),
+                            )
+                            .map_err(|error| error.to_string())?;
+                    }
+                }
+            }
+        }
+
+        // Entity removal.
         for key in COLLECTIONS {
             loop {
                 let len = value
@@ -979,16 +1270,41 @@ pub mod debug {
                     .map_or(0, Vec::len);
                 let mut removed_any = false;
                 for index in (0..len).rev() {
-                    if renders.get() > CAP {
+                    if renders.get() > MINIMIZE_RENDER_CAP {
                         break;
                     }
                     let mut candidate = value.clone();
                     if let Some(array) = candidate.get_mut(*key).and_then(|v| v.as_array_mut()) {
                         array.remove(index);
                     }
-                    if holds_counted(&candidate) {
+                    if let Some(game) = try_candidate(&candidate, &anchor, &renders) {
+                        let current_len = value
+                            .get(*key)
+                            .and_then(|v| v.as_array())
+                            .map_or(0, Vec::len);
+                        let removed = value
+                            .get(*key)
+                            .and_then(|v| v.as_array())
+                            .and_then(|array| array.get(index))
+                            .map(|item| item.to_string())
+                            .unwrap_or_default();
                         value = candidate;
                         removed_any = true;
+                        step += 1;
+                        let change = format!(
+                            "removed {key}[{index}] = {removed}; {key} {current_len} -> {}",
+                            current_len - 1
+                        );
+                        if let Some(writer) = writer.as_mut() {
+                            writer
+                                .write_all(
+                                    format_review_step(
+                                        step, &change, &game, &anchor, explain, colors,
+                                    )
+                                    .as_bytes(),
+                                )
+                                .map_err(|error| error.to_string())?;
+                        }
                     }
                 }
                 if !removed_any {
@@ -1001,11 +1317,26 @@ pub mod debug {
             .map_err(|error| format!("Could not serialize minimized snapshot: {error}"))?;
         std::fs::write(out_path, &minimized)
             .map_err(|error| format!("Could not write {}: {error}", out_path.display()))?;
-        Ok(format!(
-            "minimized in {} renders (cap {CAP}); wrote {}",
+        let summary = format!(
+            "minimized in {} renders (cap {MINIMIZE_RENDER_CAP}); {step} steps; wrote {}",
             renders.get(),
             out_path.display()
-        ))
+        );
+        if let Some(writer) = writer.as_mut() {
+            writeln!(writer, "\n### done: {summary}").map_err(|error| error.to_string())?;
+            writer.flush().map_err(|error| error.to_string())?;
+        }
+        Ok(summary)
+    }
+
+    /// Greedy minimizer with default options and no transcript.
+    pub fn minimize_snapshot(
+        dir: &Path,
+        sx: usize,
+        sy: usize,
+        out_path: &Path,
+    ) -> Result<String, String> {
+        minimize_snapshot_review(dir, sx, sy, out_path, MinimizeOptions::default(), None)
     }
 
     /// One terminal cell as encoded in `screen.txt`: character + fg/bg RGB.
@@ -1287,6 +1618,56 @@ pub mod debug {
             std::fs::remove_dir_all(&dir).ok();
 
             assert!(result.is_err(), "expected no-artifact error, got {result:?}");
+        }
+
+        #[test]
+        fn derive_anchor_errors_without_partial_visibility() {
+            let mut game = set_up_game_with_player();
+            game.draw_headless_at_duration_from_start(Duration::ZERO);
+            // Open board, no portals: every visible square is fully visible.
+            assert!(derive_artifact_anchor(&game, 0, 0).is_err());
+        }
+
+        #[test]
+        fn screen_crop_candidate_bounds_artifact_with_margin() {
+            use utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
+
+            let mut game = Game::new(200, 100, LogicalTime::ZERO);
+            let mid = game.mid_square();
+            game.place_player(mid);
+            game.draw_headless_at_duration_from_start(Duration::ZERO);
+
+            let anchor = ArtifactAnchor {
+                relative_square: WorldStep::new(15, 1),
+                depth: 3,
+                absolute_square: WorldSquare::new(mid.x + 15, mid.y + 1),
+            };
+            let (width, height) = screen_crop_candidate(&game, &anchor, 4);
+            assert!(width < 200 && height < 100, "crop did not shrink: {width}x{height}");
+            assert!(width >= 3 && height >= 3, "crop too small: {width}x{height}");
+            // The artifact is 15 squares east, 1 row up: a short, wide window.
+            assert!(height <= 13, "height should track the 1-row offset: {height}");
+        }
+
+        #[test]
+        fn review_step_formats_change_then_frame() {
+            use utility::coordinate_frame_conversions::WorldStep;
+
+            let mut game = set_up_game_with_player();
+            game.draw_headless_at_duration_from_start(Duration::ZERO);
+            let anchor = ArtifactAnchor {
+                relative_square: WorldStep::new(0, 0),
+                depth: 0,
+                absolute_square: game.player_square(),
+            };
+
+            let brief = format_review_step(2, "removed pieces[0]", &game, &anchor, false, false);
+            assert!(brief.contains("--- step 2 — removed pieces[0]"), "{brief}");
+            assert!(brief.contains("artifact preserved"), "{brief}");
+            assert!(!brief.contains("explain ("), "{brief}");
+
+            let verbose = format_review_step(2, "removed pieces[0]", &game, &anchor, true, false);
+            assert!(verbose.contains("explain ("), "{verbose}");
         }
     }
 }

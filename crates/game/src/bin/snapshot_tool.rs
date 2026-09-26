@@ -11,6 +11,13 @@
 //!   fov-trace <dir>       print the player's portal-recursion FOV trace
 //!   fov-trace-json <dir>  the same trace as JSON
 //!   explain <dir> X Y     explain how screen cell (X,Y) got its glyph
+//!   invariants <dir>      FOV visibility-consistency violations
+//!   minimize <dir> X Y [out]
+//!       --review[=<path>]   write a screen-by-screen review transcript
+//!       --review-explain    include the full explain block per step
+//!       --review-plain      strip ANSI colors from the transcript
+//!       --crop-margin <n>   virtual-screen crop margin in squares (default 4)
+//!       --no-screen-crop    disable the virtual-screen crop step
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -102,24 +109,62 @@ fn main() -> ExitCode {
             }
         },
         "minimize" => {
-            let (Some(x), Some(y)) = (args.get(2), args.get(3)) else {
+            let mut positionals: Vec<&String> = Vec::new();
+            let mut options = debug::MinimizeOptions::default();
+            let mut review: Option<debug::MinimizeReview> = None;
+            let mut i = 2; // args[0] = "minimize", args[1] = dir
+            while i < args.len() {
+                let arg = &args[i];
+                if let Some(path) = arg.strip_prefix("--review=") {
+                    review = Some(debug::MinimizeReview {
+                        path: Some(PathBuf::from(path)),
+                        ..Default::default()
+                    });
+                } else if arg == "--review" {
+                    review = Some(debug::MinimizeReview::default());
+                } else if arg == "--review-explain" {
+                    review.get_or_insert_with(Default::default).explain = true;
+                } else if arg == "--review-plain" {
+                    review.get_or_insert_with(Default::default).colors = false;
+                } else if arg == "--no-screen-crop" {
+                    options.screen_crop = false;
+                } else if arg == "--crop-margin" {
+                    i += 1;
+                    match args.get(i).and_then(|value| value.parse::<u32>().ok()) {
+                        Some(margin) => options.crop_margin = margin,
+                        None => return usage(),
+                    }
+                } else if let Some(margin) = arg.strip_prefix("--crop-margin=") {
+                    match margin.parse::<u32>() {
+                        Ok(margin) => options.crop_margin = margin,
+                        Err(_) => return usage(),
+                    }
+                } else {
+                    positionals.push(arg);
+                }
+                i += 1;
+            }
+
+            let (Some(x), Some(y)) = (positionals.first(), positionals.get(1)) else {
                 return usage();
             };
-            let out_path = args
-                .get(4)
+            let out_path = positionals
+                .get(2)
                 .map(PathBuf::from)
                 .unwrap_or_else(|| dir.join("minimized.json"));
             match (x.parse::<usize>(), y.parse::<usize>()) {
-                (Ok(x), Ok(y)) => match debug::minimize_snapshot(&dir, x, y, &out_path) {
-                    Ok(report) => {
-                        println!("{report}");
-                        ExitCode::SUCCESS
+                (Ok(x), Ok(y)) => {
+                    match debug::minimize_snapshot_review(&dir, x, y, &out_path, options, review) {
+                        Ok(report) => {
+                            println!("{report}");
+                            ExitCode::SUCCESS
+                        }
+                        Err(error) => {
+                            eprintln!("error: {error}");
+                            ExitCode::FAILURE
+                        }
                     }
-                    Err(error) => {
-                        eprintln!("error: {error}");
-                        ExitCode::FAILURE
-                    }
-                },
+                }
                 _ => usage(),
             }
         }
