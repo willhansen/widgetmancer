@@ -127,8 +127,8 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   regression repro.
 - **Landed (2026-09):** `debug::minimize_snapshot` greedily removes entity
   collection entries (pieces, blocks, upgrades, belts, arrows, widgets,
-  incubating pawns, death cubes, drones) while the `OUT_OF_SIGHT`-tinted
-  partial persists; portals and player are preserved (the bug's cause). The
+  incubating pawns, death cubes, drones) and portal entries while the
+  `OUT_OF_SIGHT`-tinted partial persists; the player is preserved. The
   artifact is anchored to the player (relative square + portal depth + absolute
   square) so it survives a resize. An **early virtual-screen crop** shrinks
   `screen.terminal_width/height` to the `{player, artifact}` bounding box plus
@@ -136,9 +136,12 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   leave the buffer. `snapshot_tool minimize <dir> X Y [out]` with
   `--review[=<path>]` (screen-by-screen transcript: frame → one-line change →
   next frame), `--review-explain`, `--review-plain`, `--crop-margin`,
-  `--no-screen-crop`. On the black-block snapshot: 141×78 → **73×11**, then all
-  entities removed → **player + 21 portals**, artifact intact. Tests: crop
-  geometry, anchor-derivation error, review-step formatting, no-artifact error.
+  `--no-screen-crop`, `--keep-portals`. Portals are minimized too by default
+  (the strict anchor predicate keeps the artifact's chain); `--keep-portals`
+  opts out. On the black-block snapshot: 141×78 → **73×11**, then all entities
+  and 19 of 21 portals removed → **player + 2 portals**, artifact intact.
+  Tests: crop geometry, anchor-derivation error, review-step formatting,
+  no-artifact error.
   **Remaining:** board/coordinate shrink (deliberately deferred — translation
   is near a visual no-op, floor pattern is mod-6, and it risks `place_piece`
   panics), and a chunked (delta-debugging) search for large maps.

@@ -15,6 +15,32 @@ Implemented the debug-tooling wishlist from the front of
 [ROADMAP.md](ROADMAP.md), motivated by the portal-depth partial-visibility
 artifact in `issues/black-block-deep-in-portal/`. All workspace tests green.
 
+### game: minimize portals too, with --keep-portals opt-out (W.E)
+The minimizer previously protected all portals, leaving 21 in the black-block
+repro. It now removes portal entries by default; the strict anchor predicate
+(same relative square + depth + absolute square) keeps only the artifact's own
+chain, so the repro drops to **2 portals** (`[41,44]`/`[41,45]`, both
+`dir[1,0] -> [37,44/45]`). `MinimizeOptions.keep_portals` /
+`snapshot_tool minimize --keep-portals` restores the old behavior (21 portals).
+Regenerated the issue debug outputs, added a `--keep-portals` variant, and
+updated `debug/README.md`. Tests green (238 lib).
+
+### docs: add post-minimization renders to the black-block debug outputs
+The first pass rendered only the original snapshot; the minimized state existed
+only embedded in the review transcripts. Materialized `debug/minimized/` and
+`debug/minimized-nocrop/` as full snapshot dirs (`game_state.json` +
+`screen.txt`) and added `render-minimized.txt`, `render-minimized-nocrop.txt`,
+`cells-minimized.txt`, `explain-minimized.txt` (artifact moves to buffer
+`(32,4)` in the 73×11 frame), and `diff-minimized.txt`. Verified the review
+transcript's final frame equals the standalone minimized render.
+
+### docs: capture all snapshot_tool debug outputs for the black-block issue
+Generated `issues/black-block-deep-in-portal/debug/` from the issue snapshot:
+`render`, `diff`, `cells`, `fov-trace` (+JSON), `explain 49 37`, `invariants`,
+and the minimizer with each review variant (`--review`, `--review-plain`,
+`--review-explain`, `--no-screen-crop`) plus the minimized JSONs. Added a
+`debug/README.md` index with the regeneration commands.
+
 ### game: virtual-screen crop + review transcript for the minimizer (W.E)
 The minimizer now anchors the artifact to the player (relative square + portal
 depth + absolute square) instead of a fixed buffer cell, so it survives a

@@ -1131,6 +1131,8 @@ pub mod debug {
     pub struct MinimizeOptions {
         pub screen_crop: bool,
         pub crop_margin: u32,
+        /// Keep all portals (the artifact's cause) rather than minimizing them.
+        pub keep_portals: bool,
     }
 
     impl Default for MinimizeOptions {
@@ -1138,6 +1140,7 @@ pub mod debug {
             MinimizeOptions {
                 screen_crop: true,
                 crop_margin: 4,
+                keep_portals: false,
             }
         }
     }
@@ -1163,8 +1166,9 @@ pub mod debug {
     /// Greedily shrink a snapshot while preserving the anchored artifact
     /// (roadmap W.E). First crops the virtual screen to `{player, artifact}`
     /// plus margin (early, so review frames stay small), then removes entity
-    /// entries one at a time. Portals and player are left intact. With
-    /// `review`, streams a screen-by-screen transcript.
+    /// entries and (unless `keep_portals`) portal entries one at a time. The
+    /// strict anchor predicate keeps the artifact's own portal chain intact.
+    /// With `review`, streams a screen-by-screen transcript.
     pub fn minimize_snapshot_review(
         dir: &Path,
         sx: usize,
@@ -1261,11 +1265,22 @@ pub mod debug {
             }
         }
 
-        // Entity removal.
-        for key in COLLECTIONS {
+        // Entity removal. Portals are removed too by default (guarded by the
+        // strict anchor predicate, so the artifact's own chain survives);
+        // `keep_portals` opts out.
+        let collections: Vec<&str> = if options.keep_portals {
+            COLLECTIONS.to_vec()
+        } else {
+            COLLECTIONS
+                .iter()
+                .copied()
+                .chain(std::iter::once("portals"))
+                .collect()
+        };
+        for key in collections {
             loop {
                 let len = value
-                    .get(*key)
+                    .get(key)
                     .and_then(|array| array.as_array())
                     .map_or(0, Vec::len);
                 let mut removed_any = false;
@@ -1274,16 +1289,16 @@ pub mod debug {
                         break;
                     }
                     let mut candidate = value.clone();
-                    if let Some(array) = candidate.get_mut(*key).and_then(|v| v.as_array_mut()) {
+                    if let Some(array) = candidate.get_mut(key).and_then(|v| v.as_array_mut()) {
                         array.remove(index);
                     }
                     if let Some(game) = try_candidate(&candidate, &anchor, &renders) {
                         let current_len = value
-                            .get(*key)
+                            .get(key)
                             .and_then(|v| v.as_array())
                             .map_or(0, Vec::len);
                         let removed = value
-                            .get(*key)
+                            .get(key)
                             .and_then(|v| v.as_array())
                             .and_then(|array| array.get(index))
                             .map(|item| item.to_string())

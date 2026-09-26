@@ -18,6 +18,7 @@
 //!       --review-plain      strip ANSI colors from the transcript
 //!       --crop-margin <n>   virtual-screen crop margin in squares (default 4)
 //!       --no-screen-crop    disable the virtual-screen crop step
+//!       --keep-portals      keep all portals instead of minimizing them
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -128,6 +129,8 @@ fn main() -> ExitCode {
                     review.get_or_insert_with(Default::default).colors = false;
                 } else if arg == "--no-screen-crop" {
                     options.screen_crop = false;
+                } else if arg == "--keep-portals" {
+                    options.keep_portals = true;
                 } else if arg == "--crop-margin" {
                     i += 1;
                     match args.get(i).and_then(|value| value.parse::<u32>().ok()) {
