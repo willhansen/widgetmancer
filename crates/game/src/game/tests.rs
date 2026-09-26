@@ -2763,3 +2763,89 @@
             Some(DrawableEnum::OffsetSquare(_))
         ));
     }
+
+    fn set_up_hallways_game() -> Game {
+        // Same 96x26-character clamp the real game uses for racetrack; the
+        // hallways map is compact but the diagram binary reuses this size.
+        let mut game = Game::new(96, 26, Instant::now());
+        game.place_player(point2(24, 13));
+        game.set_up_portal_pair_hallways_map();
+        game
+    }
+
+    // Lane centers relative to the player at (24,13): one-way at y=19,
+    // two-way single-sided at y=13, two-way double-sided at y=7. Every cube
+    // spawns on its lane's left portal square (x=26).
+    fn hallways_cube_seeds() -> [WorldPoint; 3] {
+        [point2(26.0, 19.0), point2(26.0, 13.0), point2(26.0, 7.0)]
+    }
+
+    #[test]
+    fn test_hallways_cubes_loop_after_one_lap() {
+        // 5-square lap at 4/s = 1.25s. All three portal types must close
+        // the same infinite hallway.
+        let mut game = set_up_hallways_game();
+        game.tick_realtime_effects(Duration::from_secs_f32(1.25));
+        for (cube, seed) in game.death_cubes.iter().zip(hallways_cube_seeds()) {
+            assert!(
+                (cube.position - seed).length() < 0.01,
+                "cube ended at {:?}, expected {:?}",
+                cube.position,
+                seed
+            );
+        }
+        game.draw_headless_now();
+    }
+
+    #[test]
+    fn test_hallways_cubes_survive_frame_rate_ticks() {
+        let mut game = set_up_hallways_game();
+        let frame = Duration::from_secs_f32(0.021);
+        // 60 frames ~= 1.26s, one lap plus a little drift.
+        for _ in 0..60 {
+            game.tick_realtime_effects(frame);
+        }
+        assert_eq!(game.death_cubes.len(), 3);
+        for (cube, seed) in game.death_cubes.iter().zip(hallways_cube_seeds()) {
+            assert!(
+                (cube.position - seed).length() < 0.1,
+                "cube ended at {:?}, expected near {:?}",
+                cube.position,
+                seed
+            );
+        }
+        game.draw_headless_now();
+    }
+
+    #[test]
+    fn test_hallways_survives_first_tick_nanosecond_delta() {
+        let mut game = set_up_hallways_game();
+        let positions_before: Vec<WorldPoint> =
+            game.death_cubes.iter().map(|cube| cube.position).collect();
+        game.tick_realtime_effects(Duration::from_nanos(50));
+        assert_eq!(
+            game.death_cubes.iter().map(|cube| cube.position).collect_vec(),
+            positions_before
+        );
+    }
+
+    #[test]
+    fn test_hallways_ascii_diagram_shows_portal_registration() {
+        let game = set_up_hallways_game();
+        let diagram = game.ascii_diagram();
+
+        // One-way single-sided: only the forward face registers.
+        assert!(diagram.contains(" > right (30, 19) -> (26, 19)"));
+        assert!(!diagram.contains("(25, 19)"));
+        assert!(!diagram.contains("(31, 19)"));
+
+        // Two-way single-sided: forward and reverse faces, no back faces.
+        assert!(diagram.contains(" > right (30, 13) -> (26, 13)"));
+        assert!(diagram.contains(" < left (26, 13) -> (30, 13)"));
+        assert!(!diagram.contains("(25, 13)"));
+        assert!(!diagram.contains("(31, 13)"));
+
+        // Two-way double-sided: back faces on both windows register too.
+        assert!(diagram.contains(" > right (25, 7) -> (31, 7)"));
+        assert!(diagram.contains(" < left (31, 7) -> (25, 7)"));
+    }

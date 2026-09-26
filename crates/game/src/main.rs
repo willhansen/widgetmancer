@@ -9,7 +9,7 @@ fn main() {
         [a] if a.starts_with("--map=") => Some(a.trim_start_matches("--map=").to_string()),
         [flag, name] if flag == "--map" => Some(name.clone()),
         _ => {
-            eprintln!("Usage: game [--map <demo|racetrack>]");
+            eprintln!("Usage: game [--map <demo|racetrack|hallways>]");
             return;
         }
     };

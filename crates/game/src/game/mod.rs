@@ -28,6 +28,7 @@ mod ai;
 mod blocks;
 mod combat;
 mod floating_entities;
+mod map_diagram;
 mod realtime;
 mod spawning;
 mod turns;
@@ -1178,6 +1179,52 @@ impl Game {
                 vec2(0.0, 0.0),
             );
         });
+    }
+
+    /// Minimal portal placement map: three horizontal hallways stacked
+    /// vertically, one per portal type, each an infinite loop for a single
+    /// death cube. The point is to isolate placement from rendering — the
+    /// `map_diagram` binary dumps exactly where every portal face registers,
+    /// so a broken hall visually but coherent diagram points at rendering.
+    ///
+    /// Each lane has a 3-wide band (rows y-1..=y+1) of right-facing portals:
+    /// entering the right square moving right emerges from the left square
+    /// moving right, so a cube laps the 5-square hallway forever.
+    ///
+    /// - top: one-way, single-sided — only the forward face is an entrance,
+    ///   so the anti-bounce guard is idle and the cube only ever crosses
+    ///   the right face.
+    /// - middle: two-way, single-sided — adds the reverse face on the
+    ///   emergence plane, which the anti-bounce guard must skip.
+    /// - bottom: two-way, double-sided — also registers the backs of both
+    ///   windows, giving the guard more faces to skip at each emergence.
+    pub fn set_up_portal_pair_hallways_map(&mut self) {
+        let base = self.player_square();
+
+        let left_x = base.x + 2;
+        let right_x = base.x + 6;
+
+        // 6 rows between lane centers leaves 3 empty rows between the
+        // 3-tall portal bands.
+        let lanes: [(i32, fn(&mut Game, SquareWithOrthogonalDir, SquareWithOrthogonalDir)); 3] = [
+            (base.y + 6, Game::place_single_sided_one_way_portal),
+            (base.y, Game::place_single_sided_two_way_portal),
+            (base.y - 6, Game::place_double_sided_two_way_portal),
+        ];
+
+        for (y, place_portal) in lanes {
+            (-1..=1).for_each(|d| {
+                let entrance =
+                    SquareWithOrthogonalDir::from_square_and_worldstep(point2(right_x, y + d), STEP_RIGHT);
+                let exit =
+                    SquareWithOrthogonalDir::from_square_and_worldstep(point2(left_x, y + d), STEP_RIGHT);
+                place_portal(self, entrance, exit);
+            });
+            self.place_linear_death_cube(
+                point2(left_x as f32, y as f32),
+                STEP_RIGHT.to_f32() * 4.0,
+            );
+        }
     }
 
     fn place_dotted_thin_walls(&mut self, bars_top_left_root_square: WorldSquare) {
