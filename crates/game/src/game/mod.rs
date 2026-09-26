@@ -30,6 +30,7 @@ mod combat;
 mod floating_entities;
 mod map_diagram;
 mod realtime;
+pub mod snapshot;
 mod spawning;
 mod turns;
 pub use spawning::IncubatingPawn;

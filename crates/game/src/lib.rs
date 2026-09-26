@@ -25,6 +25,7 @@ use terminal_rendering::glyph::*;
 use utility::*;
 
 use crate::game::Game;
+use crate::game::snapshot::{write_snapshot, InputRecord, SNAPSHOT_KEY};
 use crate::inputmap::InputMap;
 use crate::piece::PieceType;
 
@@ -123,6 +124,8 @@ pub fn do_everything(map_name: Option<String>) {
     //game.set_up_vs_arrows();
 
     let mut prev_tick_start_time = Instant::now();
+    let mut input_history: Vec<InputRecord> = Vec::new();
+    let mut snapshot_requested = false;
     while game.running() {
         let tick_start_time = Instant::now();
         let delta = tick_start_time - prev_tick_start_time;
@@ -130,13 +133,30 @@ pub fn do_everything(map_name: Option<String>) {
         //let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
 
-        while let Ok((_, event)) = event_receiver.try_recv() {
+        while let Ok((event_time, event)) = event_receiver.try_recv() {
+            input_history.push(InputRecord {
+                millis_from_start: event_time
+                    .duration_since(game.graphics().start_time())
+                    .as_millis(),
+                event: event.clone(),
+            });
+            if event == Event::Key(SNAPSHOT_KEY) {
+                snapshot_requested = true;
+            }
+
             input_map.handle_event(&mut game, event);
 
             game.tick_game_logic();
         }
         game.tick_realtime_effects(delta);
         game.draw(&mut wrapped_terminal, Instant::now());
+
+        // Dump after drawing so the snapshot captures the frame the player saw.
+        if snapshot_requested {
+            snapshot_requested = false;
+            write_snapshot(&game, &input_history, map_name.as_deref());
+        }
+
         thread::sleep(Duration::from_millis(21));
     }
 }

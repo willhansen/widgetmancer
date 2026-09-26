@@ -20,3 +20,6 @@ perf.*
 uftrace.data*
 
 gmon.out
+
+# Debug snapshots dumped at runtime with the 'p' key
+/snapshot/
