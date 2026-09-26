@@ -1,0 +1,505 @@
+{
+  "blocks": [],
+  "board_height": 78,
+  "board_width": 70,
+  "conveyor_belts": [],
+  "death_cubes": [],
+  "floating_hunter_drones": [],
+  "floor_push_arrows": [],
+  "incubating_pawns": [],
+  "map": "hallways",
+  "pieces": [],
+  "player": {
+    "blink_range": 5,
+    "faced_direction": [
+      1,
+      0
+    ],
+    "position": [
+      37,
+      44
+    ]
+  },
+  "portals": [
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          36,
+          32
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          42,
+          32
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          36,
+          33
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          42,
+          33
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          36,
+          34
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          42,
+          34
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          37,
+          32
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          41,
+          32
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          37,
+          33
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          41,
+          33
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          37,
+          34
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          41,
+          34
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          37,
+          38
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          41,
+          38
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          37,
+          39
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          41,
+          39
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          37,
+          40
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          41,
+          40
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          32
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          32
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          33
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          33
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          34
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          34
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          38
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          38
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          39
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          39
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          40
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          40
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          44
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          44
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          45
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          45
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          41,
+          46
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          46
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          42,
+          32
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          36,
+          32
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          42,
+          33
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          36,
+          33
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          42,
+          34
+        ]
+      },
+      "exit": {
+        "direction": [
+          -1,
+          0
+        ],
+        "square": [
+          36,
+          34
+        ]
+      }
+    }
+  ],
+  "running": true,
+  "screen": {
+    "center": [
+      37,
+      44
+    ],
+    "origin": [
+      3,
+      82
+    ],
+    "rotation_quarter_turns": 0,
+    "terminal_height": 11,
+    "terminal_width": 73
+  },
+  "turn_count": 0,
+  "upgrades": [],
+  "widgets": [],
+  "world_time_seconds": 4.091499
+}

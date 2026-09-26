@@ -1,6 +1,7 @@
 # Portal-depth partial-visibility artifact
 
-Status: open — blocked on missing headless FOV-inspection tooling.
+Status: **fixed** (2026-09). Tooling built (roadmap W.A–W.G); root cause found
+and patched. See "Resolution" at the end.
 Captured from: `snapshot/` (map `hallways`), player at world (37,44) facing east.
 
 ## Symptom
@@ -86,3 +87,31 @@ No supported way to dump FOV internals for a loaded snapshot. Needed:
    containing arc on intersection instead of accumulating shrink).
 5. Regression test on the snapshot asserting no `OUT_OF_SIGHT`-background partial
    appears at (15,1); run `cargo nextest run`.
+
+## Resolution (2026-09)
+
+The tooling wishlist (roadmap W.A–W.G) was built, then used to locate the bug.
+The original hypothesis (missing depth cap / accumulated arc shrink) was close
+but not the mechanism:
+
+- `fov-trace` showed four depth-3 sub-FOVs all resolving to the same
+  transformed root `(22,44)` with adjacent arc slices
+  (`[0..1.975]`, `[1.975..3.013]`, `[3.013..5.906]`, `[-1.975..0]`) — slices of
+  one portal opening, split across portal faces and octants.
+- Those co-root sub-FOVs were merged by `combined_main_view_only` →
+  `combined_increasing_visibility` (`fov_stuff.rs`), which stores a single
+  `SquareVisibility` half-plane. It only returns "fully visible" for exact
+  complements; otherwise it keeps one half-plane. Instrumentation confirmed the
+  artifact square `(15,1)` was combined as `a=(mostly shadowed) + b=(half) ->
+  b`, discarding `a`'s coverage.
+- The remaining shadow was rendered as an opaque `OUT_OF_SIGHT_COLOR`
+  background (the black), with no shallower view behind it.
+
+**Fix:** carry the view cone on `FieldOfViewResult::view_arc`, and when
+`combined_sub_fovs` merges results that reach the same root (portal slices),
+union their arcs and recompute the affected squares under the unioned cone
+(`combined_with_unioning_arcs`). The top-level octant fold and blocker splits
+keep their distinct arcs. After the fix, `explain 49 37` reports
+`abs_vis "  "` (fully visible) with `bg(165,89,89)` — the black partial is gone.
+Regression test: `test_portal_slice_arcs_union_to_full_visibility`.
+

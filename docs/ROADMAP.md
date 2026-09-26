@@ -452,6 +452,23 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
 
 ## Done
 
+### 12. Fix portal-depth partial-visibility artifact — 2026-09
+- **Evidence:** `issues/black-block-deep-in-portal/` — a black
+  `OUT_OF_SIGHT`-background partial at buffer `(49,37)` (rel `(15,1)`, depth 3)
+  where depths 0–2 see the same absolute square `(37,45)` fully.
+- **Root cause:** sub-FOVs reaching the same transformed root through adjacent
+  portal-face slices were merged by combining per-square half-planes
+  (`combined_increasing_visibility`), which can only express exact complements;
+  the union of two non-complementary partials was lost, leaving a shadow that
+  rendered as opaque `OUT_OF_SIGHT` black.
+- **Landed:** `FieldOfViewResult` carries its `view_arc`; `combined_sub_fovs`
+  merges same-root results with `combined_with_unioning_arcs`, which unions the
+  cones and recomputes affected squares under the union. Top-level octant folds
+  and blocker splits keep their arcs. Regression test
+  `test_portal_slice_arcs_union_to_full_visibility`; full workspace suite green.
+  Debug outputs regenerated under `issues/black-block-deep-in-portal/debug/`
+  (pre-fix minimization kept in `debug/pre-fix/`).
+
 ### 11. Floating squares travel through portals — 2026-09-23
 - **Evidence:** `slide_floating_entity_with_portal_awareness` was a
   `// TODO: portal awareness` stub (realtime.rs); `tick_death_cubes`

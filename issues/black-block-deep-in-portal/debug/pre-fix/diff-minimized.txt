@@ -1,0 +1,1 @@
+OK: issues/black-block-deep-in-portal/debug/minimized/screen.txt matches the render

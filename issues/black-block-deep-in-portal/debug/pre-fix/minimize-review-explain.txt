@@ -1,0 +1,542 @@
+### MINIMIZE REVIEW — target buffer (49,37); anchor rel(15,1) depth 3 abs(37,45); terminal 141x78
+### baseline: death_cubes=3 portals=21
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                    🭈🭆                                       
+                                                                                                🭈🭆🭂█                                         
+                                                                                            🭇🬭🭆🭂                                             
+                                                                                         🭈🭆🭂██                                               
+                                                                                     🭈🭆🬹🭂█                                                   
+                                                                                  🭈🭆🭂█          🭈🬭🬭🭆🬹🭂                                       
+                                                                              🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭                                       
+                                                                                                                                             
+                                                                      🮇█▊       🮇█▊       🮇█▊     🬭🬭🮇█                                       
+                                                                    🢂         🢂         🢂         🢂                                          
+                                                                                🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂                                           
+                                                                                                  🭣🬂🬂🬂                                       
+                                                                                                                                             
+                                                                   🭋          🭍🭑🬼                                                            
+                                                                   ▐  🮇█▊       █🭏🬽                                                          
+                                                                   🭅              █🭍🭑🬼                                                       
+                                                                   █          🭥🭒    ██🭍🬿                                                     
+                                                                  🭋█           🭢🭕█      🭌🭑🬽                                                  
+                                                                                 🭕        █🭍🭑🬼                                               
+                                                                              ◣   🭥🭒    🭍🬿  █🭌🭑🬽                                             
+                                                                 🭋    🮇█▊     █◣   🭢🭕█    🭍🬿    🭍🭑🬼                                          
+                                                                 ▐              ◣    🭥🭒█    🭍🬿    █🭏🬽                                        
+                                                                 🭅█             █◣    🭤🭒🭥🭒    🭍🬿    █🭍                                       
+                                                                 ██           🭢🭔  🬾    🭢 🭢🭕█    🭍🬿                                           
+                                                                🭋█🭡            🭤  🭌🬾     🭥 🭥      🭍🬿                                         
+                                                                   ▐                🬾     🭢🭕🭢🭕      🭍🬿                                       
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+
+--- step 1 — screen crop 141x78 -> 73x11 (margin 4 squares); artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                    🮇█▊       🮇█▊       🮇█▊     🬭🬭🮇█     
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐  🮇█▊       █🭏🬽                        
+
+--- step 2 — removed death_cubes[2] = {"id":2,"position":[38.36601,32.999374],"velocity":[4,0]}; death_cubes 3 -> 2; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                    🮇█▊       🮇█▊       🮇█▊     🬭🬭🮇█     
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐  🮇█▊       █🭏🬽                        
+
+--- step 3 — removed death_cubes[1] = {"id":1,"position":[38.36601,39.000015],"velocity":[4,0]}; death_cubes 2 -> 1; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                    🮇█▊       🮇█▊       🮇█▊     🬭🬭🮇█     
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐            █🭏🬽                        
+
+--- step 4 — removed death_cubes[0] = {"id":0,"position":[38.36601,44.99968],"velocity":[4,0]}; death_cubes 1 -> 0; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐            █🭏🬽                        
+
+--- step 5 — removed portals[20] = {"entrance":{"direction":[-1,0],"square":[42,34]},"exit":{"direction":[-1,0],"square":[36,34]}}; portals 21 -> 20; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐            █🭏🬽                        
+
+--- step 6 — removed portals[19] = {"entrance":{"direction":[-1,0],"square":[42,33]},"exit":{"direction":[-1,0],"square":[36,33]}}; portals 20 -> 19; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐            █🭏🬽                        
+
+--- step 7 — removed portals[18] = {"entrance":{"direction":[-1,0],"square":[42,32]},"exit":{"direction":[-1,0],"square":[36,32]}}; portals 19 -> 18; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐            █🭏🬽                        
+
+--- step 8 — removed portals[17] = {"entrance":{"direction":[1,0],"square":[41,46]},"exit":{"direction":[1,0],"square":[37,46]}}; portals 18 -> 17; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐            █🭏🬽                        
+
+--- step 9 — removed portals[14] = {"entrance":{"direction":[1,0],"square":[41,40]},"exit":{"direction":[1,0],"square":[37,40]}}; portals 17 -> 16; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋                                       
+                                 ▐          🭍🬿                           
+
+--- step 10 — removed portals[13] = {"entrance":{"direction":[1,0],"square":[41,39]},"exit":{"direction":[1,0],"square":[37,39]}}; portals 16 -> 15; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋                                       
+                                 ▐                                       
+
+--- step 11 — removed portals[12] = {"entrance":{"direction":[1,0],"square":[41,38]},"exit":{"direction":[1,0],"square":[37,38]}}; portals 15 -> 14; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋                                       
+                                 ▐                                       
+
+--- step 12 — removed portals[11] = {"entrance":{"direction":[1,0],"square":[41,34]},"exit":{"direction":[1,0],"square":[37,34]}}; portals 14 -> 13; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋                                       
+                                 ▐                                       
+
+--- step 13 — removed portals[10] = {"entrance":{"direction":[1,0],"square":[41,33]},"exit":{"direction":[1,0],"square":[37,33]}}; portals 13 -> 12; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋                                       
+                                 ▐                                       
+
+--- step 14 — removed portals[9] = {"entrance":{"direction":[1,0],"square":[41,32]},"exit":{"direction":[1,0],"square":[37,32]}}; portals 12 -> 11; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋                                       
+                                 ▐                                       
+
+--- step 15 — removed portals[8] = {"entrance":{"direction":[-1,0],"square":[37,40]},"exit":{"direction":[-1,0],"square":[41,40]}}; portals 11 -> 10; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+--- step 16 — removed portals[7] = {"entrance":{"direction":[-1,0],"square":[37,39]},"exit":{"direction":[-1,0],"square":[41,39]}}; portals 10 -> 9; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+--- step 17 — removed portals[6] = {"entrance":{"direction":[-1,0],"square":[37,38]},"exit":{"direction":[-1,0],"square":[41,38]}}; portals 9 -> 8; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+--- step 18 — removed portals[5] = {"entrance":{"direction":[-1,0],"square":[37,34]},"exit":{"direction":[-1,0],"square":[41,34]}}; portals 8 -> 7; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+--- step 19 — removed portals[4] = {"entrance":{"direction":[-1,0],"square":[37,33]},"exit":{"direction":[-1,0],"square":[41,33]}}; portals 7 -> 6; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+--- step 20 — removed portals[3] = {"entrance":{"direction":[-1,0],"square":[37,32]},"exit":{"direction":[-1,0],"square":[41,32]}}; portals 6 -> 5; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+--- step 21 — removed portals[2] = {"entrance":{"direction":[1,0],"square":[36,34]},"exit":{"direction":[1,0],"square":[42,34]}}; portals 5 -> 4; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+--- step 22 — removed portals[1] = {"entrance":{"direction":[1,0],"square":[36,33]},"exit":{"direction":[1,0],"square":[42,33]}}; portals 4 -> 3; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+--- step 23 — removed portals[0] = {"entrance":{"direction":[1,0],"square":[36,32]},"exit":{"direction":[1,0],"square":[42,32]}}; portals 3 -> 2; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+explain (square 32, row 4):
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })
+
+                                                              🭈🬭🭆🬹🭂█     
+                                                        🭈🬭🭆🬹🭂█           
+                                                  🭈🬭🭆🬹🭂█                 
+                                            🭈🬭🭆🬹🭂█      🭈🬭🬭🬭🭆🬹🬹🬹   🭈     
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                                                         
+                                                                         
+
+### done: minimized in 27 renders (cap 4000); 23 steps; wrote issues/black-block-deep-in-portal/debug/minimized-explain.json

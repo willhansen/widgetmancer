@@ -297,6 +297,12 @@ pub struct FieldOfViewResult {
     center_square: WorldSquare,
     key_direction: OrthogonalWorldStep,
     center_offset: WorldMove,
+    /// The view cone this result was computed over. Carried so that results
+    /// reaching the same root through different portal faces (adjacent arc
+    /// slices of one opening) can be merged at the *arc* level rather than by
+    /// combining their per-square half-planes (roadmap fix for the
+    /// portal-depth partial-visibility artifact).
+    view_arc: AngleInterval,
     visible_relative_squares_in_main_view_only: StepVisibilityMap,
     transformed_sub_fovs: Vec<FieldOfViewResult>,
 }
@@ -310,6 +316,7 @@ impl FieldOfViewResult {
             center_square,
             key_direction,
             center_offset: [0.0; 2].into(),
+            view_arc: AngleInterval::default(),
             visible_relative_squares_in_main_view_only: Default::default(),
             transformed_sub_fovs: vec![],
         }
@@ -416,11 +423,34 @@ impl FieldOfViewResult {
             .collect()
     }
 
-    fn combined_main_view_only(&self, other: &Self) -> Self {
+    fn combined_main_view_only(&self, other: &Self, union_arcs: bool) -> Self {
         assert_eq!(
             self.root_square_with_direction(),
             other.root_square_with_direction()
         );
+
+        // When merging two results that reach the same root through adjacent
+        // portal-face slices, union their view cones and recompute the affected
+        // squares under the union. Combining the per-square half-planes instead
+        // (the old path) cannot represent the union and leaves a spurious
+        // partial (the portal-depth black-block artifact).
+        let combined_arc: Option<AngleInterval> = if union_arcs
+            && self.view_arc.width().radians > 0.0
+            && other.view_arc.width().radians > 0.0
+            && self.view_arc.overlaps_or_touches(other.view_arc)
+        {
+            Some(self.view_arc.union(other.view_arc))
+        } else {
+            None
+        };
+        let widen = |square: WorldStep, fallback: SquareVisibility| -> SquareVisibility {
+            match combined_arc {
+                Some(arc) => {
+                    visibility_of_offset_square(arc, square, self.center_offset).unwrap_or(fallback)
+                }
+                None => fallback,
+            }
+        };
 
         let squares_visible_in_only_one_view: StepSet = self
             .at_least_partially_visible_relative_squares_in_main_view_only()
@@ -435,6 +465,7 @@ impl FieldOfViewResult {
             .clone()
             .into_iter()
             .filter(|(square, _)| squares_visible_in_only_one_view.contains(square))
+            .map(|(square, visibility)| (square, widen(square, visibility)))
             .collect();
 
         let visibility_of_squares_only_visible_in_other: StepVisibilityMap = other
@@ -442,6 +473,7 @@ impl FieldOfViewResult {
             .clone()
             .into_iter()
             .filter(|(square, _)| squares_visible_in_only_one_view.contains(square))
+            .map(|(square, visibility)| (square, widen(square, visibility)))
             .collect();
 
         let all_visible_squares: StepSet = self
@@ -467,7 +499,13 @@ impl FieldOfViewResult {
                         .visible_relative_squares_in_main_view_only
                         .get(&square)
                         .unwrap();
-                    let combined = partial_a.combined_increasing_visibility(&partial_b);
+                    let combined = match combined_arc {
+                        Some(arc) => visibility_of_offset_square(arc, square, self.center_offset)
+                            .unwrap_or_else(|| {
+                                partial_a.combined_increasing_visibility(partial_b)
+                            }),
+                        None => partial_a.combined_increasing_visibility(partial_b),
+                    };
                     (square, combined)
                 })
                 .collect();
@@ -480,6 +518,7 @@ impl FieldOfViewResult {
             center_square: self.center_square,
             key_direction: self.key_direction,
             center_offset: self.center_offset,
+            view_arc: combined_arc.unwrap_or(self.view_arc),
             visible_relative_squares_in_main_view_only: all_visibilities,
             transformed_sub_fovs: vec![],
         }
@@ -506,7 +545,7 @@ impl FieldOfViewResult {
                     fov_list
                         .into_iter()
                         .reduce(|acc: FieldOfViewResult, next_fov: FieldOfViewResult| {
-                            acc.combined_with(&next_fov)
+                            acc.combined_with_unioning_arcs(&next_fov)
                         })
                         .unwrap()
                 },
@@ -522,18 +561,38 @@ impl FieldOfViewResult {
             other.root_square_with_direction()
         );
 
-        let mut top_view_combined_fov = self.combined_main_view_only(other);
+        let mut top_view_combined_fov = self.combined_main_view_only(other, false);
 
         top_view_combined_fov.transformed_sub_fovs =
             Self::combined_sub_fovs(&self.transformed_sub_fovs, &other.transformed_sub_fovs);
 
         top_view_combined_fov
     }
+
+    /// Like [`combined_with`], but unions the two view cones when they overlap
+    /// or touch. Used only when merging results that reach the same root via
+    /// portal faces (see `combined_sub_fovs`); the top-level octant fold and
+    /// blocker splits must keep their distinct arcs.
+    fn combined_with_unioning_arcs(&self, other: &Self) -> Self {
+        assert_eq!(
+            self.root_square_with_direction(),
+            other.root_square_with_direction()
+        );
+
+        let mut top_view_combined_fov = self.combined_main_view_only(other, true);
+
+        top_view_combined_fov.transformed_sub_fovs =
+            Self::combined_sub_fovs(&self.transformed_sub_fovs, &other.transformed_sub_fovs);
+
+        top_view_combined_fov
+    }
+
     fn without_sub_views(&self) -> Self {
         FieldOfViewResult {
             center_square: self.center_square,
             key_direction: self.key_direction,
             center_offset: self.center_offset,
+            view_arc: self.view_arc,
             visible_relative_squares_in_main_view_only: self
                 .visible_relative_squares_in_main_view_only
                 .clone(),
@@ -1002,6 +1061,8 @@ pub fn field_of_view_within_arc_in_single_octant(
     mut trace: Option<&mut FovTrace>,
 ) -> FieldOfViewResult {
     let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(center_square, key_direction);
+    fov_result.center_offset = center_offset;
+    fov_result.view_arc = view_arc;
 
     // TODO: Stop being an iterator, just be a function
     let rel_squares_in_fov_sequence =
@@ -2165,6 +2226,38 @@ mod tests {
         assert!(depth1.transformed_center_square.is_some());
         assert!(!trace.to_tree_string().is_empty());
         assert!(trace.to_json().starts_with('['));
+    }
+
+    #[test]
+    fn test_portal_slice_arcs_union_to_full_visibility() {
+        // Two portal faces on one east wall both lead to the same transformed
+        // root; the square seen through them must end up fully visible rather
+        // than a spurious OUT_OF_SIGHT partial (the black-block artifact).
+        let mut portal_geometry = PortalGeometry::default();
+        let player = point2(37, 44);
+        portal_geometry.create_portal(
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(41, 44), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(37, 44), STEP_RIGHT),
+        );
+        portal_geometry.create_portal(
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(41, 45), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(37, 45), STEP_RIGHT),
+        );
+
+        let fov =
+            portal_aware_field_of_view_from_square(player, 16, &Default::default(), &portal_geometry);
+        let visibilities = fov.visibilities_of_relative_square(WorldStep::new(15, 1));
+        let artifact = visibilities
+            .iter()
+            .find(|v| v.absolute_square() == WorldSquare::new(37, 45))
+            .expect("depth-3 image of abs(37,45)");
+        assert!(
+            artifact
+                .square_visibility_in_absolute_frame()
+                .is_fully_visible(),
+            "expected fully visible, got {:?}",
+            artifact.square_visibility_in_absolute_frame().as_string()
+        );
     }
 
     #[test]

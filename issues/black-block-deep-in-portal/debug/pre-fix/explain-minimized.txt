@@ -1,0 +1,5 @@
+cell (square 32, row 4) left_col 64 world(52,45) rel(15,1) fov_center(37,44):
+  final: '🬭' fg(165,89,89) bg(77,0,0)
+  fov visibilities: 1
+    depth 3 abs(37,45) rot 0 abs_vis "🬭🬭" rel_vis "🬭🬭"
+      draw_buffer: SolidColor(SolidColorDrawable { color: Rgb { r: 127, g: 127, b: 127 } })

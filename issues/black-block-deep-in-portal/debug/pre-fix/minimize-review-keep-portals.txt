@@ -1,0 +1,134 @@
+### MINIMIZE REVIEW — target buffer (49,37); anchor rel(15,1) depth 3 abs(37,45); terminal 141x78
+### baseline: death_cubes=3 portals=21
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                    🭈🭆                                       
+                                                                                                🭈🭆🭂█                                         
+                                                                                            🭇🬭🭆🭂                                             
+                                                                                         🭈🭆🭂██                                               
+                                                                                     🭈🭆🬹🭂█                                                   
+                                                                                  🭈🭆🭂█          🭈🬭🬭🭆🬹🭂                                       
+                                                                              🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭                                       
+                                                                                                                                             
+                                                                      🮇█▊       🮇█▊       🮇█▊     🬭🬭🮇█                                       
+                                                                    🢂         🢂         🢂         🢂                                          
+                                                                                🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂                                           
+                                                                                                  🭣🬂🬂🬂                                       
+                                                                                                                                             
+                                                                   🭋          🭍🭑🬼                                                            
+                                                                   ▐  🮇█▊       █🭏🬽                                                          
+                                                                   🭅              █🭍🭑🬼                                                       
+                                                                   █          🭥🭒    ██🭍🬿                                                     
+                                                                  🭋█           🭢🭕█      🭌🭑🬽                                                  
+                                                                                 🭕        █🭍🭑🬼                                               
+                                                                              ◣   🭥🭒    🭍🬿  █🭌🭑🬽                                             
+                                                                 🭋    🮇█▊     █◣   🭢🭕█    🭍🬿    🭍🭑🬼                                          
+                                                                 ▐              ◣    🭥🭒█    🭍🬿    █🭏🬽                                        
+                                                                 🭅█             █◣    🭤🭒🭥🭒    🭍🬿    █🭍                                       
+                                                                 ██           🭢🭔  🬾    🭢 🭢🭕█    🭍🬿                                           
+                                                                🭋█🭡            🭤  🭌🬾     🭥 🭥      🭍🬿                                         
+                                                                   ▐                🬾     🭢🭕🭢🭕      🭍🬿                                       
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+                                                                                                                                             
+
+--- step 1 — screen crop 141x78 -> 73x11 (margin 4 squares); artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                    🮇█▊       🮇█▊       🮇█▊     🬭🬭🮇█     
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐  🮇█▊       █🭏🬽                        
+
+--- step 2 — removed death_cubes[2] = {"id":2,"position":[38.36601,32.999374],"velocity":[4,0]}; death_cubes 3 -> 2; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                    🮇█▊       🮇█▊       🮇█▊     🬭🬭🮇█     
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐  🮇█▊       █🭏🬽                        
+
+--- step 3 — removed death_cubes[1] = {"id":1,"position":[38.36601,39.000015],"velocity":[4,0]}; death_cubes 2 -> 1; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                    🮇█▊       🮇█▊       🮇█▊     🬭🬭🮇█     
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐            █🭏🬽                        
+
+--- step 4 — removed death_cubes[0] = {"id":0,"position":[38.36601,44.99968],"velocity":[4,0]}; death_cubes 1 -> 0; artifact preserved: rel(15,1) depth 3 abs(37,45) fg(165,89,89) bg(77,0,0) ---
+                                                   🭈🭆🬹🭂█                 
+                                                🭈🭆🭂█          🭈🬭🬭🭆🬹🭂     
+                                            🭈🭆🭂█       🭈🬭🭆🬹🬹🭂█   🭈🬭🬭     
+                                                                         
+                                                                🬭🬭       
+                                  🢂         🢂         🢂         🢂        
+                                              🭣🬂🬂🬂🬂🬂🭧🬎      🭣🬂🬂🬂         
+                                                                🭣🬂🬂🬂     
+                                                                         
+                                 🭋          🭍🭑🬼                          
+                                 ▐            █🭏🬽                        
+
+### done: minimized in 4 renders (cap 4000); 4 steps; wrote issues/black-block-deep-in-portal/debug/minimized-keep-portals.json

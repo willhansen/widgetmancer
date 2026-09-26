@@ -15,6 +15,20 @@ Implemented the debug-tooling wishlist from the front of
 [ROADMAP.md](ROADMAP.md), motivated by the portal-depth partial-visibility
 artifact in `issues/black-block-deep-in-portal/`. All workspace tests green.
 
+### fov: union portal-slice view cones before merging (fixes black-block artifact)
+Root cause: sub-FOVs reaching the same transformed root through adjacent
+portal-face slices were merged by combining their per-square half-planes
+(`combined_increasing_visibility`), which cannot represent the union of two
+non-complementary partials; the uncovered part rendered as an `OUT_OF_SIGHT`
+(black) partial. Carry the view cone on `FieldOfViewResult::view_arc` and, when
+`combined_sub_fovs` merges same-root results, union the arcs and recompute
+affected squares under the unioned cone (`combined_with_unioning_arcs`); the
+top-level octant fold and blocker splits keep their arcs. The artifact cell
+`(49,37)` now renders as a fully-visible tinted floor. Added regression test
+`test_portal_slice_arcs_union_to_full_visibility`; full workspace suite green
+(238 game lib). Regenerated the issue debug outputs (analysis post-fix;
+minimizer outputs moved to `debug/pre-fix/`).
+
 ### game: minimize portals too, with --keep-portals opt-out (W.E)
 The minimizer previously protected all portals, leaving 21 in the black-block
 repro. It now removes portal entries by default; the strict anchor predicate

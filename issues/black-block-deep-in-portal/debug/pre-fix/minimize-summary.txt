@@ -1,0 +1,1 @@
+minimized in 27 renders (cap 4000); 23 steps; wrote issues/black-block-deep-in-portal/debug/minimized.json
