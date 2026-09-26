@@ -47,4 +47,3 @@ or directly:
 
 - Vision: `docs/vision/floating-square-debug-tool.md`
 - Rendering background: `docs/FLOATING_BLOCKS.md`
-- History: `docs/checkpoints/floating-square-*.md`

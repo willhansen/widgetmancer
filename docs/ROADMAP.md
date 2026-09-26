@@ -135,8 +135,7 @@ with each item so the context doesn't have to be re-discovered later.
     un-deprecate-or-rename decision), `Graphics::square_is_white` x5,
     `Glyph::get_glyphs_for_player` x1. Then remove
     `#![allow(warnings)]` and add clippy to CI.
-  - PHASE 3 STEP 1 COMPLETE (2026-08-07, trivial group; full log
-    `docs/checkpoints/roadmap-2-phase3-step1.md`): deleted dead
+  - PHASE 3 STEP 1 COMPLETE (2026-08-07, trivial group): deleted dead
     `Graphics::off_board_color_at_square` and `checkerboard_square_function`
     (0 callers each); renamed `square_is_white` → `square_is_light` (only
     live caller `radial_shockwave.rs`, which needs the chessboard-light parity
@@ -147,8 +146,7 @@ with each item so the context doesn't have to be re-discovered later.
     items remain in the game crate: `from_square_visibility` x16 and
     `draw_glyphs_for_square_to_draw_buffer` x8. Suite: 459 passed / 11
     ignored, unchanged.
-  - PHASE 3 STEP 2 COMPLETE (2026-08-07; log
-    `docs/checkpoints/roadmap-2-phase3-step2.md`): resolved the
+  - PHASE 3 STEP 2 COMPLETE (2026-08-07): resolved the
     un-deprecate-or-rename decision for `draw_glyphs_for_square_to_draw_buffer`
     — deleted it (not renamed) and migrated its 8 callers (all internal to
     `graphics.rs` incl. 2 in `#[cfg(test)]`) to
@@ -156,8 +154,7 @@ with each item so the context doesn't have to be re-discovered later.
     which is byte-for-byte what the deprecated body did. Re-probe now shows a
     single remaining deprecation: `from_square_visibility` x16. Suite:
     459 passed / 11 ignored.
-  - PHASE 3 STEP 3 COMPLETE (2026-08-07; log
-    `docs/checkpoints/roadmap-2-phase3-step3.md`): migrated all 17
+  - PHASE 3 STEP 3 COMPLETE (2026-08-07): migrated all 17
     `from_square_visibility` uses (all `#[cfg(test)]` — 15 in fov_stuff tests,
     1 in drawable.rs test, + the def) to
     `from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), viz)`,
@@ -266,8 +263,7 @@ with each item so the context doesn't have to be re-discovered later.
   hextants, quadrants); sibling cells of one square drop different axes, so
   the edges land at different positions per column. Failing visual test:
   `crates/terminal_rendering/tests/floating_square_coherence.rs` (5/9
-  sampled positions along a motion line fail edge coherence). Details:
-  [checkpoints/floating-square-rendering-quality.md](checkpoints/floating-square-rendering-quality.md).
+  sampled positions along a motion line fail edge coherence).
 - **Plan:** pick the glyph family once per square (score families against
   the center offset, y weighted ~2x for cell aspect), then snap all
   half-cells within that family. Also fix the debug tool's misleading
@@ -299,7 +295,6 @@ with each item so the context doesn't have to be re-discovered later.
   an entrance-only rule that covers one-way, two-way, and double-sided
   portals with no inverse transforms or transit tracking. Both TODO tests
   un-ignored and passing. Suite: 509 passed / 9 skipped.
-  Full log: [checkpoints/floating-entities-through-portals.md](checkpoints/floating-entities-through-portals.md).
 
 ### 10. Improve floating-square rendering quality — 2026-08
 - **Evidence:** post-item-9 evaluation found (a) a 0.25×1/6 silhouette notch
@@ -323,7 +318,6 @@ with each item so the context doesn't have to be re-discovered later.
   sweeps per frame), one biased pick per frame forced on all 9 cells
   (portal rotations re-derive — families aren't rotation-invariant). Hysteresis takes boundary flicker from 39 switches
   to 0 with silhouette metrics green. Suite: 469 passed / 0 failed.
-  Full log: [checkpoints/floating-square-rendering-improvements.md](checkpoints/floating-square-rendering-improvements.md).
 
 ### 8. Migrate animation/graphics API off the world character grid — 2026-08-02
 - **Evidence:** `Animation::glyphs_at_time` returned `WorldCharacterSquareGlyphMap`
@@ -351,15 +345,12 @@ with each item so the context doesn't have to be re-discovered later.
   tests retain coverage. Workspace deprecation warnings: 59 → 0 (only 2
   intentional glob-shadowing warnings remain, item 4). Suite: 459 passed /
   11 skipped (14 tests of deleted APIs removed/converted).
-  Full log: `docs/checkpoints/roadmap-8-flip-animation-trait.md`.
 
 ### 1. Split the `game.rs` god module — 2026-07-30
 - **Evidence:** `crates/game/src/game.rs` was ~4,900 LOC with 121 `pub fn`s and ~59 `unwrap()`s.
 - **Landed:** extracted `game/blocks.rs`, `game/floating_entities.rs`, `game/ai.rs`,
   `game/spawning.rs`, `game/turns.rs`, `game/tests.rs`, `game/combat.rs`, and
-  `game/realtime.rs` in seven compiling steps (checkpoints:
-  `docs/checkpoints/roadmap-1.1-extract-blocks.md` through
-  `roadmap-1.7-extract-combat-realtime.md`). `mod.rs` is now 1,219 lines —
+  `game/realtime.rs` in seven compiling steps. `mod.rs` is now 1,219 lines —
   primarily the `Game` struct, core accessors, map construction, and rendering
   glue; no non-test module exceeds ~1.5k LOC. Test suite held at 470 passed /
   11 skipped throughout; public `Game` API unchanged.
