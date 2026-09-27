@@ -138,5 +138,24 @@ The actual game. Modules:
   `crates/terminal_rendering/test_data/`); `tests/integration_tests.rs` covers
   end-to-end behavior. Recommended runner: `cargo nextest run`.
 - `bacon.toml` — bacon watch config; `flake.nix` — Nix dev shell;
-  `scripts/` — test recording/printing helpers; `flamegraph.svg` — a captured
-  performance profile.
+  `scripts/` — test recording/printing helpers.
+
+### Profiling (what actually runs in this sandbox)
+
+`flake.nix` lists more profilers than resolve here, so don't trust it as an
+inventory. `.cargo/config.toml` builds with `-Zinstrument-mcount` (plus frame
+pointers), so the toolchain is already mcount-instrumented.
+
+| Tool | Status | Use |
+|------|--------|-----|
+| `uftrace` 0.19 | works | function tracing / `report` / `graph` / `--flame-graph`; run against `target/debug/*` (verified on `map_diagram racetrack`) |
+| `gprof` | works | sampling profile from a run's `gmon.out`; no `perf` needed |
+| `cargo-nextest` | works | test runner (README) |
+| `cargo-flamegraph` | broken | installed, but its Linux backend is `perf`, which is absent |
+| `cargo-profiler` | broken | wraps valgrind callgrind/cachegrind; valgrind absent |
+
+No `perf`, `valgrind`, `gdb`, `lldb`, or `rr`. `flamegraph.svg` at the repo
+root is stale (pre-sandbox). The live game loop (`lib.rs`) is a TTY
+alternate-screen loop, so profile headlessly instead: the `map_diagram` bin,
+`Game::draw_headless_now`, or a frame-loop test such as
+`test_racetrack_map_cubes_survive_frame_rate_ticks`.

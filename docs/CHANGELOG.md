@@ -9,6 +9,21 @@ Newest first.
 
 ---
 
+## 2026-09 — Document which profilers actually run in the sandbox
+
+### docs: note available profiling tooling in ARCHITECTURE
+The `flake.nix` dev shell lists `cargo-flamegraph`, `cargo-profiler` and
+`uftrace`, but in this sandbox only some resolve. Replaced the stale
+`flamegraph.svg` mention in "Testing & Tooling" with a table of what actually
+runs: `uftrace` (verified via dynamic tracing of `map_diagram racetrack`),
+`gprof` (sampling from `gmon.out`), and `cargo-nextest` work; `cargo-flamegraph`
+and `cargo-profiler` do not, because `perf` and `valgrind` are absent (as are
+gdb/lldb/rr). Noted that `.cargo/config.toml` already builds with
+`-Zinstrument-mcount`, and that the TTY game loop must be profiled through a
+headless harness (`map_diagram`, `draw_headless_now`, or a frame-loop test).
+
+---
+
 ## 2026-09 — Build wide racetrack portal bands from one transform
 
 ### game: derive every wide-band strip from one portal transform
