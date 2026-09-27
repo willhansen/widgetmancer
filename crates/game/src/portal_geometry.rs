@@ -333,9 +333,15 @@ impl PortalGeometry {
     /// register their reverse/back faces as entrances too, so callers that
     /// care about "all portal windows" only need to look at entrances.
     pub fn iter_portals(&self) -> impl Iterator<Item = Portal> + '_ {
-        self.portal_exits_by_entrance
+        let mut portals: Vec<Portal> = self
+            .portal_exits_by_entrance
             .iter()
             .map(|(&entrance, &exit)| Portal::new(entrance, exit))
+            .collect();
+        // Deterministic order: callers (e.g. floating-entity remapping) must
+        // not depend on hash-map iteration order.
+        portals.sort_by_key(|portal| portal.entrance().sort_key());
+        portals.into_iter()
     }
 
     pub fn multiple_portal_aware_steps(
@@ -355,7 +361,8 @@ impl PortalGeometry {
     }
 
     pub fn portals_entering_from_square(&self, square: WorldSquare) -> Vec<Portal> {
-        self.portal_exits_by_entrance
+        let mut portals: Vec<Portal> = self
+            .portal_exits_by_entrance
             .iter()
             .filter(
                 |(&entrance, _): &(&SquareWithOrthogonalDir, &SquareWithOrthogonalDir)| {
@@ -367,7 +374,10 @@ impl PortalGeometry {
                     Portal::new(entrance, exit)
                 },
             )
-            .collect()
+            .collect();
+        // Deterministic order; the FOV builds sub-views by iterating these.
+        portals.sort_by_key(|portal| portal.entrance().sort_key());
+        portals
     }
     pub fn ray_to_naive_line_segments(
         &self,
@@ -694,6 +704,37 @@ mod tests {
         assert_eq!(rotation, QuarterTurnsAnticlockwise::default());
         assert_eq!(segments.len(), 5);
     }
+    #[test]
+    fn test_portal_iteration_is_deterministic() {
+        // Portal iteration feeds FOV sub-view order; it must not depend on
+        // hash-map order. Guards the sort in `iter_portals` /
+        // `portals_entering_from_square`.
+        let mut pg = PortalGeometry::default();
+        pg.create_double_sided_two_way_portal(
+            (point2(10, 11), STEP_UP).into(),
+            (point2(12, 11), STEP_RIGHT).into(),
+        );
+        pg.create_double_sided_two_way_portal(
+            (point2(20, 11), STEP_RIGHT).into(),
+            (point2(20, 9), STEP_DOWN).into(),
+        );
+        let keys: Vec<_> = pg.iter_portals().map(|p| p.entrance().sort_key()).collect();
+        let mut sorted = keys.clone();
+        sorted.sort();
+        assert_eq!(keys, sorted);
+
+        for square in [point2(10, 11), point2(12, 11), point2(20, 11), point2(20, 9)] {
+            let keys: Vec<_> = pg
+                .portals_entering_from_square(square)
+                .iter()
+                .map(|p| p.entrance().sort_key())
+                .collect();
+            let mut sorted = keys.clone();
+            sorted.sort();
+            assert_eq!(keys, sorted, "square {square:?} not sorted");
+        }
+    }
+
     #[test]
     fn test_portal_aware_move_through_two_way_portal_keeps_going() {
         // Two-way portals register reverse twins exactly on the mover's

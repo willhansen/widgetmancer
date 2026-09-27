@@ -46,7 +46,7 @@ fn main() {
             fov_toggles.cache = true;
         } else if let Some(value) = arg.strip_prefix("--fov-budget=") {
             match value.parse::<f32>() {
-                Ok(n) => fov_toggles.cumulative_distance_budget = Some(n),
+                Ok(n) => fov_toggles.cumulative_radius_budget = Some(n),
                 Err(_) => {
                     usage();
                     return;
@@ -54,7 +54,7 @@ fn main() {
             }
         } else if arg == "--fov-budget" {
             match iter.next().and_then(|value| value.parse::<f32>().ok()) {
-                Some(n) => fov_toggles.cumulative_distance_budget = Some(n),
+                Some(n) => fov_toggles.cumulative_radius_budget = Some(n),
                 None => {
                     usage();
                     return;

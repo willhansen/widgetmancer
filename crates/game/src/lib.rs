@@ -81,8 +81,8 @@ pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
 pub struct FovToggles {
     /// Prototype A: cache the player FOV per player square.
     pub cache: bool,
-    /// Prototype B: cumulative portal-distance budget in squares.
-    pub cumulative_distance_budget: Option<f32>,
+    /// Prototype B: cumulative relative-radius budget in squares.
+    pub cumulative_radius_budget: Option<f32>,
 }
 
 pub fn do_everything(
@@ -117,7 +117,7 @@ pub fn do_everything(
         }
     };
     game.set_fov_cache_enabled(fov_toggles.cache);
-    game.set_fov_cumulative_distance_budget(fov_toggles.cumulative_distance_budget);
+    game.set_fov_cumulative_radius(fov_toggles.cumulative_radius_budget);
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 

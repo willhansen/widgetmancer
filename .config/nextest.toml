@@ -1,0 +1,13 @@
+# nextest configuration.
+#
+# Catch runaway tests automatically: a test is marked slow after 60s and
+# terminated after 2 periods (120s). Ordinary slow tests (the slowest here is
+# ~25s) are unaffected; an accidental unbounded loop is killed instead of
+# hanging the suite.
+#
+# Per-test overrides can tighten this, e.g.:
+#   [[profile.default.overrides]]
+#   filter = 'test(some_known_slow_test)'
+#   slow-timeout = { period = "120s", terminate-after = 2 }
+[profile.default]
+slow-timeout = { period = "60s", terminate-after = 2 }

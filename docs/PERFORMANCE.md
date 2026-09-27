@@ -103,23 +103,32 @@ snapshot load. Expected: stationary frames drop 71 ms → ~24 ms (FOV is 47 of
 result is `Clone`, and `FieldOfViewResult` is pure. Verify with a
 recompute-count test plus the existing golden render tests.
 
-### B. Make the distance cap cumulative
-Thread a `remaining: f32` budget through the recursion, initialized to the
-budget (not `radius`), and subtract the hop distance
-(`|transformed_center.square() − center_square|`) at each portal crossing
-(`:1207`); stop recursing at `remaining <= 0`. The per-hop `out_of_range` bound
-stays `radius`, so this only gates *whether* to cross a portal — it is a
-distance cap, not a depth cap, and it never shrinks a hop's own view. Racetrack
-corners are ~2-3 squares per hop, so total portal-aware sight distance is
-bounded while nearby portals can still be crossed several times. Medium risk:
-it changes visible results, so pick a budget that preserves intended views (the
-19-wide L wall, snapshots). Verify against the FOV invariant oracle,
+> **TODO(map-mutation):** the cache key is only the player square, valid only
+> while blocks/portals are immutable after setup/load. When they become
+> dynamically mutable, add a `map_version: u64` bumped on mutation and include
+> it in the key (or invalidate on mutation), so the cache degrades to partial
+> invalidation rather than going stale. Left for later by request.
+
+### B. Cumulative *relative-radius* cap
+Thread a `remaining_radius: f32` through the recursion, initialized to the
+budget (top-level extent clamped to `radius`), and at each portal crossing
+subtract how far sight travelled **in the current frame** to reach the portal
+(the portal square's Chebyshev offset), not the portal's absolute jump. The
+current frame's extent is `min(radius, remaining_radius)`. This bounds total
+relative sight travel (and thus recursion) without charging a portal its
+unwrapped jump distance — so an adjacent portal that leads far away stays
+see-through. It is a radius cap, not a depth cap. Medium risk: it changes
+visible results (it shrinks peripheral views as the budget is spent), so pick a
+budget that preserves intended views. Verify against the FOV invariant oracle,
 `test_portal_slice_arcs_union_to_full_visibility`, the racetrack L-wall render
 test, and snapshot goldens.
 
-> A first cut initialized `remaining` to `radius`, which silently ignored the
-> budget's magnitude (every budget ≥ radius behaved identically). The prototype
-> now initializes from the budget; the numbers below reflect the fix.
+> Earlier cuts were wrong in two ways: (1) `remaining` was initialized to
+> `radius`, silently ignoring the budget's magnitude (every budget ≥ radius
+> behaved identically); (2) the spend was the portal's absolute
+> entrance↔exit separation, which hides adjacent portals that lead far (see the
+> issue snapshot below). Both are fixed; the numbers below reflect the
+> relative-radius metric.
 
 ### C. Dominance pruning (no cap at all)
 Track, per transformed root (or `(root, octant)`), the union of arcs already
@@ -153,54 +162,77 @@ and the FOV pipeline.)
 
 ## Prototype results (2026-09-27)
 
-Both prototypes are implemented behind default-off runtime toggles on `Game`
-(`set_fov_cache_enabled`, `set_fov_cumulative_distance_budget`), reachable from
-the game binary as `--fov-cache` / `--fov-budget <n>`. Defaults are unchanged
-and the full suite (539 tests) is green. Three tests exercise the toggles:
-cache-matches-fresh, cache-invalidation-on-move, and budget-as-a-fidelity-dial.
+Both prototypes are behind default-off runtime toggles on `Game`
+(`set_fov_cache_enabled`, `set_fov_cumulative_radius`), reachable from the game
+binary as `--fov-cache` / `--fov-budget <n>`. Defaults are unchanged and the
+full suite is green. Tests cover: cache-matches-fresh, cache-invalidation-on-
+move, budget-as-a-fidelity-dial, deterministic portal iteration, and
+byte-identical frames.
 
-Racetrack, release, 150–200 frames:
+Racetrack, release, 120 frames:
 
-| configuration      | ms/frame | ms / player-FOV |
-|--------------------|---------:|----------------:|
-| baseline           |     70.1 |            46.3 |
-| A: cache           |     23.7 |             —   |
-| B: budget=8        |     23.8 |            16.1 |
-| A + B: budget=8    |      7.7 |             —   |
+| configuration        | ms/frame | ms / player-FOV |
+|----------------------|---------:|----------------:|
+| baseline             |     67.5 |            44.2 |
+| A: cache             |     23.7 |             —   |
+| B: budget=16         |     40.1 |            24.0 |
+| A + B: budget=16     |     17.0 |             —   |
 
-B is now a real speed/fidelity dial (budget 4/8/16/32/1000 → 13.7/16.1/32.1/
-43.0/46.6 ms per FOV). A coarse visibility probe over an 11x7 grid around the
-player (`full`/`partial`/`invisible`):
+Budget 4/16/1000 → 2.2/24.0/43.9 ms/FOV. A coarse visibility probe over an 11x7
+grid around the player (`full`/`partial`/`invisible`):
 
 | budget | full | partial | invisible |
 |--------|-----:|--------:|----------:|
 | none   |   42 |      21 |        14 |
-| 4      |   29 |      13 |        35 |
-| 8      |   33 |      13 |        31 |
-| 16     |   38 |      18 |        21 |
-| 32     |   42 |      20 |        15 |
+| 4      |    7 |       2 |        68 |
+| 8      |   15 |       6 |        56 |
+| 16     |   36 |      15 |        26 |
 | 1000   |   42 |      21 |        14 |
 
-So budget 32 is nearly indistinguishable from baseline (1 partial lost) but
-buys little; budget 8 loses 9 of 63 visible squares for ~3x. A budget that
-preserves intended views (and golden validation) still needs choosing.
+So the relative-radius cap is a real dial: budget 1000 is indistinguishable
+from baseline, budget 16 roughly halves the FOV cost while shrinking peripheral
+views, budget 4 is a ~20x speedup with a very small view.
 
 Findings:
 - **A** alone removes the per-frame recomputation but the (large) FOV tree is
-  still traversed every frame for compositing: 70 → 23.7 ms for a stationary
+  still traversed every frame for compositing: 67.5 → 23.7 ms for a stationary
   player. It does nothing for the per-step hitch while moving.
-- **A + B** compounds to 7.7 ms/frame — comfortably under the 21 ms tick.
+- **A + B(16)** compounds to 17.0 ms/frame.
 
-### Side finding: FOV ordering is non-deterministic
+### The portal-window bug is fixed by the relative metric
+The issue snapshot `issues/fov-budget-optimization-cant-see-through-portal/`
+has the player at (53,27), adjacent to the L portal's exit at (54,27). The old
+*absolute-distance* cap charged that crossing the L pair's ~17-square
+entrance↔exit separation, so everything seen through the adjacent portal was
+hidden. The relative-radius metric charges only the ~1 square travelled in the
+current frame to reach it, so the window is preserved (verified: the previously
+hidden squares are visible again at budget 16).
 
-The FOV's sub-view order varies between identical computations, because visible
-portals are collected into a `HashMap` and iterated to build
-`transformed_sub_fovs` (`fov_stuff.rs`, `significantly_visible_portals_in_sight`).
-The *set* of visibilities is stable (the cache-equivalence test uses an
-order-insensitive signature for this reason), but the renderer picks glyphs
-first-match, so frames are not byte-identical — this defeats roadmap W.A's
-"byte-identical frame at any index" promise and is unrelated to the cache.
-Worth its own fix (iterate in a deterministic order).
+### Byte-identical frames + deterministic portal ordering
+
+The FOV's sub-view order varied between identical computations, because visible
+portals were collected into a `HashMap` and iterated to build
+`transformed_sub_fovs`; `FieldOfViewResult::sorted_by_draw_order` then broke
+ties only by portal depth (a stable sort), so equal-depth visibilities fell back
+to that HashMap order and the renderer picked different glyphs frame-to-frame —
+the "ambiguity (and thus flashing)" its old TODO warned about. Two fixes:
+
+1. `sorted_by_draw_order` is now a **total** order — `(portal_depth,
+   absolute_square.x, absolute_square.y, rotation)` — so equal-depth tie-breaks
+   no longer fall back to hash order.
+2. Portal iteration itself is deterministic: `portals_entering_from_square` and
+   `iter_portals` sort by `SquareWithOrthogonalDir::sort_key()` (square, then
+   step), and `combined_sub_fovs` groups by root through a `BTreeMap`. Sorting
+   is the cheap fix here because at most two portals are visible per square
+   (the recursion asserts ≤ 2), so the lists sorted are tiny; a `BTreeMap`
+   throughout would mean deriving `Ord` across `Portal`/`SquareWithOrthogonalDir`
+   and still wouldn't reach the `into_group_map_by` grouping.
+
+Frames are byte-identical across ticks and maps (regression
+`test_headless_frames_are_byte_identical`); `test_portal_iteration_is_deterministic`
+guards the portal sort. The per-square visibility map is still a `HashMap`, so
+`FieldOfViewResult`'s `Debug` output order can vary; that does not affect
+frames.
 
 ## Staging
 

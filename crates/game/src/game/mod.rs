@@ -121,6 +121,12 @@ pub struct Game {
     /// Defaults preserve original behavior.
     fov_options: FovOptions,
     fov_cache_enabled: bool,
+    // TODO(map-mutation): the cache key is only the player square, which is
+    // valid today because blocks/portals are immutable after map setup or
+    // snapshot load. When blocks/portals become dynamically mutable, add a
+    // `map_version: u64` bumped on every mutation (place_block / portal
+    // creation / load) and include it in the key, or invalidate here. Until
+    // then a mid-game map mutation would silently render a stale view.
     fov_cache: Option<(WorldSquare, FieldOfViewResult)>,
 }
 
@@ -1432,10 +1438,10 @@ impl Game {
         self.fov_cache = None;
     }
 
-    /// Set the cumulative portal-distance budget (prototype B); `None` keeps
-    /// the legacy per-hop-only bound. Clears the FOV cache since results change.
-    pub fn set_fov_cumulative_distance_budget(&mut self, budget: Option<f32>) {
-        self.fov_options.cumulative_distance_budget = budget;
+    /// Set the cumulative relative-radius budget (prototype B); `None` keeps
+    /// the legacy per-hop bound. Clears the FOV cache since results change.
+    pub fn set_fov_cumulative_radius(&mut self, budget: Option<f32>) {
+        self.fov_options.cumulative_radius_budget = budget;
         self.fov_cache = None;
     }
 

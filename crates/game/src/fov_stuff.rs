@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 
 use derive_more::Constructor;
@@ -22,11 +22,13 @@ const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 /// measure each independently. `Default` preserves the original behavior.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FovOptions {
-    /// When `Some(r)`, sight may travel at most `r` squares of *accumulated*
-    /// portal separation, in addition to the per-hop `radius` bound. `None`
-    /// keeps the legacy per-hop-only bound (where each portal crossing gets a
-    /// fresh `radius`).
-    pub cumulative_distance_budget: Option<f32>,
+    /// When `Some(r)`, the view starts with a relative radius of `r` and each
+    /// portal crossing *spends* how far sight travelled in the current frame to
+    /// reach the portal, so the child view's radius is reduced. This bounds
+    /// total relative sight travel (and thus recursion) without charging the
+    /// portal's absolute jump distance. `None` keeps the legacy behavior, where
+    /// every portal crossing gets a fresh `radius`.
+    pub cumulative_radius_budget: Option<f32>,
 }
 
 #[derive(Clone, Copy, Constructor)]
@@ -553,31 +555,32 @@ impl FieldOfViewResult {
         sub_fovs_1: &Vec<FieldOfViewResult>,
         sub_fovs_2: &Vec<FieldOfViewResult>,
     ) -> Vec<FieldOfViewResult> {
-        let mut clone1 = sub_fovs_1.clone();
-        let mut clone2 = sub_fovs_2.clone();
-        clone1.append(&mut clone2);
+        let mut combined_sub_fovs = sub_fovs_1.clone();
+        combined_sub_fovs.extend(sub_fovs_2.iter().cloned());
 
-        let combined_sub_fovs = clone1;
+        // Group by transformed root and emit groups in a deterministic order
+        // (BTreeMap on the pose sort key), so `transformed_sub_fovs` order does
+        // not depend on hash-map iteration.
+        let mut grouped_by_root: BTreeMap<(i32, i32, i32, i32), Vec<FieldOfViewResult>> =
+            BTreeMap::new();
+        for fov in combined_sub_fovs {
+            grouped_by_root
+                .entry(fov.root_square_with_direction().sort_key())
+                .or_default()
+                .push(fov);
+        }
 
-        let grouped_by_root = combined_sub_fovs
-            .into_iter()
-            .into_group_map_by(|fov: &FieldOfViewResult| fov.root_square_with_direction());
-
-        let combined_by_root: Vec<FieldOfViewResult> = grouped_by_root
-            .into_iter()
-            .map(
-                |(_, fov_list): (SquareWithOrthogonalDir, Vec<FieldOfViewResult>)| {
-                    fov_list
-                        .into_iter()
-                        .reduce(|acc: FieldOfViewResult, next_fov: FieldOfViewResult| {
-                            acc.combined_with_unioning_arcs(&next_fov)
-                        })
-                        .unwrap()
-                },
-            )
-            .collect();
-
-        combined_by_root
+        grouped_by_root
+            .into_values()
+            .map(|fov_list| {
+                fov_list
+                    .into_iter()
+                    .reduce(|acc: FieldOfViewResult, next_fov: FieldOfViewResult| {
+                        acc.combined_with_unioning_arcs(&next_fov)
+                    })
+                    .unwrap()
+            })
+            .collect()
     }
 
     pub fn combined_with(&self, other: &Self) -> Self {
@@ -770,10 +773,21 @@ impl FieldOfViewResult {
     pub fn sorted_by_draw_order(
         visibilities: Vec<PositionedSquareVisibilityInFov>,
     ) -> Vec<PositionedSquareVisibilityInFov> {
-        // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
+        // Total order: portal depth first (deeper portals drawn under nearer
+        // ones), then a deterministic tie-break so equal-depth visibilities do
+        // not depend on the (HashMap) iteration order that produced them.
         visibilities
             .into_iter()
-            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
+            .sorted_by_key(|pos_vis| {
+                (
+                    pos_vis.portal_depth(),
+                    pos_vis.absolute_square().x,
+                    pos_vis.absolute_square().y,
+                    pos_vis
+                        .portal_rotation_from_relative_to_absolute
+                        .quarter_turns(),
+                )
+            })
             .collect_vec()
     }
 
@@ -1103,8 +1117,8 @@ pub fn field_of_view_within_arc_in_single_octant(
 }
 
 /// [`field_of_view_within_arc_in_single_octant`] with an explicit
-/// `remaining_distance` budget and [`FovOptions`]. `remaining_distance` is only
-/// consulted when `options.cumulative_distance_budget` is set.
+/// `remaining_radius` budget and [`FovOptions`]. `remaining_radius` is only
+/// consulted when `options.cumulative_radius_budget` is set.
 #[allow(clippy::too_many_arguments)]
 fn field_of_view_within_arc_in_single_octant_impl(
     sight_blockers: &SquareSet,
@@ -1113,7 +1127,7 @@ fn field_of_view_within_arc_in_single_octant_impl(
     key_direction: OrthogonalWorldStep,
     center_offset: WorldMove,
     radius: u32,
-    remaining_distance: f32,
+    remaining_radius: f32,
     options: FovOptions,
     octant: Octant,
     view_arc: AngleInterval,
@@ -1129,13 +1143,21 @@ fn field_of_view_within_arc_in_single_octant_impl(
     let rel_squares_in_fov_sequence =
         OctantFOVSquareSequenceIter::new(octant, starting_step_in_fov_sequence);
 
-    // The per-hop extent stays bounded by `radius`; the cumulative budget only
-    // decides whether to recurse through a portal at all (see below).
+    // With the cumulative budget, the current frame's extent is the remaining
+    // relative radius, but never more than the fixed per-hop `radius` (a large
+    // budget must mean "unbounded like legacy", not "sweep thousands of
+    // squares"). Without a budget it is always `radius`.
+    let max_extent = if options.cumulative_radius_budget.is_some() {
+        remaining_radius.min(radius as f32)
+    } else {
+        radius as f32
+    };
+
     let mut next_step_in_fov_sequence = starting_step_in_fov_sequence;
     for relative_square in rel_squares_in_fov_sequence {
         next_step_in_fov_sequence += 1;
-        let out_of_range =
-            relative_square.x.abs() > radius as i32 || relative_square.y.abs() > radius as i32;
+        let out_of_range = relative_square.x.abs() as f32 > max_extent
+            || relative_square.y.abs() as f32 > max_extent;
         if out_of_range {
             break;
         }
@@ -1191,12 +1213,14 @@ fn field_of_view_within_arc_in_single_octant_impl(
                 })
                 .collect();
 
-            // Break the view arc around the (up to 2) portals and recurse
-            let portal_view_arcs: HashMap<Portal, AngleInterval> = portals_at_square_facing_viewer
+            // Break the view arc around the (up to 2) portals and recurse.
+            // Kept as an order-preserving Vec (`portals_entering_from_square`
+            // is sorted by entrance) so sub-view order is deterministic.
+            let portal_view_arcs: Vec<(Portal, AngleInterval)> = portals_at_square_facing_viewer
                 .iter()
                 .map(|&portal: &Portal| {
                     (
-                        portal.clone(),
+                        portal,
                         AngleInterval::from_square_face_and_center_offset(
                             relative_square,
                             portal.entrance().direction(),
@@ -1206,20 +1230,20 @@ fn field_of_view_within_arc_in_single_octant_impl(
                 })
                 .collect();
 
-            let significantly_visible_portals_in_sight: HashMap<Portal, AngleInterval> =
+            let significantly_visible_portals_in_sight: Vec<(Portal, AngleInterval)> =
                 portal_view_arcs
-                    .clone()
-                    .into_iter()
-                    .filter(|(_portal, portal_arc): &(Portal, AngleInterval)| {
-                        portal_arc.overlaps_other_by_at_least_this_much(
+                    .iter()
+                    .filter(|entry: &&(Portal, AngleInterval)| {
+                        entry.1.overlaps_other_by_at_least_this_much(
                             view_arc,
                             Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
                         )
                     })
+                    .cloned()
                     .collect();
 
-            significantly_visible_portals_in_sight.iter().for_each(
-                |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
+            significantly_visible_portals_in_sight.into_iter().for_each(
+                |(portal, portal_view_arc): (Portal, AngleInterval)| {
                     let transform = portal.get_transform();
                     let transformed_center =
                         transform.transform_pose(SquareWithOrthogonalDir::from_square_and_step(
@@ -1253,15 +1277,17 @@ fn field_of_view_within_arc_in_single_octant_impl(
                             rotation_quarter_turns: transform.rotation().quarter_turns(),
                         });
                     }
-                    // Cumulative-distance budget: each portal crossing spends
-                    // the straight-line separation between the current sub-view
-                    // center and its transform. A crossing that would overrun
-                    // the budget is skipped rather than recursed.
-                    let hop_distance =
-                        (transformed_center.square() - center_square).to_f32().length();
-                    let child_remaining_distance = remaining_distance - hop_distance;
-                    let budget_exhausted = options.cumulative_distance_budget.is_some()
-                        && child_remaining_distance <= 0.0;
+                    // Cumulative relative-radius budget: crossing a portal
+                    // spends how far sight travelled in the *current* frame to
+                    // reach it (the portal square's offset), not the portal's
+                    // absolute jump distance — otherwise an adjacent portal
+                    // that leads far away would be hidden. The child view gets
+                    // the remaining relative radius.
+                    let spent_radius =
+                        relative_square.x.abs().max(relative_square.y.abs()) as f32;
+                    let child_remaining_radius = remaining_radius - spent_radius;
+                    let budget_exhausted = options.cumulative_radius_budget.is_some()
+                        && child_remaining_radius <= 0.0;
                     if !budget_exhausted {
                         let sub_arc_fov = field_of_view_within_arc_in_single_octant_impl(
                             sight_blockers,
@@ -1270,7 +1296,7 @@ fn field_of_view_within_arc_in_single_octant_impl(
                             transformed_center.direction(),
                             rotated_center_offset,
                             radius,
-                            child_remaining_distance,
+                            child_remaining_radius,
                             options,
                             transform.transform_octant(octant),
                             transformed_visible_arc_of_portal,
@@ -1287,12 +1313,9 @@ fn field_of_view_within_arc_in_single_octant_impl(
             if portals_at_square_facing_viewer.len() > 0 {
                 // TODO: turn this into a constructor for angleintervals
                 let combined_view_arc_of_portals: AngleInterval = if portal_view_arcs.len() == 1 {
-                    *portal_view_arcs.values().next().unwrap()
+                    portal_view_arcs[0].1
                 } else if portal_view_arcs.len() == 2 {
-                    // let arcs = portal_view_arcs.values().next_chunk::<2>().unwrap();
-                    let mut vals = portal_view_arcs.values();
-                    let arcs = [vals.next().unwrap(), vals.next().unwrap()];
-                    arcs[0].union(*arcs[1])
+                    portal_view_arcs[0].1.union(portal_view_arcs[1].1)
                 } else {
                     panic!(
                         "There should be exactly one or two portals here.  found {}: {:?}",
@@ -1322,7 +1345,7 @@ fn field_of_view_within_arc_in_single_octant_impl(
                         key_direction,
                         center_offset,
                         radius,
-                        remaining_distance,
+                        remaining_radius,
                         options,
                         octant,
                         new_sub_arc,
@@ -1390,10 +1413,10 @@ pub fn single_octant_field_of_view_traced_with_options(
 ) -> FieldOfViewResult {
     assert!(center_offset.x.abs() <= 0.5);
     assert!(center_offset.y.abs() <= 0.5);
-    // The budget is the total portal-aware distance; each hop spends its
-    // separation. Without a budget the recursion is unbounded (legacy).
-    let initial_remaining_distance = options
-        .cumulative_distance_budget
+    // With a budget, the view starts at the budgeted relative radius; without
+    // one, it starts at `radius` and resets on every hop (legacy).
+    let initial_remaining_radius = options
+        .cumulative_radius_budget
         .unwrap_or(radius as f32);
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
     //let octant: i32 = arc.octant().expect("arc not confined to octant");
@@ -1404,7 +1427,7 @@ pub fn single_octant_field_of_view_traced_with_options(
         STEP_UP.into(),
         center_offset,
         radius,
-        initial_remaining_distance,
+        initial_remaining_radius,
         options,
         octant,
         AngleInterval::from_octant(octant),

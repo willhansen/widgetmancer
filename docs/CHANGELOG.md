@@ -9,6 +9,62 @@ Newest first.
 
 ---
 
+## 2026-09 — Deterministic portal ordering, relative-radius cap, test timeout
+
+### game: deterministic portal order; relative-radius FOV cap; test timeout
+Three changes:
+
+1. **Deterministic portal ordering.** Portal iteration fed FOV sub-view order
+   from hash maps. `portals_entering_from_square` and `iter_portals` now sort by
+   `SquareWithOrthogonalDir::sort_key()` (square, then step), the FOV keeps
+   portal arcs in an order-preserving `Vec` instead of a `HashMap`, and
+   `combined_sub_fovs` groups by root through a `BTreeMap`. Sorting is the cheap
+   fix because at most two portals are visible per square. New test
+   `test_portal_iteration_is_deterministic`.
+2. **B is now a cumulative *relative-radius* cap.** The budget charged each
+   portal crossing its absolute entrance↔exit jump, so an adjacent portal that
+   led far away was hidden (issue
+   `issues/fov-budget-optimization-cant-see-through-portal/`). It now spends how
+   far sight travelled in the current frame to reach the portal, and the frame
+   extent is `min(radius, remaining)`. Renamed
+   `FovOptions::cumulative_radius_budget` / `set_fov_cumulative_radius`. Also
+   clamped the top-level extent to `radius`: a large budget had made the octant
+   iterator sweep thousands of squares (the test-suite hang). Verified against
+   the issue snapshot that the adjacent-portal view is preserved at budget 16.
+3. **Default test timeout.** Added `.config/nextest.toml` with
+   `slow-timeout = { period = "60s", terminate-after = 2 }`, so a runaway test
+   fails after 120s instead of hanging the suite. This would have caught change
+   2's hang.
+
+Full suite green (541 tests).
+
+---
+
+## 2026-09 — Byte-identical frames: make the FOV draw order total
+
+### game: make FOV draw order total so frames are deterministic
+Frames were not byte-identical. The FOV's sub-view order is non-deterministic
+(visible portals are iterated from a `HashMap` to build `transformed_sub_fovs`),
+and `FieldOfViewResult::sorted_by_draw_order` only broke ties by portal depth
+(a stable sort). Equal-depth visibilities therefore fell back to HashMap order,
+and `drawable_at_relative_square` picked different glyphs frame-to-frame — the
+"ambiguity (and thus flashing)" its old TODO warned about, defeating roadmap
+W.A's byte-identical-frame promise.
+
+`sorted_by_draw_order` is now a total order on `(portal_depth,
+absolute_square.x, absolute_square.y, rotation)`. New regression test
+`test_headless_frames_are_byte_identical` renders each tick twice on racetrack
+and hallways and asserts identical screen buffers; all goldens still pass. FOV
+*construction* order remains HashMap-dependent (affects debug FOV trace/JSON
+ordering, not frames).
+
+Also recorded the map-mutation cache-invalidation TODO on the FOV cache fields
+(`game/mod.rs`) and in `docs/PERFORMANCE.md`, left for later by request.
+
+Full suite green (540 tests).
+
+---
+
 ## 2026-09 — Test the FOV prototypes and fix the budget's initialization
 
 ### perf: test FOV cache/budget, fix budget initialization

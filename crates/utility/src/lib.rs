@@ -1105,6 +1105,13 @@ impl SquareWithOrthogonalDir {
     pub fn direction(&self) -> OrthogonalWorldStep {
         self.step()
     }
+    /// Deterministic ordering key: `(square.x, square.y, step.x, step.y)`.
+    /// Used to iterate portals/poses in a fixed order instead of relying on
+    /// hash-map iteration order.
+    pub fn sort_key(&self) -> (i32, i32, i32, i32) {
+        let step = self.direction().step();
+        (self.square.x, self.square.y, step.x, step.y)
+    }
     pub fn stepped(&self) -> Self {
         SquareWithOrthogonalDir::from_square_and_worldstep(
             self.square + self.direction().step(),

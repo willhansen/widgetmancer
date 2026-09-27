@@ -149,6 +149,6 @@ fn game_for(map: &str, toggles: &Toggles) -> Game {
     game.place_player(point2(24, 13));
     set_up_map_by_name(&mut game, Some(map));
     game.set_fov_cache_enabled(toggles.cache);
-    game.set_fov_cumulative_distance_budget(toggles.budget);
+    game.set_fov_cumulative_radius(toggles.budget);
     game
 }

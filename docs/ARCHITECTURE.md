@@ -137,6 +137,11 @@ The actual game. Modules:
 - Unit tests live alongside source (snapshot data in
   `crates/terminal_rendering/test_data/`); `tests/integration_tests.rs` covers
   end-to-end behavior. Recommended runner: `cargo nextest run`.
+- `.config/nextest.toml` sets a default per-test timeout
+  (`slow-timeout = { period = "60s", terminate-after = 2 }`): a test is marked
+  slow after 60s and terminated after 120s, so a runaway test fails fast
+  instead of hanging the suite. Override per test with
+  `[[profile.default.overrides]]` if something is legitimately slower.
 - `bacon.toml` — bacon watch config; `flake.nix` — Nix dev shell;
   `scripts/` — test recording/printing helpers.
 

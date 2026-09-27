@@ -2766,10 +2766,9 @@
     }
 
     /// Order-insensitive signature of a FOV over a fixed grid of relative
-    /// squares: `F` fully visible, `p` partially, `.` not visible. Screen and
-    /// `Debug` comparisons are unusable here: the FOV's sub-view order (HashMap
-    /// iteration over visible portals) and the angled-block renderer are both
-    /// non-deterministic frame-to-frame, independent of the cache.
+    /// squares: `F` fully visible, `p` partially, `.` not visible. Needed
+    /// because a FOV's `Debug`/sub-view order depends on HashMap iteration over
+    /// visible portals; the visibility set is stable, the order is not.
     fn fov_signature(fov: &FieldOfViewResult) -> String {
         let mut out = String::new();
         for dx in -24..=24 {
@@ -2835,11 +2834,11 @@
 
         // A budget larger than any reachable portal path is indistinguishable
         // from the unbounded default.
-        game.set_fov_cumulative_distance_budget(Some(1000.0));
+        game.set_fov_cumulative_radius(Some(1000.0));
         assert_eq!(default_sig, fov_signature(&game.player_field_of_view()));
 
         // A tight budget prunes deep portal views, changing the FOV.
-        game.set_fov_cumulative_distance_budget(Some(4.0));
+        game.set_fov_cumulative_radius(Some(4.0));
         assert_ne!(default_sig, fov_signature(&game.player_field_of_view()));
     }
 
@@ -2927,4 +2926,29 @@
         // Two-way double-sided: back faces on both windows register too.
         assert!(diagram.contains(" > right (25, 7) -> (31, 7)"));
         assert!(diagram.contains(" < left (31, 7) -> (25, 7)"));
+    }
+
+    #[test]
+    fn test_headless_frames_are_byte_identical() {
+        // Regression: the FOV's sub-view order is non-deterministic (visible
+        // portals are iterated from a HashMap), and `sorted_by_draw_order` used
+        // to break ties only by portal depth. Equal-depth visibilities then
+        // picked glyphs in HashMap order, so frames flashed. The draw order
+        // must be a total order.
+        for map in ["racetrack", "hallways"] {
+            let mut game = match map {
+                "racetrack" => set_up_racetrack_game(),
+                _ => set_up_hallways_game(),
+            };
+            for tick in 0..4 {
+                game.tick_realtime_effects(Duration::from_secs_f32(0.021));
+                game.draw_headless_now();
+                let frame = game.graphics.screen.screen_buffer.clone();
+                game.draw_headless_now();
+                assert!(
+                    game.graphics.screen.screen_buffer == frame,
+                    "{map} frame not reproducible at tick {tick}"
+                );
+            }
+        }
     }
