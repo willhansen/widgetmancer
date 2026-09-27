@@ -75,7 +75,21 @@ pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
     }
 }
 
-pub fn do_everything(map_name: Option<String>, load_path: Option<PathBuf>) {
+/// Prototype FOV performance toggles (see docs/PERFORMANCE.md). Both default
+/// off, so normal play is unaffected.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FovToggles {
+    /// Prototype A: cache the player FOV per player square.
+    pub cache: bool,
+    /// Prototype B: cumulative portal-distance budget in squares.
+    pub cumulative_distance_budget: Option<f32>,
+}
+
+pub fn do_everything(
+    map_name: Option<String>,
+    load_path: Option<PathBuf>,
+    fov_toggles: FovToggles,
+) {
     let (width, height) = termion::terminal_size().unwrap();
     //let (width, height) = (40, 20);
     // The racetrack map's exhibits span ~30x19 squares around the player,
@@ -102,6 +116,8 @@ pub fn do_everything(map_name: Option<String>, load_path: Option<PathBuf>) {
             game
         }
     };
+    game.set_fov_cache_enabled(fov_toggles.cache);
+    game.set_fov_cumulative_distance_budget(fov_toggles.cumulative_distance_budget);
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 

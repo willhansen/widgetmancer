@@ -159,3 +159,7 @@ root is stale (pre-sandbox). The live game loop (`lib.rs`) is a TTY
 alternate-screen loop, so profile headlessly instead: the `map_diagram` bin,
 `Game::draw_headless_now`, or a frame-loop test such as
 `test_racetrack_map_cubes_survive_frame_rate_ticks`.
+
+`crates/game/examples/profile_racetrack.rs` is a ready-made headless harness
+(`-- <map> <frames>` or `-- fov <map> <iters>`). Findings from it are in
+[PERFORMANCE.md](PERFORMANCE.md).

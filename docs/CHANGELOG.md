@@ -9,6 +9,103 @@ Newest first.
 
 ---
 
+## 2026-09 — Test the FOV prototypes and fix the budget's initialization
+
+### perf: test FOV cache/budget, fix budget initialization
+Added three tests that enable the prototypes directly (they were default-off and
+untested): `test_fov_cache_matches_fresh_computation`,
+`test_fov_cache_invalidates_when_player_moves`, and
+`test_fov_cumulative_budget_is_a_fidelity_dial`.
+
+Fixed a bug in prototype B: `remaining_distance` was initialized to `radius`,
+so the budget's magnitude was ignored — every budget ≥ radius behaved
+identically (that is why budgets 8–48 had looked flat). It now initializes from
+the budget, and the per-hop extent stays `radius` (gate-only, never shrinking a
+hop's own view). B is now a real speed/fidelity dial: budget 4/8/16/32/1000 →
+13.7/16.1/32.1/43.0/46.6 ms/FOV on racetrack; A + B(8) = 7.7 ms/frame.
+
+The tests compare an order-insensitive FOV signature rather than screen
+buffers, because of a side finding: the FOV's sub-view order is
+non-deterministic (visible portals are collected into a `HashMap` and iterated
+to build `transformed_sub_fovs`), and the renderer picks glyphs first-match, so
+frames are not byte-identical. This is unrelated to the cache but defeats
+roadmap W.A's "byte-identical frame" promise; recorded in
+`docs/PERFORMANCE.md`.
+
+Full suite green (539 tests).
+
+---
+
+## 2026-09 — Expose the FOV prototypes on the game binary
+
+### game: add --fov-cache / --fov-budget CLI flags
+The FOV prototypes were only reachable from the profiling example. Added
+`FovToggles` and a third `do_everything` argument, applied to the game after
+map setup or snapshot load, plus `--fov-cache` and `--fov-budget <n>` (or
+`--fov-budget=<n>`) in `main.rs`'s arg parser and usage text.
+
+Both default off, so normal play is unchanged. The `maps/*.sh` launchers now
+forward extra args, so `./maps/racetrack.sh --fov-cache --fov-budget 16` works;
+`./play-game --map racetrack --fov-cache` works directly. Verified the game
+starts and renders under a pty with both flags set.
+
+---
+
+## 2026-09 — Prototype FOV fixes for the racetrack frame time
+
+### perf: prototype FOV cache and cumulative distance budget behind flags
+Implemented prototypes A and B from `docs/PERFORMANCE.md` behind default-off
+runtime toggles on `Game`:
+
+- **A** (`set_fov_cache_enabled`): cache the player FOV per player square. The
+  FOV is render-only and a pure function of the player square plus the static
+  map (blocks/portals never change at runtime, facing is irrelevant), so it
+  only recomputes when the player moves. Served at the draw seam by
+  `player_fov_for_draw`.
+- **B** (`set_fov_cumulative_distance_budget`): thread `FovOptions` +
+  `remaining_distance` through the FOV recursion
+  (`field_of_view_within_arc_in_single_octant_impl`). Each portal crossing
+  spends the straight-line separation between sub-view centers, and a crossing
+  that overruns the budget is skipped instead of recursed. This is a distance
+  budget, not a depth cap. Public wrappers keep legacy per-hop-only behavior
+  via `FovOptions::default()`.
+
+The harness gains `--cache`, `--budget=<n>`, and a coarse `vis` mode.
+Racetrack, release: 71.2 → 23.6 ms/frame (A), 28.0 (B at budget 16), 10.8
+(A+B). B's curve is flat for budgets 8–48. Caveat: B changes visibility (a
+coarse 11x7 probe goes from 14 to 35 invisible squares), so it must be tuned
+and validated against goldens before enabling. Default behavior is unchanged;
+all 267 game tests pass.
+
+Recorded the results, the float-key memoization caveat, and the staged plan in
+`docs/PERFORMANCE.md`.
+
+---
+
+## 2026-09 — Profile the racetrack map; FOV recursion is the hotspot
+
+### perf: add racetrack profiling harness; FOV recursion dominates
+Added `crates/game/examples/profile_racetrack.rs`, a headless harness that
+replays the real loop (`tick_realtime_effects` + a headless draw per frame) and
+can time the player FOV alone. Used it with `gprof` to rank hotspots.
+
+Racetrack renders at 71 ms/frame (release) against the 21 ms budget — ~2.2x
+slower than demo/hallways (29/33 ms). All time is in `Game::draw`. The driver
+is the portal-recursive FOV (`field_of_view_within_arc_in_single_octant`):
+~545k recursive calls/frame vs 72–135k on other maps, and a single player-FOV
+computation costs 47 ms. The FOV is recomputed from scratch every draw
+(`game/mod.rs:601`) with no memoization and no recursion depth cap or
+visited-portal set; the racetrack's 19-face L portal and 3-wide two-way corners
+give it many branching crossings. Secondary costs are the angle-interval/trig
+math feeding the recursion, angled-block glyph mapping over point tuples, and
+general `WorldSquare` SipHash.
+
+Wrote `docs/PERFORMANCE.md` with the numbers and method, and linked it from the
+ARCHITECTURE profiling section. Root cause overlaps roadmap W.C ("no depth
+cap"); this quantifies its frame-time impact.
+
+---
+
 ## 2026-09 — Document which profilers actually run in the sandbox
 
 ### docs: note available profiling tooling in ARCHITECTURE

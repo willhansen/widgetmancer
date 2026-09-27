@@ -18,6 +18,17 @@ type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
+/// Toggles for the FOV recursion, threaded from the caller so experiments can
+/// measure each independently. `Default` preserves the original behavior.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FovOptions {
+    /// When `Some(r)`, sight may travel at most `r` squares of *accumulated*
+    /// portal separation, in addition to the per-hop `radius` bound. `None`
+    /// keeps the legacy per-hop-only bound (where each portal crossing gets a
+    /// fresh `radius`).
+    pub cumulative_distance_budget: Option<f32>,
+}
+
 #[derive(Clone, Copy, Constructor)]
 pub struct SquareVisibility {
     visible_portion: Option<LocalSquareHalfPlane>,
@@ -1072,6 +1083,42 @@ pub fn field_of_view_within_arc_in_single_octant(
     view_arc: AngleInterval,
     starting_step_in_fov_sequence: u32,
     depth: u32,
+    trace: Option<&mut FovTrace>,
+) -> FieldOfViewResult {
+    field_of_view_within_arc_in_single_octant_impl(
+        sight_blockers,
+        portal_geometry,
+        center_square,
+        key_direction,
+        center_offset,
+        radius,
+        radius as f32,
+        FovOptions::default(),
+        octant,
+        view_arc,
+        starting_step_in_fov_sequence,
+        depth,
+        trace,
+    )
+}
+
+/// [`field_of_view_within_arc_in_single_octant`] with an explicit
+/// `remaining_distance` budget and [`FovOptions`]. `remaining_distance` is only
+/// consulted when `options.cumulative_distance_budget` is set.
+#[allow(clippy::too_many_arguments)]
+fn field_of_view_within_arc_in_single_octant_impl(
+    sight_blockers: &SquareSet,
+    portal_geometry: &PortalGeometry,
+    center_square: WorldSquare,
+    key_direction: OrthogonalWorldStep,
+    center_offset: WorldMove,
+    radius: u32,
+    remaining_distance: f32,
+    options: FovOptions,
+    octant: Octant,
+    view_arc: AngleInterval,
+    starting_step_in_fov_sequence: u32,
+    depth: u32,
     mut trace: Option<&mut FovTrace>,
 ) -> FieldOfViewResult {
     let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(center_square, key_direction);
@@ -1082,6 +1129,8 @@ pub fn field_of_view_within_arc_in_single_octant(
     let rel_squares_in_fov_sequence =
         OctantFOVSquareSequenceIter::new(octant, starting_step_in_fov_sequence);
 
+    // The per-hop extent stays bounded by `radius`; the cumulative budget only
+    // decides whether to recurse through a portal at all (see below).
     let mut next_step_in_fov_sequence = starting_step_in_fov_sequence;
     for relative_square in rel_squares_in_fov_sequence {
         next_step_in_fov_sequence += 1;
@@ -1204,20 +1253,33 @@ pub fn field_of_view_within_arc_in_single_octant(
                             rotation_quarter_turns: transform.rotation().quarter_turns(),
                         });
                     }
-                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
-                        sight_blockers,
-                        portal_geometry,
-                        transformed_center.square(),
-                        transformed_center.direction(),
-                        rotated_center_offset,
-                        radius,
-                        transform.transform_octant(octant),
-                        transformed_visible_arc_of_portal,
-                        next_step_in_fov_sequence,
-                        depth + 1,
-                        trace.as_deref_mut(),
-                    );
-                    fov_result.transformed_sub_fovs.push(sub_arc_fov);
+                    // Cumulative-distance budget: each portal crossing spends
+                    // the straight-line separation between the current sub-view
+                    // center and its transform. A crossing that would overrun
+                    // the budget is skipped rather than recursed.
+                    let hop_distance =
+                        (transformed_center.square() - center_square).to_f32().length();
+                    let child_remaining_distance = remaining_distance - hop_distance;
+                    let budget_exhausted = options.cumulative_distance_budget.is_some()
+                        && child_remaining_distance <= 0.0;
+                    if !budget_exhausted {
+                        let sub_arc_fov = field_of_view_within_arc_in_single_octant_impl(
+                            sight_blockers,
+                            portal_geometry,
+                            transformed_center.square(),
+                            transformed_center.direction(),
+                            rotated_center_offset,
+                            radius,
+                            child_remaining_distance,
+                            options,
+                            transform.transform_octant(octant),
+                            transformed_visible_arc_of_portal,
+                            next_step_in_fov_sequence,
+                            depth + 1,
+                            trace.as_deref_mut(),
+                        );
+                        fov_result.transformed_sub_fovs.push(sub_arc_fov);
+                    }
                 },
             );
 
@@ -1253,13 +1315,15 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .into_iter()
                 .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
                 .for_each(|new_sub_arc| {
-                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
+                    let sub_arc_fov = field_of_view_within_arc_in_single_octant_impl(
                         sight_blockers,
                         portal_geometry,
                         center_square,
                         key_direction,
                         center_offset,
                         radius,
+                        remaining_distance,
+                        options,
                         octant,
                         new_sub_arc,
                         next_step_in_fov_sequence,
@@ -1300,19 +1364,48 @@ pub fn single_octant_field_of_view_traced(
     octant: Octant,
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
+    trace: Option<&mut FovTrace>,
+) -> FieldOfViewResult {
+    single_octant_field_of_view_traced_with_options(
+        center_square,
+        center_offset,
+        radius,
+        octant,
+        sight_blockers,
+        portal_geometry,
+        FovOptions::default(),
+        trace,
+    )
+}
+
+pub fn single_octant_field_of_view_traced_with_options(
+    center_square: WorldSquare,
+    center_offset: WorldMove,
+    radius: u32,
+    octant: Octant,
+    sight_blockers: &HashSet<WorldSquare>,
+    portal_geometry: &PortalGeometry,
+    options: FovOptions,
     mut trace: Option<&mut FovTrace>,
 ) -> FieldOfViewResult {
     assert!(center_offset.x.abs() <= 0.5);
     assert!(center_offset.y.abs() <= 0.5);
+    // The budget is the total portal-aware distance; each hop spends its
+    // separation. Without a budget the recursion is unbounded (legacy).
+    let initial_remaining_distance = options
+        .cumulative_distance_budget
+        .unwrap_or(radius as f32);
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
     //let octant: i32 = arc.octant().expect("arc not confined to octant");
-    let mut fov_result = field_of_view_within_arc_in_single_octant(
+    let mut fov_result = field_of_view_within_arc_in_single_octant_impl(
         sight_blockers,
         portal_geometry,
         center_square,
         STEP_UP.into(),
         center_offset,
         radius,
+        initial_remaining_distance,
+        options,
         octant,
         AngleInterval::from_octant(octant),
         0,
@@ -1333,6 +1426,23 @@ pub fn portal_aware_field_of_view_from_square(
         radius,
         sight_blockers,
         portal_geometry,
+    )
+}
+
+pub fn portal_aware_field_of_view_from_square_with_options(
+    center_square: WorldSquare,
+    radius: u32,
+    sight_blockers: &SquareSet,
+    portal_geometry: &PortalGeometry,
+    options: FovOptions,
+) -> FieldOfViewResult {
+    portal_aware_field_of_view_from_point_traced_with_options(
+        center_square.to_f32(),
+        radius,
+        sight_blockers,
+        portal_geometry,
+        options,
+        None,
     )
 }
 
@@ -1373,6 +1483,24 @@ fn portal_aware_field_of_view_from_point_traced(
     radius: u32,
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
+    trace: Option<&mut FovTrace>,
+) -> FieldOfViewResult {
+    portal_aware_field_of_view_from_point_traced_with_options(
+        center_point,
+        radius,
+        sight_blockers,
+        portal_geometry,
+        FovOptions::default(),
+        trace,
+    )
+}
+
+fn portal_aware_field_of_view_from_point_traced_with_options(
+    center_point: WorldPoint,
+    radius: u32,
+    sight_blockers: &SquareSet,
+    portal_geometry: &PortalGeometry,
+    options: FovOptions,
     mut trace: Option<&mut FovTrace>,
 ) -> FieldOfViewResult {
     // Split into square and offset to avoid rounding issues with all the rotations the center
@@ -1387,13 +1515,14 @@ fn portal_aware_field_of_view_from_point_traced(
         .fold(
             FieldOfViewResult::new_empty_fov_at_square(center_square),
             |fov_result_accumulator: FieldOfViewResult, octant_number: i32| {
-                let new_fov_result = single_octant_field_of_view_traced(
+                let new_fov_result = single_octant_field_of_view_traced_with_options(
                     center_square,
                     center_offset,
                     radius,
                     Octant::new(octant_number),
                     sight_blockers,
                     portal_geometry,
+                    options,
                     trace.as_deref_mut(),
                 );
                 let combined_fov = fov_result_accumulator.combined_with(&new_fov_result);

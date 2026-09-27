@@ -13,8 +13,8 @@ use rgb::RGB8;
 use strum::IntoEnumIterator;
 
 use crate::fov_stuff::{
-    portal_aware_field_of_view_from_square, portal_aware_field_of_view_from_square_traced,
-    FieldOfViewResult, FovTrace,
+    portal_aware_field_of_view_from_square_traced,
+    portal_aware_field_of_view_from_square_with_options, FieldOfViewResult, FovOptions, FovTrace,
 };
 use crate::graphics::drawable::TextDrawable;
 use crate::graphics::*;
@@ -117,6 +117,11 @@ pub struct Game {
     rng: ChaCha8Rng,
     world_start_time: LogicalTime,
     world_time: LogicalTime,
+    /// Prototype toggles for FOV performance work (see docs/PERFORMANCE.md).
+    /// Defaults preserve original behavior.
+    fov_options: FovOptions,
+    fov_cache_enabled: bool,
+    fov_cache: Option<(WorldSquare, FieldOfViewResult)>,
 }
 
 /// Fixed seed for the gameplay RNG. Bump only with a snapshot-format note;
@@ -150,6 +155,9 @@ impl Game {
             rng: ChaCha8Rng::seed_from_u64(GAME_RNG_SEED),
             world_start_time: start_time,
             world_time: start_time,
+            fov_options: FovOptions::default(),
+            fov_cache_enabled: false,
+            fov_cache: None,
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
@@ -597,8 +605,8 @@ impl Game {
             self.graphics
                 .screen
                 .set_screen_center_by_world_square(self.player_square());
-            self.graphics
-                .load_screen_buffer_from_fov(self.player_field_of_view());
+            let fov = self.player_fov_for_draw();
+            self.graphics.load_screen_buffer_from_fov(fov);
         } else {
             self.graphics
                 .load_screen_buffer_from_absolute_positions_in_draw_buffer();
@@ -1409,12 +1417,42 @@ impl Game {
     }
     fn player_field_of_view(&self) -> FieldOfViewResult {
         let start_square = self.player_square();
-        portal_aware_field_of_view_from_square(
+        portal_aware_field_of_view_from_square_with_options(
             start_square,
             PLAYER_SIGHT_RADIUS,
             &self.blocks.blocks,
             &self.portal_geometry,
+            self.fov_options,
         )
+    }
+
+    /// Enable/disable the per-player-square FOV cache (prototype A).
+    pub fn set_fov_cache_enabled(&mut self, enabled: bool) {
+        self.fov_cache_enabled = enabled;
+        self.fov_cache = None;
+    }
+
+    /// Set the cumulative portal-distance budget (prototype B); `None` keeps
+    /// the legacy per-hop-only bound. Clears the FOV cache since results change.
+    pub fn set_fov_cumulative_distance_budget(&mut self, budget: Option<f32>) {
+        self.fov_options.cumulative_distance_budget = budget;
+        self.fov_cache = None;
+    }
+
+    /// The player FOV for the draw pass, optionally served from the cache. The
+    /// FOV is a pure function of the player square plus the static map, so it
+    /// only needs recomputing when the player changes square.
+    fn player_fov_for_draw(&mut self) -> FieldOfViewResult {
+        if !self.fov_cache_enabled {
+            return self.player_field_of_view();
+        }
+        let square = self.player_square();
+        let stale = self.fov_cache.as_ref().map(|(cached, _)| *cached) != Some(square);
+        if stale {
+            let fov = self.player_field_of_view();
+            self.fov_cache = Some((square, fov));
+        }
+        self.fov_cache.as_ref().unwrap().1.clone()
     }
 
     /// The player's FOV plus the flat portal-recursion trace (roadmap W.C).

@@ -1,11 +1,16 @@
 use std::env;
 use std::path::PathBuf;
 
-use game::do_everything;
+use game::{do_everything, FovToggles};
 
 fn usage() {
     eprintln!(
-        "Usage: game [--map <demo|racetrack|hallways>] [--load <snapshot-dir>]"
+        "Usage: game [--map <demo|racetrack|hallways>] [--load <snapshot-dir>]\n\
+         \x20      [--fov-cache] [--fov-budget <squares>]\n\
+         \n\
+         FOV performance prototypes (see docs/PERFORMANCE.md):\n\
+         \x20 --fov-cache          cache the player FOV per player square (A)\n\
+         \x20 --fov-budget <n>     cumulative portal-distance budget (B)"
     );
 }
 
@@ -13,6 +18,7 @@ fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     let mut map_name = None;
     let mut load_path = None;
+    let mut fov_toggles = FovToggles::default();
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -36,11 +42,29 @@ fn main() {
                     return;
                 }
             }
+        } else if arg == "--fov-cache" {
+            fov_toggles.cache = true;
+        } else if let Some(value) = arg.strip_prefix("--fov-budget=") {
+            match value.parse::<f32>() {
+                Ok(n) => fov_toggles.cumulative_distance_budget = Some(n),
+                Err(_) => {
+                    usage();
+                    return;
+                }
+            }
+        } else if arg == "--fov-budget" {
+            match iter.next().and_then(|value| value.parse::<f32>().ok()) {
+                Some(n) => fov_toggles.cumulative_distance_budget = Some(n),
+                None => {
+                    usage();
+                    return;
+                }
+            }
         } else {
             usage();
             return;
         }
     }
 
-    do_everything(map_name, load_path);
+    do_everything(map_name, load_path, fov_toggles);
 }

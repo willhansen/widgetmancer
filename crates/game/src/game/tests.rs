@@ -2765,6 +2765,84 @@
         ));
     }
 
+    /// Order-insensitive signature of a FOV over a fixed grid of relative
+    /// squares: `F` fully visible, `p` partially, `.` not visible. Screen and
+    /// `Debug` comparisons are unusable here: the FOV's sub-view order (HashMap
+    /// iteration over visible portals) and the angled-block renderer are both
+    /// non-deterministic frame-to-frame, independent of the cache.
+    fn fov_signature(fov: &FieldOfViewResult) -> String {
+        let mut out = String::new();
+        for dx in -24..=24 {
+            for dy in -12..=12 {
+                let rel = vec2(dx, dy);
+                let visibilities = fov.visibilities_of_relative_square(rel);
+                let any_full = visibilities
+                    .iter()
+                    .any(|v| v.square_visibility_in_absolute_frame.is_fully_visible());
+                out.push(if any_full {
+                    'F'
+                } else if visibilities.is_empty() {
+                    '.'
+                } else {
+                    'p'
+                });
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn test_fov_cache_matches_fresh_computation() {
+        let mut game = set_up_racetrack_game();
+        game.set_fov_cache_enabled(true);
+
+        // The FOV computation itself is deterministic.
+        assert_eq!(
+            fov_signature(&game.player_field_of_view()),
+            fov_signature(&game.player_field_of_view())
+        );
+
+        for square in [point2(24, 13), point2(25, 13), point2(24, 14), point2(22, 11)] {
+            game.place_player(square);
+            game.draw_headless_now(); // populates the cache for this square
+            assert_eq!(
+                fov_signature(&game.player_fov_for_draw()),
+                fov_signature(&game.player_field_of_view()),
+                "cached FOV differs from fresh at {square:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fov_cache_invalidates_when_player_moves() {
+        let mut game = set_up_racetrack_game();
+        game.set_fov_cache_enabled(true);
+
+        game.draw_headless_now();
+        let (square, _) = game.fov_cache.as_ref().expect("cache populated");
+        assert_eq!(*square, point2(24, 13));
+
+        game.try_set_player_position(point2(25, 13)).unwrap();
+        game.draw_headless_now();
+        let (square, _) = game.fov_cache.as_ref().expect("cache repopulated");
+        assert_eq!(*square, point2(25, 13));
+    }
+
+    #[test]
+    fn test_fov_cumulative_budget_is_a_fidelity_dial() {
+        let mut game = set_up_racetrack_game();
+        let default_sig = fov_signature(&game.player_field_of_view());
+
+        // A budget larger than any reachable portal path is indistinguishable
+        // from the unbounded default.
+        game.set_fov_cumulative_distance_budget(Some(1000.0));
+        assert_eq!(default_sig, fov_signature(&game.player_field_of_view()));
+
+        // A tight budget prunes deep portal views, changing the FOV.
+        game.set_fov_cumulative_distance_budget(Some(4.0));
+        assert_ne!(default_sig, fov_signature(&game.player_field_of_view()));
+    }
+
     fn set_up_hallways_game() -> Game {
         // Same 96x26-character clamp the real game uses for racetrack; the
         // hallways map is compact but the diagram binary reuses this size.
