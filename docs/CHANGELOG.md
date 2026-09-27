@@ -9,6 +9,44 @@ Newest first.
 
 ---
 
+## 2026-09 — Black diagonal portal-seam artifact
+
+### fov: merge adjacent portal-slice view cones as a set (fixes black diagonal seam)
+Root cause of `issues/black-diagonal-portal-seam/`: standing on one of a
+stacked pair of east-facing portals, a square on the 45-degree seam between
+their openings had only one partial visibility and rendered as an
+`OUT_OF_SIGHT` black diagonal. The item-12 merge (`combined_with_unioning_arcs`)
+carried a single `view_arc`; when two same-root slices did not touch it kept one
+arc but the other's squares, so a later touching slice unioned only with the
+retained arc and the dropped slice's squares were recomputed under an arc that
+no longer covered them (order-dependent, since `combined_sub_fovs` reduces a
+`HashMap` group). `FieldOfViewResult` now carries `view_arcs:
+Vec<AngleInterval>`; `combined_main_view_only` merges touching/overlapping
+fragments (`merge_contiguous_arc_intervals`) and recomputes squares under the
+merged set (`visibility_of_square_under_arc_intervals`), while
+blocker-separated arcs stay distinct. All seam cells `rel(k,-k)` are now fully
+visible. Regression tests `test_stacked_portal_slices_union_to_full_visibility`
+and `stacked_portal_seam_has_no_out_of_sight_partial`; full suite green
+(535 passed / 9 skipped).
+
+### game: issue capture + minimized repro for the black diagonal seam
+New `issues/black-diagonal-portal-seam/` with the snapshot, a write-up
+(symptom, observed cells, minimal repro, mechanism), and `debug/` outputs from
+`snapshot_tool` (render/diff/cells/fov-trace/explain/invariants). The minimizer
+reduced the capture to **player + 2 portals** (`--no-screen-crop`; a crop
+candidate bounding portals is still too small because mirrored portals draw
+virtual images out to the sight radius).
+
+### game: harden the snapshot minimizer's screen crop
+`screen_crop_candidate` now bounds portal squares as well as `{player,
+artifact}`; `try_candidate` catches off-screen-draw panics (`catch_unwind`) so
+an unsafe crop is rejected instead of aborting the tool; and the crop is retried
+after entity/portal removal. New test
+`screen_crop_candidate_includes_far_portals`. With `debug-tools`: 276 passed /
+7 skipped.
+
+---
+
 ## 2026-09 — Debug tooling wishlist (W.A–W.G)
 
 Implemented the debug-tooling wishlist from the front of

@@ -1,0 +1,5 @@
+cell (square 32, row 22) left_col 64 world(38,22) rel(1,-1) fov_center(37,23):
+  final: '🭥' fg(255,0,105) bg(26,0,0)
+  fov visibilities: 1
+    depth 1 abs(33,22) rot 0 abs_vis "🭥🭓" rel_vis "🭥🭓"
+      draw_buffer: OffsetSquare(OffsetSquareDrawable { offset: (-0.3073845, -0.00037574768), colors: [Rgb { r: 255, g: 0, b: 117 }, Rgb { r: 191, g: 191, b: 191 }], forced_family: Some(0) })

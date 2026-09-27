@@ -297,12 +297,13 @@ pub struct FieldOfViewResult {
     center_square: WorldSquare,
     key_direction: OrthogonalWorldStep,
     center_offset: WorldMove,
-    /// The view cone this result was computed over. Carried so that results
-    /// reaching the same root through different portal faces (adjacent arc
-    /// slices of one opening) can be merged at the *arc* level rather than by
-    /// combining their per-square half-planes (roadmap fix for the
-    /// portal-depth partial-visibility artifact).
-    view_arc: AngleInterval,
+    /// The view cones this result was computed over. Usually one interval, but
+    /// a result can inherit several when it is built by merging same-root
+    /// portal-face slices whose arcs do not all touch (e.g. two stacked portals
+    /// whose openings meet at a corner). Carried so those slices can be merged
+    /// at the *arc* level rather than by combining their per-square half-planes
+    /// (roadmap fix for the portal-depth partial-visibility artifact).
+    view_arcs: Vec<AngleInterval>,
     visible_relative_squares_in_main_view_only: StepVisibilityMap,
     transformed_sub_fovs: Vec<FieldOfViewResult>,
 }
@@ -316,7 +317,7 @@ impl FieldOfViewResult {
             center_square,
             key_direction,
             center_offset: [0.0; 2].into(),
-            view_arc: AngleInterval::default(),
+            view_arcs: vec![],
             visible_relative_squares_in_main_view_only: Default::default(),
             transformed_sub_fovs: vec![],
         }
@@ -430,23 +431,30 @@ impl FieldOfViewResult {
         );
 
         // When merging two results that reach the same root through adjacent
-        // portal-face slices, union their view cones and recompute the affected
-        // squares under the union. Combining the per-square half-planes instead
-        // (the old path) cannot represent the union and leaves a spurious
-        // partial (the portal-depth black-block artifact).
-        let combined_arc: Option<AngleInterval> = if union_arcs
-            && self.view_arc.width().radians > 0.0
-            && other.view_arc.width().radians > 0.0
-            && self.view_arc.overlaps_or_touches(other.view_arc)
-        {
-            Some(self.view_arc.union(other.view_arc))
+        // portal-face slices, merge their view cones and recompute the affected
+        // squares under the merged cones. Combining the per-square half-planes
+        // instead (the old path) cannot represent the union of two
+        // non-complementary partials and leaves a spurious partial (the
+        // portal-depth black-block artifact).
+        //
+        // The cones are carried as a *set*: two stacked portals can contribute
+        // disjoint arcs (their openings meet only at a corner), and a third
+        // slice can bridge them. A single `union` of the current pair would drop
+        // one slice, so a later merge would recompute its squares under an arc
+        // that no longer covers them. Touching/overlapping fragments are merged
+        // here; genuinely separated arcs (blocker gaps) are not.
+        let mut combined_view_arcs: Vec<AngleInterval> = self.view_arcs.clone();
+        combined_view_arcs.extend(other.view_arcs.iter().copied());
+        let unioned_view_arcs: Option<Vec<AngleInterval>> = if union_arcs {
+            Some(merge_contiguous_arc_intervals(combined_view_arcs.clone()))
         } else {
             None
         };
         let widen = |square: WorldStep, fallback: SquareVisibility| -> SquareVisibility {
-            match combined_arc {
-                Some(arc) => {
-                    visibility_of_offset_square(arc, square, self.center_offset).unwrap_or(fallback)
+            match &unioned_view_arcs {
+                Some(arcs) => {
+                    visibility_of_square_under_arc_intervals(arcs, square, self.center_offset)
+                        .unwrap_or(fallback)
                 }
                 None => fallback,
             }
@@ -499,11 +507,17 @@ impl FieldOfViewResult {
                         .visible_relative_squares_in_main_view_only
                         .get(&square)
                         .unwrap();
-                    let combined = match combined_arc {
-                        Some(arc) => visibility_of_offset_square(arc, square, self.center_offset)
+                    let combined = match &unioned_view_arcs {
+                        Some(arcs) => {
+                            visibility_of_square_under_arc_intervals(
+                                arcs,
+                                square,
+                                self.center_offset,
+                            )
                             .unwrap_or_else(|| {
                                 partial_a.combined_increasing_visibility(partial_b)
-                            }),
+                            })
+                        }
                         None => partial_a.combined_increasing_visibility(partial_b),
                     };
                     (square, combined)
@@ -518,7 +532,7 @@ impl FieldOfViewResult {
             center_square: self.center_square,
             key_direction: self.key_direction,
             center_offset: self.center_offset,
-            view_arc: combined_arc.unwrap_or(self.view_arc),
+            view_arcs: unioned_view_arcs.unwrap_or(combined_view_arcs),
             visible_relative_squares_in_main_view_only: all_visibilities,
             transformed_sub_fovs: vec![],
         }
@@ -592,7 +606,7 @@ impl FieldOfViewResult {
             center_square: self.center_square,
             key_direction: self.key_direction,
             center_offset: self.center_offset,
-            view_arc: self.view_arc,
+            view_arcs: self.view_arcs.clone(),
             visible_relative_squares_in_main_view_only: self
                 .visible_relative_squares_in_main_view_only
                 .clone(),
@@ -1062,7 +1076,7 @@ pub fn field_of_view_within_arc_in_single_octant(
 ) -> FieldOfViewResult {
     let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(center_square, key_direction);
     fov_result.center_offset = center_offset;
-    fov_result.view_arc = view_arc;
+    fov_result.view_arcs = vec![view_arc];
 
     // TODO: Stop being an iterator, just be a function
     let rel_squares_in_fov_sequence =
@@ -1413,6 +1427,45 @@ fn visibility_of_offset_square(
     } else {
         None
     }
+}
+
+/// Visibility of `rel_square` under a set of view-arc fragments: the union of
+/// what each fragment sees. Used when same-root portal-face slices are merged.
+/// Fragments that touch have already been consolidated (see
+/// [`merge_contiguous_arc_intervals`]), so a square straddling their shared
+/// edge is recomputed as fully visible instead of as a lone partial.
+fn visibility_of_square_under_arc_intervals(
+    view_arcs: &[AngleInterval],
+    rel_square: WorldStep,
+    center_offset: WorldMove,
+) -> Option<SquareVisibility> {
+    view_arcs
+        .iter()
+        .filter_map(|&arc| {
+            square_visibility_from_one_view_arc_with_center_offset(arc, rel_square, center_offset)
+        })
+        .reduce(|a, b| a.combined_increasing_visibility(&b))
+}
+
+/// Merge view arcs that overlap or touch into maximal intervals, leaving
+/// genuinely separated arcs (e.g. the two sides of a sight blocker) distinct.
+fn merge_contiguous_arc_intervals(mut intervals: Vec<AngleInterval>) -> Vec<AngleInterval> {
+    intervals.retain(|arc| arc.width().radians > 0.0);
+    let mut merged_any = true;
+    while merged_any {
+        merged_any = false;
+        'outer: for i in 0..intervals.len() {
+            for j in (i + 1)..intervals.len() {
+                if intervals[i].overlaps_or_touches(intervals[j]) {
+                    intervals[i] = intervals[i].union(intervals[j]);
+                    intervals.remove(j);
+                    merged_any = true;
+                    break 'outer;
+                }
+            }
+        }
+    }
+    intervals
 }
 
 fn square_visibility_from_one_view_arc(
@@ -2258,6 +2311,42 @@ mod tests {
             "expected fully visible, got {:?}",
             artifact.square_visibility_in_absolute_frame().as_string()
         );
+    }
+
+    #[test]
+    fn test_stacked_portal_slices_union_to_full_visibility() {
+        // Two east-facing portals stacked on adjacent squares ((37,22) and
+        // (37,23)) with the viewer standing on the lower one. Their openings
+        // meet at a 45-degree corner, so a square on that seam used to get only
+        // one slice's half-plane and render as an OUT_OF_SIGHT black diagonal
+        // (issues/black-diagonal-portal-seam). Merging the slices' arcs must
+        // make the seam square fully visible.
+        let mut portal_geometry = PortalGeometry::default();
+        let player = point2(37, 23);
+        portal_geometry.create_portal(
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(37, 22), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(33, 22), STEP_RIGHT),
+        );
+        portal_geometry.create_portal(
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(37, 23), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(33, 23), STEP_RIGHT),
+        );
+        let fov = portal_aware_field_of_view_from_square(
+            player,
+            16,
+            &Default::default(),
+            &portal_geometry,
+        );
+        for k in 1..=5 {
+            let relative = WorldStep::new(k, -k);
+            let visibilities = fov.visibilities_of_relative_square(relative);
+            assert!(
+                visibilities.iter().all(|v| v
+                    .square_visibility_in_absolute_frame()
+                    .is_fully_visible()),
+                "rel({k},-{k}) should be fully visible through the merged portal slices, got {visibilities:?}"
+            );
+        }
     }
 
     #[test]

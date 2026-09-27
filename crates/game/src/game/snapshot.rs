@@ -698,7 +698,7 @@ impl Game {
 mod tests {
     use super::*;
     use crate::utils_for_tests::set_up_game_with_player;
-    use euclid::vec2;
+    use euclid::{point2, vec2};
     use utility::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
 
     #[test]
@@ -805,6 +805,42 @@ mod tests {
         loaded.draw_headless_at_duration_from_start(std::time::Duration::ZERO);
 
         assert_eq!(screen_text(&loaded), before);
+    }
+
+    #[test]
+    fn stacked_portal_seam_has_no_out_of_sight_partial() {
+        // Reproduces issues/black-diagonal-portal-seam: standing on a portal in
+        // a stacked pair used to render a diagonal of OUT_OF_SIGHT black
+        // partials along the 45-degree seam between their openings.
+        let mut game = crate::utils_for_tests::set_up_nxm_game(44, 63);
+        game.place_player(point2(37, 23));
+        for row in [22, 23] {
+            game.place_single_sided_one_way_portal(
+                SquareWithOrthogonalDir::from_square_and_worldstep(
+                    point2(37, row),
+                    STEP_RIGHT,
+                ),
+                SquareWithOrthogonalDir::from_square_and_worldstep(
+                    point2(33, row),
+                    STEP_RIGHT,
+                ),
+            );
+        }
+        game.draw_headless_now();
+
+        let screen = &game.graphics.screen;
+        let player = game.player_square();
+        for k in 1..=5 {
+            let world = player + WorldStep::new(k, -k);
+            let cell = screen.world_square_to_left_screen_buffer_character_square(world);
+            let bg = screen.screen_buffer[cell.x as usize][cell.y as usize].bg_color;
+            assert!(
+                !(bg.r > 0 && bg.g == 0 && bg.b == 0),
+                "OUT_OF_SIGHT-tinted partial at rel({k},-{k}) buffer ({},{})",
+                cell.x,
+                cell.y
+            );
+        }
     }
 }
 
@@ -1018,30 +1054,56 @@ pub mod debug {
         )
     }
 
-    /// Candidate terminal size for a virtual-screen crop: the `{player,
-    /// artifact}` bounding box plus `margin_squares` on every side, never
-    /// larger than the current size.
+    /// Candidate terminal size for a virtual-screen crop: the bounding box of
+    /// the player, the artifact, and every portal (portals are drawn with line
+    /// of sight, so they can reach far outside a `{player, artifact}` box and
+    /// would otherwise be drawn off-screen), plus `margin_squares` on every
+    /// side, never larger than the current size.
     pub fn screen_crop_candidate(
         game: &Game,
         anchor: &ArtifactAnchor,
         margin_squares: u32,
     ) -> (u16, u16) {
         let screen = &game.graphics.screen;
-        let player = game.player_square();
         let center = screen.screen_center_as_screen_buffer_character_square();
-        let artifact_cell =
-            screen.world_square_to_left_screen_buffer_character_square(player + anchor.relative_square);
-        let dx = (artifact_cell.x - center.x).unsigned_abs();
-        let dy = (artifact_cell.y - center.y).unsigned_abs();
+        let player = game.player_square();
+        let mut relevant_squares = vec![player, player + anchor.relative_square];
+        relevant_squares.extend(
+            game.portal_geometry
+                .iter_portals()
+                .flat_map(|portal| [portal.entrance().square(), portal.exit().square()]),
+        );
+
+        let max_dx = relevant_squares
+            .iter()
+            .map(|&square| {
+                let cell = screen.world_square_to_left_screen_buffer_character_square(square);
+                (cell.x - center.x).unsigned_abs()
+            })
+            .max()
+            .unwrap_or(0);
+        let max_dy = relevant_squares
+            .iter()
+            .map(|&square| {
+                let cell = screen.world_square_to_left_screen_buffer_character_square(square);
+                (cell.y - center.y).unsigned_abs()
+            })
+            .max()
+            .unwrap_or(0);
+
         let margin_chars = 2 * margin_squares; // one world square = two columns
-        let width = (2 * (dx + margin_chars) + 1).min(screen.terminal_width as u32) as u16;
-        let height = (2 * (dy + margin_squares) + 1).min(screen.terminal_height as u32) as u16;
+        let width = (2 * (max_dx + margin_chars) + 1).min(screen.terminal_width as u32) as u16;
+        let height = (2 * (max_dy + margin_squares) + 1).min(screen.terminal_height as u32) as u16;
         (width, height)
     }
 
     const MINIMIZE_RENDER_CAP: usize = 4000;
 
     /// Render a candidate and return it iff the anchored artifact survives.
+    /// Rendering is fallible in practice (a too-aggressive crop can place a
+    /// drawable off-screen, which the screen buffer treats as a bug and panics
+    /// on); catch that here so the minimizer rejects the candidate instead of
+    /// aborting.
     fn try_candidate(
         value: &serde_json::Value,
         anchor: &ArtifactAnchor,
@@ -1051,9 +1113,38 @@ pub mod debug {
         if renders.get() > MINIMIZE_RENDER_CAP {
             return None;
         }
-        render_value_at_captured_time(value)
-            .ok()
-            .filter(|game| artifact_present_at(game, anchor))
+        let rendered = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            render_value_at_captured_time(value)
+        }))
+        .ok()
+        .and_then(Result::ok);
+        rendered.filter(|game| artifact_present_at(game, anchor))
+    }
+
+    /// Try to shrink `value`'s virtual screen to [`screen_crop_candidate`].
+    /// On success replaces `value` with the cropped candidate and returns
+    /// `(old_width, old_height, new_width, new_height, rendered)`.
+    fn attempt_screen_crop(
+        value: &mut serde_json::Value,
+        anchor: &ArtifactAnchor,
+        options: &MinimizeOptions,
+        renders: &std::cell::Cell<usize>,
+    ) -> Option<(u16, u16, u16, u16, Game)> {
+        let baseline = render_value_at_captured_time(value).ok()?;
+        let screen = &baseline.graphics.screen;
+        let old = (screen.terminal_width, screen.terminal_height);
+        let (new_width, new_height) = screen_crop_candidate(&baseline, anchor, options.crop_margin);
+        if (new_width, new_height) == old {
+            return None;
+        }
+        let mut candidate = value.clone();
+        if let Some(screen_value) = candidate.get_mut("screen") {
+            screen_value["terminal_width"] = serde_json::json!(new_width);
+            screen_value["terminal_height"] = serde_json::json!(new_height);
+        }
+        let game = try_candidate(&candidate, anchor, renders)?;
+        *value = candidate;
+        Some((old.0, old.1, new_width, new_height, game))
     }
 
     fn strip_ansi(text: &str) -> String {
@@ -1235,32 +1326,24 @@ pub mod debug {
         let renders = std::cell::Cell::new(0usize);
         let mut step = 0usize;
 
-        // Early virtual-screen crop.
+        // Early virtual-screen crop (before entity removal, so review frames
+        // stay small where possible).
         if options.screen_crop {
-            let screen = &baseline_game.graphics.screen;
-            let (new_width, new_height) =
-                screen_crop_candidate(&baseline_game, &anchor, options.crop_margin);
-            if (new_width, new_height) != (screen.terminal_width, screen.terminal_height) {
-                let mut candidate = value.clone();
-                if let Some(screen_value) = candidate.get_mut("screen") {
-                    screen_value["terminal_width"] = serde_json::json!(new_width);
-                    screen_value["terminal_height"] = serde_json::json!(new_height);
-                }
-                if let Some(game) = try_candidate(&candidate, &anchor, &renders) {
-                    value = candidate;
-                    step += 1;
-                    let change = format!(
-                        "screen crop {}x{} -> {new_width}x{new_height} (margin {} squares)",
-                        screen.terminal_width, screen.terminal_height, options.crop_margin
-                    );
-                    if let Some(writer) = writer.as_mut() {
-                        writer
-                            .write_all(
-                                format_review_step(step, &change, &game, &anchor, explain, colors)
-                                    .as_bytes(),
-                            )
-                            .map_err(|error| error.to_string())?;
-                    }
+            if let Some((old_width, old_height, new_width, new_height, game)) =
+                attempt_screen_crop(&mut value, &anchor, &options, &renders)
+            {
+                step += 1;
+                let change = format!(
+                    "screen crop {old_width}x{old_height} -> {new_width}x{new_height} (margin {} squares)",
+                    options.crop_margin
+                );
+                if let Some(writer) = writer.as_mut() {
+                    writer
+                        .write_all(
+                            format_review_step(step, &change, &game, &anchor, explain, colors)
+                                .as_bytes(),
+                        )
+                        .map_err(|error| error.to_string())?;
                 }
             }
         }
@@ -1324,6 +1407,29 @@ pub mod debug {
                 }
                 if !removed_any {
                     break;
+                }
+            }
+        }
+
+        // Late crop: entities (and most portals) are gone now, so a crop that
+        // was rejected early (drawables off-screen) can succeed with a much
+        // smaller bounding box.
+        if options.screen_crop {
+            if let Some((old_width, old_height, new_width, new_height, game)) =
+                attempt_screen_crop(&mut value, &anchor, &options, &renders)
+            {
+                step += 1;
+                let change = format!(
+                    "screen crop {old_width}x{old_height} -> {new_width}x{new_height} (margin {} squares)",
+                    options.crop_margin
+                );
+                if let Some(writer) = writer.as_mut() {
+                    writer
+                        .write_all(
+                            format_review_step(step, &change, &game, &anchor, explain, colors)
+                                .as_bytes(),
+                        )
+                        .map_err(|error| error.to_string())?;
                 }
             }
         }
@@ -1662,6 +1768,35 @@ pub mod debug {
             assert!(width >= 3 && height >= 3, "crop too small: {width}x{height}");
             // The artifact is 15 squares east, 1 row up: a short, wide window.
             assert!(height <= 13, "height should track the 1-row offset: {height}");
+        }
+
+        #[test]
+        fn screen_crop_candidate_includes_far_portals() {
+            use euclid::point2;
+            use utility::{SquareWithOrthogonalDir, STEP_RIGHT};
+
+            // 126x44 frame, matching the issue snapshot geometry.
+            let mut game = crate::utils_for_tests::set_up_nxm_game(44, 63);
+            game.place_player(point2(37, 23));
+            // The exit sits four squares west of the player, so a {player,
+            // artifact}-only box would leave it off the cropped screen.
+            game.place_single_sided_one_way_portal(
+                SquareWithOrthogonalDir::from_square_and_worldstep(point2(37, 23), STEP_RIGHT),
+                SquareWithOrthogonalDir::from_square_and_worldstep(point2(33, 23), STEP_RIGHT),
+            );
+            game.draw_headless_at_duration_from_start(Duration::ZERO);
+
+            let anchor = ArtifactAnchor {
+                relative_square: WorldStep::new(1, -1),
+                depth: 1,
+                absolute_square: WorldSquare::new(38, 22),
+            };
+            let (width, _height) = screen_crop_candidate(&game, &anchor, 4);
+            // 4 squares west = 8 char columns, plus an 8-char margin each side.
+            assert!(
+                width >= 33,
+                "crop width {width} would clip the portal exit four squares west"
+            );
         }
 
         #[test]

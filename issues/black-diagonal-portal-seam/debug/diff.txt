@@ -1,0 +1,1 @@
+OK: issues/black-diagonal-portal-seam/screen.txt matches the render

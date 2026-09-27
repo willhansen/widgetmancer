@@ -1,0 +1,88 @@
+{
+  "blocks": [],
+  "board_height": 44,
+  "board_width": 63,
+  "conveyor_belts": [],
+  "death_cubes": [],
+  "floating_hunter_drones": [],
+  "floor_push_arrows": [],
+  "incubating_pawns": [],
+  "map": "hallways",
+  "pieces": [],
+  "player": {
+    "blink_range": 5,
+    "faced_direction": [
+      1,
+      0
+    ],
+    "position": [
+      37,
+      23
+    ]
+  },
+  "portals": [
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          22
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          33,
+          22
+        ]
+      }
+    },
+    {
+      "entrance": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          37,
+          23
+        ]
+      },
+      "exit": {
+        "direction": [
+          1,
+          0
+        ],
+        "square": [
+          33,
+          23
+        ]
+      }
+    }
+  ],
+  "rng_state": "{\"seed\":[60,64,172,11,74,188,224,128,161,112,220,75,85,212,145,251,64,34,112,213,39,92,2,246,44,43,66,94,43,10,236,9],\"stream\":0,\"word_pos\":0}",
+  "running": true,
+  "screen": {
+    "center": [
+      37,
+      23
+    ],
+    "origin": [
+      6,
+      44
+    ],
+    "rotation_quarter_turns": 0,
+    "terminal_height": 44,
+    "terminal_width": 126
+  },
+  "turn_count": 0,
+  "upgrades": [],
+  "widgets": [],
+  "world_time_seconds": 29.92316
+}

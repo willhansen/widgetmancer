@@ -452,6 +452,27 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
 
 ## Done
 
+### 13. Fix black diagonal partial-square seam through adjacent portals — 2026-09
+- **Evidence:** `issues/black-diagonal-portal-seam/` — standing on one of a
+  stacked pair of east-facing portals rendered a diagonal of
+  `OUT_OF_SIGHT`-background partials on the 45-degree seam between their
+  openings (`rel(k,-k)`, `k=1..5` in the capture; longer in the minimized repro).
+- **Root cause:** the item-12 merge carried a single `view_arc`. When same-root
+  portal slices did not touch, `combined_with_unioning_arcs` kept one operand's
+  arc but the other's squares; a later touching slice unioned only with the
+  retained arc, so the dropped slice's squares were recomputed under an arc
+  that no longer covered them. `combined_sub_fovs` reduces a `HashMap` group, so
+  the loss was order-dependent.
+- **Landed:** `FieldOfViewResult` carries `view_arcs: Vec<AngleInterval>`;
+  `combined_main_view_only` merges touching/overlapping fragments
+  (`merge_contiguous_arc_intervals`) and recomputes squares under the merged set
+  (`visibility_of_square_under_arc_intervals`), leaving blocker-separated arcs
+  distinct. Minimizer hardening: `screen_crop_candidate` bounds portal squares,
+  `try_candidate` catches off-screen-draw panics, and the crop is retried after
+  entity removal. Tests `test_stacked_portal_slices_union_to_full_visibility`
+  and `stacked_portal_seam_has_no_out_of_sight_partial`; full suite green
+  (535 passed / 9 skipped).
+
 ### 12. Fix portal-depth partial-visibility artifact — 2026-09
 - **Evidence:** `issues/black-block-deep-in-portal/` — a black
   `OUT_OF_SIGHT`-background partial at buffer `(49,37)` (rel `(15,1)`, depth 3)
