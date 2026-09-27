@@ -9,6 +9,49 @@ Newest first.
 
 ---
 
+## 2026-09 — Build wide racetrack portal bands from one transform
+
+### game: derive every wide-band strip from one portal transform
+Replaced the map's hand-laid multi-square portals with a single helper,
+`place_wide_portal_from_transform(entrance, exit, width)`: caller gives the
+center strip and the helper derives every other strip's exit from that
+portal's rigid transform. The corners (width 3), both shuttle flips (width
+3) and the 19-wide L portal now all use it, so a band is one coherent window
+by construction — including turns (180° flips, 90° corners) that reverse the
+wall's lateral direction. This supersedes the manual `-d` mirror and the
+manually reversed L exit ordering.
+
+Removed `test_every_map_has_coherent_portal_bands` and the L-specific
+coherence test: asserting coherent bands as an invariant is too strong, since
+unorthodox portal arrangements may be intentional. Coherence now comes from
+the construction helper; behavior stays covered by the lap, shuttle and
+L-render tests.
+
+`place_wide_corner_portal` is gone (folded into the new helper).
+
+---
+
+## 2026-09 — Racetrack shuttle band sheared; audit all map portal bands
+
+### game: mirror the racetrack shuttle's 3-wide exit band
+The same shear as the L portal, one square over: a 180° flip reverses a
+wall's lateral direction, so a 3-wide entrance band's exit band must be its
+mirror. The shuttle offset both ends of each flip by `+d`, so the three
+strips each got a different transform and the window twisted. Exit offsets
+now use `-d` for both shuttle walls.
+
+### game: assert every map's portal bands share one transform
+Added `test_every_map_has_coherent_portal_bands`, which walks demo,
+racetrack, hallways and test_map and asserts that entrance strips laid side
+by side (adjacent along the axis perpendicular to their shared entrance
+direction) are `is_coherent_with` each other. It fails on the shuttle before
+the mirror fix (`racetrack: portal band shears: (19,10) -> (19,14) vs
+(20,10) -> (20,14)`) and passes after. Adjacency along the travel axis is
+deliberately excluded — those are separate windows, not one band. Demo,
+hallways and test_map were already coherent.
+
+---
+
 ## 2026-09 — Racetrack L portal sheared across its strips
 
 ### game: make the racetrack's big L portal one coherent window

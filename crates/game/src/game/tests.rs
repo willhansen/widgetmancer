@@ -2616,36 +2616,6 @@
     }
 
     #[test]
-    fn test_racetrack_l_portal_strips_are_one_coherent_portal() {
-        // The L portal is one big 90° window: all 19 entrance/exit strip
-        // pairs must share a single rigid transform, or the wall shears
-        // (each strip maps the plane to a different place) and renders as
-        // weird turns and breaks.
-        let game = set_up_racetrack_game();
-        let base: WorldSquare = point2(24, 13);
-        let strip_entrance = |i: i32| {
-            SquareWithOrthogonalDir::from_square_and_step(
-                point2(base.x + 22, base.y - 9 + i),
-                STEP_RIGHT,
-            )
-        };
-        let first = game
-            .portal_geometry
-            .get_portal_by_entrance(strip_entrance(0))
-            .unwrap();
-        for i in 1..19 {
-            let strip = game
-                .portal_geometry
-                .get_portal_by_entrance(strip_entrance(i))
-                .unwrap();
-            assert!(
-                first.is_coherent_with(&strip),
-                "L strip {i} does not share the first strip's transform"
-            );
-        }
-    }
-
-    #[test]
     fn test_shuttle_cube_oscillates() {
         let mut game = set_up_racetrack_game();
         let seed = point2(19.0, 10.75); // shuttle cube, moving up

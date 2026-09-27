@@ -812,19 +812,23 @@ impl Game {
         });
     }
 
-    /// A 3-wide, double-sided, two-way band around the given portal:
-    /// the portal itself plus one strafed copy either side. Strafed exits
-    /// are derived from the portal's own rigid transform — on a turning
-    /// portal the exit band strafes in a rotated direction, so strafing
-    /// both ends blindly (place_wide_portal) would produce an
-    /// incoherent band whose faces disagree about where it leads.
-    fn place_wide_corner_portal(
+    /// An odd, `width`-wide, double-sided, two-way band around the given
+    /// portal: the portal itself (the center strip) plus strafed copies
+    /// either side. Every strip's exit is derived from the center portal's
+    /// own rigid transform, so the whole band is one coherent window for any
+    /// turn — straight, 90° corner, or 180° flip. Deriving the two ends
+    /// independently is how a band shears when the turn reverses their
+    /// lateral direction.
+    fn place_wide_portal_from_transform(
         &mut self,
         entrance: SquareWithOrthogonalDir,
         exit: SquareWithOrthogonalDir,
+        width: i32,
     ) {
+        assert!(width > 0 && width % 2 == 1, "band width must be odd");
+        let half_width = width / 2;
         let transform = RigidTransform::from_start_and_end_poses(entrance, exit.stepped_back());
-        (-1..=1).for_each(|i| {
+        (-half_width..=half_width).for_each(|i| {
             let strafed_entrance = entrance.strafed_right_n(i);
             let strafed_exit = transform.transform_pose(strafed_entrance).stepped();
             self.place_double_sided_two_way_portal(strafed_entrance, strafed_exit);
@@ -1118,24 +1122,28 @@ impl Game {
         // next edge, facing along it — a cube emerges there moving in the
         // next edge's direction. Widened into 3-square bands.
         // top-left corner: moving up → emerges moving right
-        self.place_wide_corner_portal(
+        self.place_wide_portal_from_transform(
             (point2(left_edge_x, top_row_y), STEP_UP).into(),
             (point2(left_edge_x + 2, top_row_y), STEP_RIGHT).into(),
+            3,
         );
         // top-right corner: moving right → emerges moving down
-        self.place_wide_corner_portal(
+        self.place_wide_portal_from_transform(
             (point2(right_edge_x, top_row_y), STEP_RIGHT).into(),
             (point2(right_edge_x, top_row_y - 2), STEP_DOWN).into(),
+            3,
         );
         // bottom-right corner: moving down → emerges moving left
-        self.place_wide_corner_portal(
+        self.place_wide_portal_from_transform(
             (point2(right_edge_x, bottom_row_y), STEP_DOWN).into(),
             (point2(right_edge_x - 2, bottom_row_y), STEP_LEFT).into(),
+            3,
         );
         // bottom-left corner: moving left → emerges moving up
-        self.place_wide_corner_portal(
+        self.place_wide_portal_from_transform(
             (point2(left_edge_x, bottom_row_y), STEP_LEFT).into(),
             (point2(left_edge_x, bottom_row_y + 2), STEP_UP).into(),
+            3,
         );
 
         self.place_linear_death_cube(
@@ -1156,18 +1164,20 @@ impl Game {
         );
 
         let shuttle_x = base.x - 5;
-        // moving up through the bottom portal → exits at the top moving down
-        // moving down through the top portal → exits at the bottom moving up
-        (-1..=1).for_each(|d| {
-            self.place_double_sided_two_way_portal(
-                (point2(shuttle_x + d, bottom_row_y), STEP_UP).into(),
-                (point2(shuttle_x + d, top_row_y - 1), STEP_DOWN).into(),
-            );
-            self.place_double_sided_two_way_portal(
-                (point2(shuttle_x + d, bottom_row_y + 4), STEP_DOWN).into(),
-                (point2(shuttle_x + d, bottom_row_y), STEP_UP).into(),
-            );
-        });
+        // Two 3-wide 180° flip portals: a cube moving up through the bottom
+        // one emerges at the top moving down, and vice versa. Each band's
+        // strips come from the center portal's transform, so the flip's
+        // reversed lateral direction is handled by construction.
+        self.place_wide_portal_from_transform(
+            (point2(shuttle_x, bottom_row_y), STEP_UP).into(),
+            (point2(shuttle_x, top_row_y - 1), STEP_DOWN).into(),
+            3,
+        );
+        self.place_wide_portal_from_transform(
+            (point2(shuttle_x, bottom_row_y + 4), STEP_DOWN).into(),
+            (point2(shuttle_x, bottom_row_y), STEP_UP).into(),
+            3,
+        );
         self.place_linear_death_cube(
             point2(shuttle_x as f32, bottom_row_y as f32 - 0.25),
             STEP_UP.to_f32() * 2.0,
@@ -1176,20 +1186,24 @@ impl Game {
         // The L portal: enter the vertical wall moving right anywhere
         // along it, emerge from the horizontal wall above the track
         // moving up — a 90° turn stretched over 19 squares (the map's
-        // corners do the same turn in one). A 90° anticlockwise turn maps
-        // the wall's "up" tangent to "left", so the exit wall runs right
-        // to left as the entrance runs bottom to top; laying it out
-        // left-to-right instead makes each strip a different transform
-        // and the wall visibly shears.
+        // corners do the same turn in one). The center strip's transform
+        // derives all 19, so the wall is one coherent window.
         let l_entrance_x = base.x + 22;
         let l_entrance_bottom_y = base.y - 9;
         let l_exit_y = base.y + 7;
-        (0..19).for_each(|i| {
-            self.place_double_sided_two_way_portal(
-                (point2(l_entrance_x, l_entrance_bottom_y + i), STEP_RIGHT).into(),
-                (point2(base.x + 20 - i, l_exit_y), STEP_UP).into(),
-            );
-        });
+        let l_half_wall = 9;
+        let l_center_entrance: SquareWithOrthogonalDir = (
+            point2(l_entrance_x, l_entrance_bottom_y + l_half_wall),
+            STEP_RIGHT,
+        )
+            .into();
+        let l_center_exit: SquareWithOrthogonalDir =
+            (point2(base.x + 2 + l_half_wall, l_exit_y), STEP_UP).into();
+        self.place_wide_portal_from_transform(
+            l_center_entrance,
+            l_center_exit,
+            2 * l_half_wall + 1,
+        );
 
         // Ten stationary cubes straddling every other L-entrance face,
         // spaced 2 squares apart, each a different fraction of the way
