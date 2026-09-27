@@ -11,16 +11,19 @@ cargo run --release -p game --example profile_racetrack -- racetrack 200   # ms/
 cargo run --release -p game --example profile_racetrack -- fov racetrack 50 # ms per player-FOV
 ```
 
-Prototype toggles (default off; see "Fix approaches"):
+Prototype toggles (harness defaults off; see "Fix approaches"):
 `--cache` (A) and `--budget=<squares>` (B).
 
-The same toggles are available on the real game binary, so a map can be played
-with them enabled:
+The same toggles are available on the real game binary, where they now
+**default on**. Opt out with `--no-fov-cache` / `--no-fov-budget`, or override
+the budget:
 
 ```
-./play-game --map racetrack --fov-cache
-./play-game --map racetrack --fov-budget 16
-./maps/racetrack.sh --fov-cache --fov-budget 16
+./play-game --map racetrack                       # cache + budget 16 (default)
+./play-game --map racetrack --no-fov-cache        # recompute the FOV every draw
+./play-game --map racetrack --no-fov-budget       # legacy per-hop sight
+./play-game --map racetrack --fov-budget 8        # tighter budget
+./maps/racetrack.sh --no-fov-budget
 ```
 
 For function attribution, run the harness from a scratch directory (it drops a
@@ -103,11 +106,11 @@ snapshot load. Expected: stationary frames drop 71 ms → ~24 ms (FOV is 47 of
 result is `Clone`, and `FieldOfViewResult` is pure. Verify with a
 recompute-count test plus the existing golden render tests.
 
-> **TODO(map-mutation):** the cache key is only the player square, valid only
-> while blocks/portals are immutable after setup/load. When they become
-> dynamically mutable, add a `map_version: u64` bumped on mutation and include
-> it in the key (or invalidate on mutation), so the cache degrades to partial
-> invalidation rather than going stale. Left for later by request.
+> **Map mutation:** the cache key is only the player square, valid while the
+> map is static between draws. `place_block` and the portal-placement methods
+> now clear the cache, so mid-game map mutation cannot serve a stale view. A
+> `map_version: u64` keyed cache would allow partial invalidation instead of a
+> full clear, but the maps are small enough that a clear is cheap.
 
 ### B. Cumulative *relative-radius* cap
 Thread a `remaining_radius: f32` through the recursion, initialized to the
@@ -162,12 +165,14 @@ and the FOV pipeline.)
 
 ## Prototype results (2026-09-27)
 
-Both prototypes are behind default-off runtime toggles on `Game`
-(`set_fov_cache_enabled`, `set_fov_cumulative_radius`), reachable from the game
-binary as `--fov-cache` / `--fov-budget <n>`. Defaults are unchanged and the
-full suite is green. Tests cover: cache-matches-fresh, cache-invalidation-on-
-move, budget-as-a-fidelity-dial, deterministic portal iteration, and
-byte-identical frames.
+Both prototypes are on by default on `Game` (the cache at construction, the
+budget initialized to `PLAYER_SIGHT_RADIUS`), and are also reachable from the
+game binary as opt-outs `--no-fov-cache` / `--no-fov-budget` (with
+`--fov-budget <n>` to override the value). Placing a block or portal
+invalidates the cache, since its key is only the player square. The full suite
+is green. Tests cover: cache-matches-fresh, cache-invalidation-on-move,
+cache-invalidation-on-map-change, defaults-on, budget-as-a-fidelity-dial,
+deterministic portal iteration, and byte-identical frames.
 
 Racetrack, release, 120 frames:
 

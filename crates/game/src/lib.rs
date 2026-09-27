@@ -75,14 +75,24 @@ pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
     }
 }
 
-/// Prototype FOV performance toggles (see docs/PERFORMANCE.md). Both default
-/// off, so normal play is unaffected.
-#[derive(Clone, Copy, Debug, Default)]
+/// FOV performance toggles (see docs/PERFORMANCE.md). Both default on: the
+/// cache is per-player-square, and the budget is the player's sight radius.
+/// The game binary exposes `--no-fov-cache` / `--no-fov-budget` to opt out.
+#[derive(Clone, Copy, Debug)]
 pub struct FovToggles {
-    /// Prototype A: cache the player FOV per player square.
+    /// Cache the player FOV per player square.
     pub cache: bool,
-    /// Prototype B: cumulative relative-radius budget in squares.
+    /// Cumulative relative-radius budget in squares.
     pub cumulative_radius_budget: Option<f32>,
+}
+
+impl Default for FovToggles {
+    fn default() -> Self {
+        FovToggles {
+            cache: true,
+            cumulative_radius_budget: Some(crate::game::PLAYER_SIGHT_RADIUS as f32),
+        }
+    }
 }
 
 pub fn do_everything(

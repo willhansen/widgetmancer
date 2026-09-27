@@ -40,7 +40,7 @@ pub use spawning::IncubatingPawn;
 pub use floating_entities::{DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
 pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
 
-const PLAYER_SIGHT_RADIUS: u32 = 16;
+pub const PLAYER_SIGHT_RADIUS: u32 = 16;
 
 use floating_entities::FloatingEntityEnum;
 
@@ -117,16 +117,14 @@ pub struct Game {
     rng: ChaCha8Rng,
     world_start_time: LogicalTime,
     world_time: LogicalTime,
-    /// Prototype toggles for FOV performance work (see docs/PERFORMANCE.md).
-    /// Defaults preserve original behavior.
+    /// FOV performance options (see docs/PERFORMANCE.md). Defaulted on: the
+    /// cumulative-radius budget equals the player's sight radius.
     fov_options: FovOptions,
     fov_cache_enabled: bool,
-    // TODO(map-mutation): the cache key is only the player square, which is
-    // valid today because blocks/portals are immutable after map setup or
-    // snapshot load. When blocks/portals become dynamically mutable, add a
-    // `map_version: u64` bumped on every mutation (place_block / portal
-    // creation / load) and include it in the key, or invalidate here. Until
-    // then a mid-game map mutation would silently render a stale view.
+    // The cache key is only the player square, valid because the FOV is a pure
+    // function of the player square plus the static map. Blocks/portals are
+    // immutable after map setup, but the placement methods invalidate the
+    // cache so mid-game map mutation can't render a stale view.
     fov_cache: Option<(WorldSquare, FieldOfViewResult)>,
 }
 
@@ -161,8 +159,10 @@ impl Game {
             rng: ChaCha8Rng::seed_from_u64(GAME_RNG_SEED),
             world_start_time: start_time,
             world_time: start_time,
-            fov_options: FovOptions::default(),
-            fov_cache_enabled: false,
+            fov_options: FovOptions {
+                cumulative_radius_budget: Some(PLAYER_SIGHT_RADIUS as f32),
+            },
+            fov_cache_enabled: true,
             fov_cache: None,
         };
         game.default_enemy_faction = game.get_new_faction();
@@ -771,6 +771,7 @@ impl Game {
         exit_step: SquareWithOrthogonalDir,
     ) {
         self.portal_geometry.create_portal(entrance_step, exit_step);
+        self.invalidate_fov_cache();
     }
     pub fn place_double_sided_one_way_portal(
         &mut self,
@@ -779,6 +780,7 @@ impl Game {
     ) {
         self.portal_geometry
             .create_double_sided_one_way_portal(entrance_step, exit_step);
+        self.invalidate_fov_cache();
     }
     pub fn place_single_sided_two_way_portal(
         &mut self,
@@ -787,6 +789,7 @@ impl Game {
     ) {
         self.portal_geometry
             .create_single_sided_two_way_portal(entrance_step, exit_step);
+        self.invalidate_fov_cache();
     }
     pub fn place_double_sided_two_way_portal(
         &mut self,
@@ -795,6 +798,7 @@ impl Game {
     ) {
         self.portal_geometry
             .create_double_sided_two_way_portal(entrance_step, exit_step);
+        self.invalidate_fov_cache();
     }
     pub fn place_dense_horizontal_portals(
         &mut self,
@@ -877,6 +881,7 @@ impl Game {
 
     pub fn place_block(&mut self, square: WorldSquare) {
         self.blocks.place_block(square);
+        self.invalidate_fov_cache();
     }
     pub fn is_block_at(&self, square: WorldSquare) -> bool {
         self.blocks.is_block_at(square)
@@ -1433,13 +1438,19 @@ impl Game {
         )
     }
 
-    /// Enable/disable the per-player-square FOV cache (prototype A).
+    /// Enable/disable the per-player-square FOV cache.
     pub fn set_fov_cache_enabled(&mut self, enabled: bool) {
         self.fov_cache_enabled = enabled;
         self.fov_cache = None;
     }
 
-    /// Set the cumulative relative-radius budget (prototype B); `None` keeps
+    /// Drop the cached player FOV. Called whenever the map's sight blockers or
+    /// portals change, since the cache key is only the player square.
+    fn invalidate_fov_cache(&mut self) {
+        self.fov_cache = None;
+    }
+
+    /// Set the cumulative relative-radius budget; `None` keeps
     /// the legacy per-hop bound. Clears the FOV cache since results change.
     pub fn set_fov_cumulative_radius(&mut self, budget: Option<f32>) {
         self.fov_options.cumulative_radius_budget = budget;

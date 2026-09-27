@@ -6,11 +6,12 @@ use game::{do_everything, FovToggles};
 fn usage() {
     eprintln!(
         "Usage: game [--map <demo|racetrack|hallways>] [--load <snapshot-dir>]\n\
-         \x20      [--fov-cache] [--fov-budget <squares>]\n\
+         \x20      [--no-fov-cache] [--no-fov-budget] [--fov-budget <squares>]\n\
          \n\
-         FOV performance prototypes (see docs/PERFORMANCE.md):\n\
-         \x20 --fov-cache          cache the player FOV per player square (A)\n\
-         \x20 --fov-budget <n>     cumulative portal-distance budget (B)"
+         FOV performance options (see docs/PERFORMANCE.md), both on by default:\n\
+         \x20 --no-fov-cache         recompute the player FOV every draw\n\
+         \x20 --no-fov-budget        unbounded per-hop portal sight (legacy)\n\
+         \x20 --fov-budget <n>       cumulative portal-distance budget (default 16)"
     );
 }
 
@@ -44,6 +45,10 @@ fn main() {
             }
         } else if arg == "--fov-cache" {
             fov_toggles.cache = true;
+        } else if arg == "--no-fov-cache" {
+            fov_toggles.cache = false;
+        } else if arg == "--no-fov-budget" {
+            fov_toggles.cumulative_radius_budget = None;
         } else if let Some(value) = arg.strip_prefix("--fov-budget=") {
             match value.parse::<f32>() {
                 Ok(n) => fov_toggles.cumulative_radius_budget = Some(n),

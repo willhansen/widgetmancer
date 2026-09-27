@@ -9,6 +9,33 @@ Newest first.
 
 ---
 
+## 2026-09-27 — Default the FOV cache and cumulative-radius budget on
+
+### perf: default FOV cache and cumulative-radius budget on
+The two racetrack FOV prototypes (docs/PERFORMANCE.md) are now the default for
+`Game` instead of opt-in flags:
+
+- `Game::new` sets `fov_cache_enabled: true` and initializes
+  `FovOptions::cumulative_radius_budget` to `Some(PLAYER_SIGHT_RADIUS as f32)`
+  (16), so the cumulative relative-radius budget equals the player's view
+  radius. `PLAYER_SIGHT_RADIUS` is now `pub`.
+- Cache invalidation: the cache key is only the player square, so `place_block`
+  and the four public portal-placement methods now clear `fov_cache`. Previously
+  they were assumed immutable after setup; defaulting the cache on makes a
+  mid-game map mutation able to serve a stale view, which the new
+  `test_fov_cache_invalidates_when_map_changes` guards.
+- CLI: `FovToggles::default()` is now on, and the game binary gains
+  `--no-fov-cache` / `--no-fov-budget` opt-outs (`--fov-cache` /
+  `--fov-budget <n>` still override). The profiling harness keeps its own
+  default-off toggles, so baseline profiling is unchanged.
+- Tests: added `test_fov_performance_defaults_are_on` and the invalidation test;
+  reworked `test_fov_cumulative_budget_is_a_fidelity_dial` to take an explicit
+  `None` unbounded reference. Full suite green (254 lib tests + 26 playground).
+
+Docs: updated the PERFORMANCE.md prototype section and map-mutation note.
+
+---
+
 ## 2026-09-27 — Off-board starfield with parallax and drift
 
 ### game: procedural starfield for the off-board void

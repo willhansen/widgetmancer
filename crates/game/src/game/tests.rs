@@ -2828,18 +2828,57 @@
     }
 
     #[test]
+    fn test_fov_performance_defaults_are_on() {
+        let game = Game::new(96, 26, LogicalTime::ZERO);
+        assert!(game.fov_cache_enabled, "FOV cache should default on");
+        assert_eq!(
+            game.fov_options.cumulative_radius_budget,
+            Some(PLAYER_SIGHT_RADIUS as f32),
+            "budget should default to the player sight radius"
+        );
+    }
+
+    #[test]
+    fn test_fov_cache_invalidates_when_map_changes() {
+        let mut game = set_up_10x10_game();
+        game.place_player(point2(5, 5));
+        game.draw_headless_now();
+        assert!(game.fov_cache.is_some(), "cache populated by the draw");
+
+        // A sight blocker changes the FOV for the same player square, so the
+        // cache must be dropped or the next draw serves a stale view.
+        game.place_block(point2(5, 4));
+        assert!(game.fov_cache.is_none(), "place_block must invalidate");
+
+        game.draw_headless_now();
+        assert!(game.fov_cache.is_some(), "redrawn after invalidation");
+        game.place_single_sided_one_way_portal(
+            (point2(3, 3), STEP_UP).into(),
+            (point2(7, 7), STEP_DOWN).into(),
+        );
+        assert!(game.fov_cache.is_none(), "portal placement must invalidate");
+    }
+
+    #[test]
     fn test_fov_cumulative_budget_is_a_fidelity_dial() {
         let mut game = set_up_racetrack_game();
-        let default_sig = fov_signature(&game.player_field_of_view());
+        // The unbounded legacy view is the reference for "no pruning".
+        game.set_fov_cumulative_radius(None);
+        let unbounded_sig = fov_signature(&game.player_field_of_view());
 
         // A budget larger than any reachable portal path is indistinguishable
         // from the unbounded default.
         game.set_fov_cumulative_radius(Some(1000.0));
-        assert_eq!(default_sig, fov_signature(&game.player_field_of_view()));
+        assert_eq!(unbounded_sig, fov_signature(&game.player_field_of_view()));
 
-        // A tight budget prunes deep portal views, changing the FOV.
+        // The game's default budget prunes deep portal views.
+        game.set_fov_cumulative_radius(Some(PLAYER_SIGHT_RADIUS as f32));
+        assert_ne!(unbounded_sig, fov_signature(&game.player_field_of_view()));
+
+        // A tighter budget prunes even more.
+        let default_budget_sig = fov_signature(&game.player_field_of_view());
         game.set_fov_cumulative_radius(Some(4.0));
-        assert_ne!(default_sig, fov_signature(&game.player_field_of_view()));
+        assert_ne!(default_budget_sig, fov_signature(&game.player_field_of_view()));
     }
 
     fn set_up_hallways_game() -> Game {
