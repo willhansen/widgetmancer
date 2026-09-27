@@ -61,11 +61,28 @@ and transparency (`bg_transparent`) lets lower layers show through.
    Otherwise fall back to
    `load_screen_buffer_from_absolute_positions_in_draw_buffer` (direct
    world→screen mapping, no visibility shading — used on the death screen).
-3. `Graphics::display(writer)` diffs and writes (see below).
+3. `Graphics::draw_starfield` paints the off-board void (see below).
+4. `Graphics::draw_debug_overlays` (no-op unless enabled).
+5. `Graphics::display(writer)` diffs and writes (see below).
 
 Headless variants (`draw_headless_now`, `display_headless`) run the same
 pipeline with `writer = None`; tests inspect the buffers instead of a
 terminal.
+
+## Off-board starfield
+
+The black beyond the board edge is filled by a procedural starfield
+(`crates/game/src/graphics/starfield.rs`). It only writes cells whose world
+square is off-board, so it composes after the FOV pass without touching the
+board. There are three depth layers; each is anchored at a fraction
+(`parallax`) of the camera's motion, so near layers slide further than far
+ones as the player moves, plus a slow linear drift so the field keeps moving
+while standing still. Stars come from an infinite hashed lattice — moving or
+drifting simply reveals new cells, so nothing is generated or recycled.
+
+`Starfield::draw` is a pure function of `(screen, board_size, time)`: it
+carries no per-frame state, which is what keeps repeated draws of the same
+moment byte-identical (`test_headless_frames_are_byte_identical`).
 
 ## FOV-aware compositing (the portal part)
 

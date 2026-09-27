@@ -9,6 +9,30 @@ Newest first.
 
 ---
 
+## 2026-09-27 — Off-board starfield with parallax and drift
+
+### game: procedural starfield for the off-board void
+The area beyond the board edge was flat black. It now renders a sparse
+starfield (`crates/game/src/graphics/starfield.rs`).
+
+- Three depth layers, each anchored at a fraction of the camera's motion, so
+  near layers slide further than far ones as the player moves (parallax). Each
+  layer also drifts slowly in a fixed direction so the field stays alive while
+  the player stands still.
+- Stars live on an infinite hashed lattice: moving/drifting reveals new cells,
+  so nothing is generated or recycled and there is no bounding region to
+  maintain.
+- `Starfield::draw` is a pure function of `(screen, board_size, time)` with no
+  per-frame state, preserving `test_headless_frames_are_byte_identical` and the
+  screen-stability tests.
+- Drawn after the FOV composite and only into off-board cells, so the board and
+  visible contents are never touched. Wired via `Graphics::draw_starfield` from
+  `Game::update_screen_from_draw_buffer`.
+- Tests cover: off-board-only, determinism, time drift, rotation round-trip,
+  and parallax ordering (near shifts more than far).
+
+---
+
 ## 2026-09 — Deterministic portal ordering, relative-radius cap, test timeout
 
 ### game: deterministic portal order; relative-radius FOV cap; test timeout

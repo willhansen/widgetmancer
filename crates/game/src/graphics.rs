@@ -34,6 +34,9 @@ pub(crate) mod drawable;
 pub mod animations;
 pub use animations::*;
 
+pub mod starfield;
+use starfield::Starfield;
+
 pub mod game_colors {
     use super::*;
 
@@ -91,6 +94,8 @@ pub struct Graphics {
     /// Debug-only render overlays (roadmap W.G). Off by default; harmless when
     /// off, so no feature gate is needed.
     pub debug_overlay: DebugOverlayFlags,
+    /// Off-board background stars. Stateless; see `starfield`.
+    starfield: Starfield,
 }
 
 /// Toggles for the live debug overlay.
@@ -118,6 +123,7 @@ impl Graphics {
             floating_entity_family_memory: HashMap::new(),
             floating_entities_drawn_this_frame: HashSet::new(),
             debug_overlay: DebugOverlayFlags::default(),
+            starfield: Starfield::new(),
         };
         g.screen.fill_screen_buffer(BLACK);
         g
@@ -586,6 +592,13 @@ impl Graphics {
         let existing = self.screen.screen_buffer[pos.x as usize][pos.y as usize];
         self.screen.screen_buffer[pos.x as usize][pos.y as usize] =
             Glyph::new(character, RGB8::new(255, 0, 255), existing.bg_color);
+    }
+
+    /// Paint off-board stars. Must run after the FOV composite so the board
+    /// and visible contents stay on top; on-board squares are never touched.
+    /// Uses the frame's `current_time`, so the caller need not thread it.
+    pub fn draw_starfield(&mut self, board_size: BoardSize) {
+        self.starfield.draw(&mut self.screen, board_size, self.current_time);
     }
 
     /// Debug-only overlays applied after the FOV composite (roadmap W.G).

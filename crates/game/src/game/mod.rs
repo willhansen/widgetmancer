@@ -618,6 +618,7 @@ impl Game {
                 .load_screen_buffer_from_absolute_positions_in_draw_buffer();
         }
 
+        self.graphics.draw_starfield(self.board_size);
         self.graphics.draw_debug_overlays();
         self.graphics.display(&mut writer);
     }
