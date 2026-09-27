@@ -2592,8 +2592,8 @@
     fn test_racetrack_map_cubes_loop_back_after_one_lap() {
         let mut game = set_up_racetrack_game();
         let seed = point2(28.0, 14.0); // left-edge fast cube, moving up
-        // One lap = 29 squares; the fast cubes move at 4/s.
-        game.tick_realtime_effects(Duration::from_secs_f32(7.25));
+        // One lap = 28 squares; the fast cubes move at 4/s.
+        game.tick_realtime_effects(Duration::from_secs_f32(7.0));
         let cube = game.death_cubes[0];
         assert!((cube.position - seed).length() < 0.01);
         game.draw_headless_now();
@@ -2604,8 +2604,8 @@
         let mut game = set_up_racetrack_game();
         let seed = point2(28.0, 14.0);
         let frame = Duration::from_secs_f32(0.021);
-        // 345 frames ~= one lap at the real tick cadence (~48 fps).
-        for _ in 0..345 {
+        // 333 frames ~= one lap at the real tick cadence (~48 fps).
+        for _ in 0..333 {
             game.tick_realtime_effects(frame);
         }
         let cube = game.death_cubes[0];
@@ -2613,6 +2613,36 @@
         // 5 lap/shuttle cubes + 10 stationary L-portal cubes.
         assert_eq!(game.death_cubes.len(), 15);
         game.draw_headless_now();
+    }
+
+    #[test]
+    fn test_racetrack_l_portal_strips_are_one_coherent_portal() {
+        // The L portal is one big 90° window: all 19 entrance/exit strip
+        // pairs must share a single rigid transform, or the wall shears
+        // (each strip maps the plane to a different place) and renders as
+        // weird turns and breaks.
+        let game = set_up_racetrack_game();
+        let base: WorldSquare = point2(24, 13);
+        let strip_entrance = |i: i32| {
+            SquareWithOrthogonalDir::from_square_and_step(
+                point2(base.x + 22, base.y - 9 + i),
+                STEP_RIGHT,
+            )
+        };
+        let first = game
+            .portal_geometry
+            .get_portal_by_entrance(strip_entrance(0))
+            .unwrap();
+        for i in 1..19 {
+            let strip = game
+                .portal_geometry
+                .get_portal_by_entrance(strip_entrance(i))
+                .unwrap();
+            assert!(
+                first.is_coherent_with(&strip),
+                "L strip {i} does not share the first strip's transform"
+            );
+        }
     }
 
     #[test]
@@ -2749,10 +2779,11 @@
                 .get_drawable_for_square_from_draw_buffer(point2(46, 4)),
             Some(DrawableEnum::OffsetSquare(_))
         ));
-        // …their poking slivers appear at the exit wall…
+        // …their poking slivers appear at the exit wall, on the end the
+        // 90° turn maps the wall's bottom entrance to…
         assert!(matches!(
             game.graphics
-                .get_drawable_for_square_from_draw_buffer(point2(26, 20)),
+                .get_drawable_for_square_from_draw_buffer(point2(44, 20)),
             Some(DrawableEnum::OffsetSquare(_))
         ));
         // …and east-side cubes (k/11 > 1/2) keep their bulk at the wall

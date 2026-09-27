@@ -686,9 +686,9 @@ mod tests {
         );
         pg.create_double_sided_two_way_portal(
             (point2(10, 5), STEP_LEFT).into(),
-            (point2(10, 6), STEP_UP).into(),
+            (point2(10, 7), STEP_UP).into(),
         );
-        let (end, rotation, segments) = pg.portal_aware_move(point2(10.0, 8.0), vec2(0.0, 29.0));
+        let (end, rotation, segments) = pg.portal_aware_move(point2(10.0, 8.0), vec2(0.0, 28.0));
         assert_about_eq_2d(end, point2(10.0, 8.0));
         // Four 90° corners per lap; net rotation is a full turn = identity.
         assert_eq!(rotation, QuarterTurnsAnticlockwise::default());

@@ -1081,17 +1081,18 @@ impl Game {
     /// so their crossings repeat indefinitely and nothing despawns:
     ///
     /// - A four-corner "racetrack" of 3-wide, double-sided, two-way 90°
-    ///   portals right of the player: cubes lap it counter-clockwise (up
-    ///   the left edge, right along the top, down the right edge, left
-    ///   along the bottom), each corner teleporting them onto the next
-    ///   edge with velocity rotated 90°. Lap length 29 squares — at
-    ///   turret-cube speed (4/s) the three fast cubes put a corner
-    ///   crossing on screen every ~2.4s; the slow cube (1.5/s) straddles
-    ///   each face long enough to watch the poke-through rendering on
-    ///   both sides. Every portal is two-way, so the reverse twins sit
-    ///   exactly on each corner's emergence plane — the anti-bounce guard
-    ///   in `portal_aware_move` is what keeps the cubes lapping instead
-    ///   of ping-ponging there forever.
+    ///   portals right of the player: cubes lap it clockwise (up the left
+    ///   edge, right along the top, down the right edge, left along the
+    ///   bottom), each corner teleporting them onto the next edge with
+    ///   velocity rotated 90°. Lap length 28 squares — at turret-cube
+    ///   speed (4/s) the three fast cubes put a corner crossing on screen
+    ///   every ~1.75s; the slow cube (1.5/s) straddles each face long
+    ///   enough to watch the poke-through rendering on both sides. Every
+    ///   corner exits two squares past the corner square so its 3-wide exit
+    ///   band clears the 3-wide entrance band; every portal is two-way, so
+    ///   the reverse twins sit exactly on each corner's emergence plane —
+    ///   the anti-bounce guard in `portal_aware_move` is what keeps the
+    ///   cubes lapping instead of ping-ponging there forever.
     /// - A vertical "shuttle" left of the player: two 3-wide 180° flip
     ///   portals bounce a cube up and down (1 square up, 2 down), showing
     ///   velocity reversal and the exit tail.
@@ -1134,7 +1135,7 @@ impl Game {
         // bottom-left corner: moving left → emerges moving up
         self.place_wide_corner_portal(
             (point2(left_edge_x, bottom_row_y), STEP_LEFT).into(),
-            (point2(left_edge_x, bottom_row_y + 1), STEP_UP).into(),
+            (point2(left_edge_x, bottom_row_y + 2), STEP_UP).into(),
         );
 
         self.place_linear_death_cube(
@@ -1175,14 +1176,18 @@ impl Game {
         // The L portal: enter the vertical wall moving right anywhere
         // along it, emerge from the horizontal wall above the track
         // moving up — a 90° turn stretched over 19 squares (the map's
-        // corners do the same turn in one).
+        // corners do the same turn in one). A 90° anticlockwise turn maps
+        // the wall's "up" tangent to "left", so the exit wall runs right
+        // to left as the entrance runs bottom to top; laying it out
+        // left-to-right instead makes each strip a different transform
+        // and the wall visibly shears.
         let l_entrance_x = base.x + 22;
         let l_entrance_bottom_y = base.y - 9;
         let l_exit_y = base.y + 7;
         (0..19).for_each(|i| {
             self.place_double_sided_two_way_portal(
                 (point2(l_entrance_x, l_entrance_bottom_y + i), STEP_RIGHT).into(),
-                (point2(base.x + 2 + i, l_exit_y), STEP_UP).into(),
+                (point2(base.x + 20 - i, l_exit_y), STEP_UP).into(),
             );
         });
 

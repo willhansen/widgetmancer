@@ -9,6 +9,50 @@ Newest first.
 
 ---
 
+## 2026-09 — Racetrack L portal sheared across its strips
+
+### game: make the racetrack's big L portal one coherent window
+The "L" exhibit places a 19-face vertical entrance wall (x = base.x+22,
+facing right) turning 90° onto a 19-face horizontal exit wall at
+y = base.y+7 (facing up). The turn is a +90° (anticlockwise) rotation, so
+the entrance wall's "up" tangent maps to "left": the exit wall must run
+right-to-left as the entrance runs bottom-to-top. The code walked the exit
+wall left-to-right (`base.x + 2 + i`), so each of the 19 strips got its own
+rigid transform (rotation centres stepping along a diagonal) instead of one
+shared transform. The wall was therefore a glide-reflection, not a portal —
+it rendered with the "weird turns and breaks" of a sheared surface, and the
+per-strip exits were mirrored. Fixed to `base.x + 20 - i` (exit x = 44 down
+to 26 as the entrance climbs y = 4..22).
+
+New regression test `test_racetrack_l_portal_strips_are_one_coherent_portal`
+asserts every strip `is_coherent_with` the first (it failed before the fix).
+Updated `test_racetrack_stationary_cubes_render_at_l_portal_wall`: the
+bottom entrance's sliver now emerges at the right end of the exit wall
+`(44,20)` instead of the mirrored `(26,20)`.
+
+---
+
+## 2026-09 — Racetrack bottom-left corner portal placement
+
+### game: fix bottom-left racetrack corner exit off-by-one
+The racetrack's four 3-wide turning portals must each exit two squares past
+their corner square: at one square the 3-wide exit band overlaps the 3-wide
+entrance band (sharing a corner square), and the resulting lap is asymmetric.
+The bottom-left corner alone used `bottom_row_y + 1`, so its exit row (y=12)
+met its entrance column (x=28) at `(28,12)`, and the left straightaway ran a
+square longer than the right. Corrected to `+ 2`, giving a symmetric 9x5 path
+with the exit bands clear of the entrance bands.
+
+The unintuitive placement was masked by tests that had been written to the
+asymmetric lap: it also made the lap length 29 rather than the true 28. Updated
+`test_racetrack_map_cubes_loop_back_after_one_lap` (7.25s -> 7.0s),
+`test_racetrack_map_cubes_survive_frame_rate_ticks` (345 -> 333 frames), the
+`test_portal_aware_move_racetrack_lap_closes` geometry (bottom-left exit
+`(10,6)` -> `(10,7)`, move 29 -> 28), and the map's doc comment (lap 29 -> 28,
+plus the lap direction: up-right-down-left is clockwise, not counter-).
+
+---
+
 ## 2026-09 — Black diagonal portal-seam artifact
 
 ### fov: merge adjacent portal-slice view cones as a set (fixes black diagonal seam)
