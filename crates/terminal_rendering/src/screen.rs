@@ -11,7 +11,7 @@ use crate::glyph::{DoubleGlyph, Glyph};
 use utility::{coordinate_frame_conversions::{
     
      WorldSquare, WorldStep,
-}, flip_y, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP};
+}, flip_y, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenBufferFrame;
@@ -399,8 +399,11 @@ impl Screen {
             let character: char = the_string.chars().nth(i).unwrap();
             let buffer_pos =
                 self.screen_buffer_square_to_left_screen_buffer_character_square(screen_square);
-            self.screen_buffer[buffer_pos.x as usize + i][buffer_pos.y as usize] =
-                Glyph::from_char(character);
+            let x = buffer_pos.x + i as i32;
+            let y = buffer_pos.y;
+            if self.buffer_character_square_is_on_screen(point2(x, y)) {
+                self.screen_buffer[x as usize][y as usize] = Glyph::from_char(character);
+            }
         }
     }
     fn draw_glyph_straight_to_screen_buffer(
@@ -408,11 +411,11 @@ impl Screen {
         new_glyph: Glyph,
         buffer_square: ScreenBufferCharacterSquare,
     ) {
+        // Clip rather than panic. A world square occupies two character
+        // columns, so an odd-width screen has a half-visible square in its last
+        // column; dropping the off-screen half is the correct visual.
         if !self.buffer_character_square_is_on_screen(buffer_square) {
-            panic!(
-                "Tried to draw character off screen: {}",
-                point_to_string(buffer_square)
-            );
+            return;
         }
 
         self.screen_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
@@ -719,5 +722,21 @@ mod tests {
             local_square_point_to_local_character_point(point2(0.0, 0.0), 1),
             point2(-0.5, 0.0)
         );
+    }
+
+    #[test]
+    fn drawing_an_odd_width_edge_square_clips_instead_of_panicking() {
+        // An odd terminal width leaves a half-visible world square in the last
+        // column (left char `width - 1`, right char `width`). Drawing it must
+        // drop the off-screen half rather than panic.
+        let mut screen = Screen::new(33, 13);
+        let edge_square = point2(16, 6); // left character column 32, right column 33
+        let glyphs: DoubleGlyph = [Glyph::from_char('▌'), Glyph::from_char('▐')];
+
+        screen.draw_glyphs_straight_to_screen_square(glyphs, edge_square);
+
+        // The on-screen left half was written; the off-screen right half was
+        // clipped (no panic, no out-of-bounds index).
+        assert_eq!(screen.screen_buffer[32][6], Glyph::from_char('▌'));
     }
 }

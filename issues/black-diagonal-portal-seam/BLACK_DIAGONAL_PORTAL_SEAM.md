@@ -117,16 +117,20 @@ false positives (complementary partials that render correctly, e.g.
 - `snapshot_tool minimize` **panicked** during the virtual-screen crop on this
   snapshot: `Tried to draw character off screen: (x: 21, y: 0)`
   (`crates/terminal_rendering/src/screen.rs:412`). The minimized repro was
-  therefore produced with `--no-screen-crop`, leaving the frame at 126x44.
-  The root cause is that `screen_crop_candidate` bounds only `{player,
-  artifact}` (plus margin), but the two stacked portals form a hall of mirrors:
-  their reflected images are drawn along sight lines out to the sight radius
-  (`PLAYER_SIGHT_RADIUS = 16`), far outside that box. Bounding the portal
-  squares is not enough (the virtual images extend further); a safe crop needs
-  either to bound the FOV extent or to make off-screen draws clip instead of
-  panic (roadmap item 5). `try_candidate` now catches the panic so the
-  minimizer rejects an unsafe crop instead of aborting, and a late crop is
-  retried after entity/portal removal.
+  initially produced with `--no-screen-crop`.
+  The real cause is an **edge/parity bug**, not the view radius:
+  `screen_crop_candidate` returned `2 * (dx + margin_chars) + 1`, i.e. always an
+  **odd** width. One world square is two character columns and the renderer
+  addresses glyphs by even left columns, so an odd width's last column is a
+  left glyph whose right half is off-screen; `Screen::all_screen_squares`
+  yields it and `draw_glyphs_straight_to_screen_square` panics. Large crops
+  (e.g. 65x33) appeared to work only because their last column falls outside
+  the sight radius, so nothing is drawn there — masking the bug.
+- Fixed: `screen_crop_candidate` now returns an even width, and off-screen
+  character columns are **clipped** instead of panicking
+  (`Screen::draw_glyph_straight_to_screen_buffer`, `draw_string_to_screen`;
+  roadmap item 5). With these, the same minimized state renders at 13 rows and
+  drops from 126x44 to a 22x13 frame.
 - `invariants` still has many false positives (roadmap W.D "reduce false
   positives" remains open). After the fix, the artifact relative squares are
   no longer flagged, but `abs(35,20)`, `abs(36,19)`, `abs(37,18)` still appear
@@ -190,7 +194,38 @@ blocker semantics the item-12 comment called out. After the fix every seam cell
 
 Tests: `test_stacked_portal_slices_union_to_full_visibility` (FOV) and
 `stacked_portal_seam_has_no_out_of_sight_partial` (end-to-end render); full
-suite green (535 passed / 9 skipped; 276 with `debug-tools`). Also hardened the
-minimizer: `screen_crop_candidate` now bounds portal squares, `try_candidate`
-catches off-screen-draw panics instead of aborting, and the crop is retried
-after entity removal.
+suite green (536 passed / 9 skipped; 275 with `debug-tools`).
+
+### Minimizer crop fix (separate, follow-up)
+
+The `--no-screen-crop` workaround was itself a bug: `screen_crop_candidate`
+returned an always-odd width, and an odd width's last left-glyph column has its
+right half off-screen, which `draw_glyphs_straight_to_screen_square` panicked
+on. Fixed by returning an even width and by clipping off-screen character
+columns instead of panicking (`Screen::draw_glyph_straight_to_screen_buffer`,
+`draw_string_to_screen`). The minimized state now crops to 22x13. Tests:
+`drawing_an_odd_width_edge_square_clips_instead_of_panicking`,
+`screen_crop_candidate_bounds_artifact_with_margin` (even-width assertion).
+
+### Methodology post-mortem
+
+The first "minimizer hardening" (bounding portal squares, `catch_unwind`,
+late crop) was a **false fix** built on a wrong diagnosis ("the portals form a
+hall of mirrors whose images reach the sight radius"). It was wrong because:
+
+- I treated the `x: / y:` in the panic message as noise instead of checking it
+  against the terminal width. `x == width` is the smoking gun for the edge bug.
+- I compared two **odd** sizes (33/35 panicked, 65/67 rendered) and inferred
+  "size vs content extent" without noticing all were odd. I never tested an
+  even small size, which would have worked and falsified the radius theory.
+- I reasoned about where content *could* be drawn (portal reflections) instead
+  of reading `Screen::all_screen_squares` / the glyph-drawing path, where the
+  parity assumption is explicit (`left char = x * 2`).
+- The proposed fix (bound portals) did not reproduce the failure and did not
+  fix it; it only made the window bigger, which is the same accidental
+  workaround the old 73x11 crop relied on.
+
+Lesson: when a renderer panics with a coordinate, check the coordinate against
+the dimension it allegedly exceeds; and prefer a discriminating experiment
+(small even width) over a plausible mechanism.
+

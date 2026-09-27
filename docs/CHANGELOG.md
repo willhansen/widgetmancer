@@ -27,23 +27,32 @@ merged set (`visibility_of_square_under_arc_intervals`), while
 blocker-separated arcs stay distinct. All seam cells `rel(k,-k)` are now fully
 visible. Regression tests `test_stacked_portal_slices_union_to_full_visibility`
 and `stacked_portal_seam_has_no_out_of_sight_partial`; full suite green
-(535 passed / 9 skipped).
+(536 passed / 9 skipped).
 
 ### game: issue capture + minimized repro for the black diagonal seam
 New `issues/black-diagonal-portal-seam/` with the snapshot, a write-up
 (symptom, observed cells, minimal repro, mechanism), and `debug/` outputs from
 `snapshot_tool` (render/diff/cells/fov-trace/explain/invariants). The minimizer
-reduced the capture to **player + 2 portals** (`--no-screen-crop`; a crop
-candidate bounding portals is still too small because mirrored portals draw
-virtual images out to the sight radius).
+reduced the capture to **player + 2 portals**. The repro was first written with
+`--no-screen-crop` because the crop candidate crashed on an odd-width bug (see
+next entry); that workaround and its false diagnosis ("halls of mirrors") were
+later corrected.
 
-### game: harden the snapshot minimizer's screen crop
-`screen_crop_candidate` now bounds portal squares as well as `{player,
-artifact}`; `try_candidate` catches off-screen-draw panics (`catch_unwind`) so
-an unsafe crop is rejected instead of aborting the tool; and the crop is retried
-after entity/portal removal. New test
-`screen_crop_candidate_includes_far_portals`. With `debug-tools`: 276 passed /
-7 skipped.
+### game: fix odd-width screen crop + clip off-screen draws
+The virtual-screen crop panicked (`Tried to draw character off screen`) because
+`screen_crop_candidate` returned `2 * (dx + margin) + 1` — always an odd width.
+One world square is two char columns addressed by even left columns, so an odd
+width's last column is a half-visible square whose right half is off-screen;
+`Screen::all_screen_squares` yielded it and `draw_glyphs_straight_to_screen_square`
+panicked. Large crops only appeared to work because their last column fell
+outside the sight radius. Fix: `screen_crop_candidate` now returns an even
+width, and off-screen character columns are clipped instead of panicking
+(`Screen::draw_glyph_straight_to_screen_buffer`, `draw_string_to_screen`;
+roadmap item 5). The minimized state crops to 22x13. Tests:
+`drawing_an_odd_width_edge_square_clips_instead_of_panicking` and the
+even-width assertion in `screen_crop_candidate_bounds_artifact_with_margin`.
+Superseded/reverted the earlier false fix (portal-square bounding,
+`catch_unwind`, late crop).
 
 ---
 
