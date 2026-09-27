@@ -1,0 +1,1 @@
+The starfield is visible off the game board, with no regard to the player's field of view.  This is incorrect.  The field of view determines what the player can see.  If off-the-board is not in fov, it should not be rendered.
