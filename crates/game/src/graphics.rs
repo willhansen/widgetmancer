@@ -277,7 +277,7 @@ impl Graphics {
         )
     }
 
-    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FieldOfViewResult) {
+    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: &FieldOfViewResult) {
         for screen_square in self.screen.all_screen_squares() {
             let world_square = self
                 .screen
@@ -285,7 +285,7 @@ impl Graphics {
 
             let relative_world_square = world_square - field_of_view.root_square();
             let maybe_unrotated =
-                self.maybe_drawable_for_rel_square_of_fov(&field_of_view, relative_world_square);
+                self.maybe_drawable_for_rel_square_of_fov(field_of_view, relative_world_square);
 
             if let Some(unrotated) = maybe_unrotated {
                 let rotated: DrawableEnum =
@@ -596,9 +596,13 @@ impl Graphics {
 
     /// Paint off-board stars. Must run after the FOV composite so the board
     /// and visible contents stay on top; on-board squares are never touched.
+    /// Also clipped to the player's field of view: a star is only drawn where
+    /// the FOV left the cell dark (off-board *and* outside the view), so stars
+    /// never appear beyond the sight radius nor on top of a portal-view floor.
     /// Uses the frame's `current_time`, so the caller need not thread it.
-    pub fn draw_starfield(&mut self, board_size: BoardSize) {
-        self.starfield.draw(&mut self.screen, board_size, self.current_time);
+    pub fn draw_starfield(&mut self, board_size: BoardSize, fov: Option<&FieldOfViewResult>) {
+        self.starfield
+            .draw(&mut self.screen, board_size, self.current_time, fov);
     }
 
     /// Debug-only overlays applied after the FOV composite (roadmap W.G).
@@ -904,7 +908,7 @@ mod tests {
         );
         g.screen
             .set_screen_center_by_world_square(fov.root_square());
-        g.load_screen_buffer_from_fov(fov);
+        g.load_screen_buffer_from_fov(&fov);
         let screen_buffer_square = g.screen.world_square_to_screen_buffer_square(world_square);
         // g.print_draw_buffer(point2(0, 0), 3);
         // g.screen.print_screen_buffer();

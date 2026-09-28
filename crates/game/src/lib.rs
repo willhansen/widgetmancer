@@ -75,22 +75,22 @@ pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
     }
 }
 
-/// FOV performance toggles (see docs/PERFORMANCE.md). Both default on: the
-/// cache is per-player-square, and the budget is the player's sight radius.
-/// The game binary exposes `--no-fov-cache` / `--no-fov-budget` to opt out.
+/// FOV performance toggles (see docs/PERFORMANCE.md). The cache is on by
+/// default; `radius` optionally overrides the player's sight radius.
+/// The game binary exposes `--no-fov-cache` / `--fov-radius <n>`.
 #[derive(Clone, Copy, Debug)]
 pub struct FovToggles {
     /// Cache the player FOV per player square.
     pub cache: bool,
-    /// Cumulative relative-radius budget in squares.
-    pub cumulative_radius_budget: Option<f32>,
+    /// Override the player's sight radius in squares.
+    pub radius: Option<u32>,
 }
 
 impl Default for FovToggles {
     fn default() -> Self {
         FovToggles {
             cache: true,
-            cumulative_radius_budget: Some(crate::game::PLAYER_SIGHT_RADIUS as f32),
+            radius: None,
         }
     }
 }
@@ -127,7 +127,9 @@ pub fn do_everything(
         }
     };
     game.set_fov_cache_enabled(fov_toggles.cache);
-    game.set_fov_cumulative_radius(fov_toggles.cumulative_radius_budget);
+    if let Some(radius) = fov_toggles.radius {
+        game.set_player_sight_radius(radius);
+    }
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 

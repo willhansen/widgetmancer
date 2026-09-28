@@ -12,10 +12,7 @@ use rand_chacha::ChaCha8Rng;
 use rgb::RGB8;
 use strum::IntoEnumIterator;
 
-use crate::fov_stuff::{
-    portal_aware_field_of_view_from_square_traced,
-    portal_aware_field_of_view_from_square_with_options, FieldOfViewResult, FovOptions, FovTrace,
-};
+use crate::fov_stuff::{portal_aware_field_of_view_from_square, FieldOfViewResult};
 use crate::graphics::drawable::TextDrawable;
 use crate::graphics::*;
 use crate::piece::PieceType::*;
@@ -117,9 +114,9 @@ pub struct Game {
     rng: ChaCha8Rng,
     world_start_time: LogicalTime,
     world_time: LogicalTime,
-    /// FOV performance options (see docs/PERFORMANCE.md). Defaulted on: the
-    /// cumulative-radius budget equals the player's sight radius.
-    fov_options: FovOptions,
+    /// The player's sight radius in squares. Defaults to
+    /// [`PLAYER_SIGHT_RADIUS`]; overridable for profiling experiments.
+    player_sight_radius: u32,
     fov_cache_enabled: bool,
     // The cache key is only the player square, valid because the FOV is a pure
     // function of the player square plus the static map. Blocks/portals are
@@ -159,9 +156,7 @@ impl Game {
             rng: ChaCha8Rng::seed_from_u64(GAME_RNG_SEED),
             world_start_time: start_time,
             world_time: start_time,
-            fov_options: FovOptions {
-                cumulative_radius_budget: Some(PLAYER_SIGHT_RADIUS as f32),
-            },
+            player_sight_radius: PLAYER_SIGHT_RADIUS,
             fov_cache_enabled: true,
             fov_cache: None,
         };
@@ -607,18 +602,20 @@ impl Game {
 
     fn update_screen_from_draw_buffer(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
         self.graphics.screen.fill_screen_buffer(BLACK);
-        if self.player_is_alive() {
+        let player_fov = if self.player_is_alive() {
             self.graphics
                 .screen
                 .set_screen_center_by_world_square(self.player_square());
             let fov = self.player_fov_for_draw();
-            self.graphics.load_screen_buffer_from_fov(fov);
+            self.graphics.load_screen_buffer_from_fov(&fov);
+            Some(fov)
         } else {
             self.graphics
                 .load_screen_buffer_from_absolute_positions_in_draw_buffer();
-        }
+            None
+        };
 
-        self.graphics.draw_starfield(self.board_size);
+        self.graphics.draw_starfield(self.board_size, player_fov.as_ref());
         self.graphics.draw_debug_overlays();
         self.graphics.display(&mut writer);
     }
@@ -1429,12 +1426,11 @@ impl Game {
     }
     fn player_field_of_view(&self) -> FieldOfViewResult {
         let start_square = self.player_square();
-        portal_aware_field_of_view_from_square_with_options(
+        portal_aware_field_of_view_from_square(
             start_square,
-            PLAYER_SIGHT_RADIUS,
+            self.player_sight_radius,
             &self.blocks.blocks,
             &self.portal_geometry,
-            self.fov_options,
         )
     }
 
@@ -1450,10 +1446,10 @@ impl Game {
         self.fov_cache = None;
     }
 
-    /// Set the cumulative relative-radius budget; `None` keeps
-    /// the legacy per-hop bound. Clears the FOV cache since results change.
-    pub fn set_fov_cumulative_radius(&mut self, budget: Option<f32>) {
-        self.fov_options.cumulative_radius_budget = budget;
+    /// Override the player's sight radius (profiling / tuning). Clears the FOV
+    /// cache since results change.
+    pub fn set_player_sight_radius(&mut self, radius: u32) {
+        self.player_sight_radius = radius;
         self.fov_cache = None;
     }
 
@@ -1475,11 +1471,13 @@ impl Game {
 
     /// The player's FOV plus the flat portal-recursion trace (roadmap W.C).
     #[cfg(feature = "debug-tools")]
-    pub fn player_field_of_view_traced(&self) -> (FieldOfViewResult, FovTrace) {
+    pub fn player_field_of_view_traced(
+        &self,
+    ) -> (FieldOfViewResult, crate::fov_stuff::FovTrace) {
         let start_square = self.player_square();
-        portal_aware_field_of_view_from_square_traced(
+        crate::fov_stuff::portal_aware_field_of_view_from_square_traced(
             start_square,
-            PLAYER_SIGHT_RADIUS,
+            self.player_sight_radius,
             &self.blocks.blocks,
             &self.portal_geometry,
         )

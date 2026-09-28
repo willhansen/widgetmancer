@@ -20,6 +20,7 @@ use rgb::RGB8;
 use terminal_rendering::glyph::glyph_constants::BLACK;
 use terminal_rendering::*;
 
+use crate::fov_stuff::FieldOfViewResult;
 use crate::LogicalTime;
 
 /// Plain screen/world-offset vector (no unit tag): star math is scalars until
@@ -97,8 +98,17 @@ impl Starfield {
     /// Paint stars into the off-board cells of `screen.screen_buffer`.
     ///
     /// On-board squares are left untouched, so this composes after the FOV
-    /// pass without disturbing the board or anything the player can see.
-    pub fn draw(&self, screen: &mut Screen, board_size: BoardSize, time: LogicalTime) {
+    /// pass without disturbing the board or anything the player can see. Cells
+    /// whose player-relative square is in the `fov` are also skipped: a portal
+    /// view can map an off-board *screen* cell to visible floor, and the void
+    /// beyond the sight radius must stay unrendered.
+    pub fn draw(
+        &self,
+        screen: &mut Screen,
+        board_size: BoardSize,
+        time: LogicalTime,
+        fov: Option<&FieldOfViewResult>,
+    ) {
         let time_secs = time.as_secs_f32();
         let camera = vec2(
             screen.screen_center_as_world_square().x as f32,
@@ -147,6 +157,11 @@ impl Starfield {
                         ScreenBufferCharacterSquare::new(pos_x, pos_y),
                     );
                     if is_on_board(world_square, board_size) {
+                        continue;
+                    }
+                    if fov.is_some_and(|fov| {
+                        fov.can_see_relative_square(world_square - fov.root_square())
+                    }) {
                         continue;
                     }
 
@@ -254,6 +269,7 @@ fn rand01(seed: u64) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fov_stuff::portal_aware_field_of_view_from_square;
     use euclid::point2;
 
     fn test_screen() -> Screen {
@@ -279,7 +295,7 @@ mod tests {
         screen.set_screen_center_by_world_square(point2(5, 5));
         let before = screen.screen_buffer.clone();
 
-        Starfield::new().draw(&mut screen, BoardSize::new(20, 20), LogicalTime::ZERO);
+        Starfield::new().draw(&mut screen, BoardSize::new(20, 20), LogicalTime::ZERO, None);
 
         assert_eq!(screen.screen_buffer, before);
     }
@@ -290,7 +306,7 @@ mod tests {
         screen.set_screen_center_by_world_square(point2(5, 5));
         let board_size = board_with_visible_void();
 
-        Starfield::new().draw(&mut screen, board_size, LogicalTime::ZERO);
+        Starfield::new().draw(&mut screen, board_size, LogicalTime::ZERO, None);
 
         assert!(count_star_cells(&screen) > 0, "expected some stars");
         for x in 0..screen.terminal_width() {
@@ -311,13 +327,48 @@ mod tests {
     }
 
     #[test]
+    fn no_stars_inside_the_field_of_view() {
+        // A small board so plenty of off-board squares fall inside the FOV.
+        let board_size = BoardSize::new(4, 4);
+        let center = point2(2, 2);
+        let mut screen = test_screen();
+        screen.set_screen_center_by_world_square(center);
+        let fov = portal_aware_field_of_view_from_square(
+            center,
+            3,
+            &Default::default(),
+            &Default::default(),
+        );
+
+        Starfield::new().draw(&mut screen, board_size, LogicalTime::ZERO, Some(&fov));
+
+        assert!(count_star_cells(&screen) > 0, "expected some stars");
+        for x in 0..screen.terminal_width() {
+            for y in 0..screen.terminal_height() {
+                let glyph = screen.screen_buffer[x as usize][y as usize];
+                if glyph.character == ' ' {
+                    continue;
+                }
+                let square = screen.screen_buffer_character_square_to_world_square(
+                    ScreenBufferCharacterSquare::new(x, y),
+                );
+                let relative = square - fov.root_square();
+                assert!(
+                    !fov.can_see_relative_square(relative),
+                    "star drawn on a visible off-board square {square:?} (rel {relative:?})"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn same_time_and_camera_are_byte_identical() {
         let board_size = board_with_visible_void();
 
         let render = || {
             let mut screen = test_screen();
             screen.set_screen_center_by_world_square(point2(5, 5));
-            Starfield::new().draw(&mut screen, board_size, LogicalTime::from_secs_f32(3.0));
+            Starfield::new().draw(&mut screen, board_size, LogicalTime::from_secs_f32(3.0), None);
             screen.screen_buffer
         };
 
@@ -331,7 +382,7 @@ mod tests {
         let render = |time| {
             let mut screen = test_screen();
             screen.set_screen_center_by_world_square(point2(5, 5));
-            Starfield::new().draw(&mut screen, board_size, LogicalTime::from_secs_f32(time));
+            Starfield::new().draw(&mut screen, board_size, LogicalTime::from_secs_f32(time), None);
             screen.screen_buffer
         };
 

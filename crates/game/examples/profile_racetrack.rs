@@ -5,7 +5,7 @@
 //!
 //! Prototype toggles (docs/PERFORMANCE.md):
 //!   --cache            prototype A: per-player-square FOV cache
-//!   --budget=<squares> prototype B: cumulative portal-distance budget
+//!   --radius=<squares>  override the player's sight radius (default 16)
 //!
 //! Usage:
 //!   cargo run --release -p game --example profile_racetrack -- [flags] [map] [frames]
@@ -22,21 +22,20 @@ use utility::coordinate_frame_conversions::WorldSquare;
 
 struct Toggles {
     cache: bool,
-    budget: Option<f32>,
+    radius: Option<u32>,
 }
 
 fn parse_args() -> (String, Vec<String>, Toggles) {
     let mut toggles = Toggles {
         cache: false,
-        budget: None,
+        radius: None,
     };
     let mut positional = Vec::new();
     for arg in std::env::args().skip(1) {
         if arg == "--cache" {
             toggles.cache = true;
-        } else if let Some(value) = arg.strip_prefix("--budget=") {
-            let parsed: f32 = value.parse().expect("--budget=<squares>");
-            toggles.budget = (parsed > 0.0).then_some(parsed);
+        } else if let Some(value) = arg.strip_prefix("--radius=") {
+            toggles.radius = Some(value.parse().expect("--radius=<squares>"));
         } else {
             positional.push(arg);
         }
@@ -129,15 +128,15 @@ fn main() {
 }
 
 fn toggles_label(toggles: &Toggles) -> String {
-    match (toggles.cache, toggles.budget) {
+    match (toggles.cache, toggles.radius) {
         (false, None) => String::new(),
-        (cache, budget) => {
+        (cache, radius) => {
             let mut parts = Vec::new();
             if cache {
                 parts.push("cache".to_string());
             }
-            if let Some(b) = budget {
-                parts.push(format!("budget={b}"));
+            if let Some(r) = radius {
+                parts.push(format!("radius={r}"));
             }
             format!(" [{}]", parts.join(","))
         }
@@ -149,6 +148,8 @@ fn game_for(map: &str, toggles: &Toggles) -> Game {
     game.place_player(point2(24, 13));
     set_up_map_by_name(&mut game, Some(map));
     game.set_fov_cache_enabled(toggles.cache);
-    game.set_fov_cumulative_radius(toggles.budget);
+    if let Some(radius) = toggles.radius {
+        game.set_player_sight_radius(radius);
+    }
     game
 }

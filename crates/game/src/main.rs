@@ -6,12 +6,11 @@ use game::{do_everything, FovToggles};
 fn usage() {
     eprintln!(
         "Usage: game [--map <demo|racetrack|hallways>] [--load <snapshot-dir>]\n\
-         \x20      [--no-fov-cache] [--no-fov-budget] [--fov-budget <squares>]\n\
+         \x20      [--no-fov-cache] [--fov-radius <squares>]\n\
          \n\
-         FOV performance options (see docs/PERFORMANCE.md), both on by default:\n\
+         FOV performance options (see docs/PERFORMANCE.md):\n\
          \x20 --no-fov-cache         recompute the player FOV every draw\n\
-         \x20 --no-fov-budget        unbounded per-hop portal sight (legacy)\n\
-         \x20 --fov-budget <n>       cumulative portal-distance budget (default 16)"
+         \x20 --fov-radius <n>       override the player's sight radius (default 16)"
     );
 }
 
@@ -47,19 +46,17 @@ fn main() {
             fov_toggles.cache = true;
         } else if arg == "--no-fov-cache" {
             fov_toggles.cache = false;
-        } else if arg == "--no-fov-budget" {
-            fov_toggles.cumulative_radius_budget = None;
-        } else if let Some(value) = arg.strip_prefix("--fov-budget=") {
-            match value.parse::<f32>() {
-                Ok(n) => fov_toggles.cumulative_radius_budget = Some(n),
+        } else if let Some(value) = arg.strip_prefix("--fov-radius=") {
+            match value.parse::<u32>() {
+                Ok(n) => fov_toggles.radius = Some(n),
                 Err(_) => {
                     usage();
                     return;
                 }
             }
-        } else if arg == "--fov-budget" {
-            match iter.next().and_then(|value| value.parse::<f32>().ok()) {
-                Some(n) => fov_toggles.cumulative_radius_budget = Some(n),
+        } else if arg == "--fov-radius" {
+            match iter.next().and_then(|value| value.parse::<u32>().ok()) {
+                Some(n) => fov_toggles.radius = Some(n),
                 None => {
                     usage();
                     return;

@@ -2832,9 +2832,8 @@
         let game = Game::new(96, 26, LogicalTime::ZERO);
         assert!(game.fov_cache_enabled, "FOV cache should default on");
         assert_eq!(
-            game.fov_options.cumulative_radius_budget,
-            Some(PLAYER_SIGHT_RADIUS as f32),
-            "budget should default to the player sight radius"
+            game.player_sight_radius, PLAYER_SIGHT_RADIUS,
+            "sight radius should default to PLAYER_SIGHT_RADIUS"
         );
     }
 
@@ -2860,25 +2859,17 @@
     }
 
     #[test]
-    fn test_fov_cumulative_budget_is_a_fidelity_dial() {
+    fn test_fov_sight_radius_override_changes_the_view_and_clears_the_cache() {
         let mut game = set_up_racetrack_game();
-        // The unbounded legacy view is the reference for "no pruning".
-        game.set_fov_cumulative_radius(None);
-        let unbounded_sig = fov_signature(&game.player_field_of_view());
+        let full_sig = fov_signature(&game.player_field_of_view());
 
-        // A budget larger than any reachable portal path is indistinguishable
-        // from the unbounded default.
-        game.set_fov_cumulative_radius(Some(1000.0));
-        assert_eq!(unbounded_sig, fov_signature(&game.player_field_of_view()));
+        game.set_player_sight_radius(8);
+        assert!(game.fov_cache.is_none(), "radius override must clear the cache");
+        let small_sig = fov_signature(&game.player_field_of_view());
+        assert_ne!(full_sig, small_sig, "a smaller radius shows less");
 
-        // The game's default budget prunes deep portal views.
-        game.set_fov_cumulative_radius(Some(PLAYER_SIGHT_RADIUS as f32));
-        assert_ne!(unbounded_sig, fov_signature(&game.player_field_of_view()));
-
-        // A tighter budget prunes even more.
-        let default_budget_sig = fov_signature(&game.player_field_of_view());
-        game.set_fov_cumulative_radius(Some(4.0));
-        assert_ne!(default_budget_sig, fov_signature(&game.player_field_of_view()));
+        game.set_player_sight_radius(PLAYER_SIGHT_RADIUS);
+        assert_eq!(full_sig, fov_signature(&game.player_field_of_view()));
     }
 
     fn set_up_hallways_game() -> Game {

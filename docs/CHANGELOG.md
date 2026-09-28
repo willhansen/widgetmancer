@@ -9,6 +9,165 @@ Newest first.
 
 ---
 
+## 2026-09-28 — Remove the cumulative budget; the sight radius is the one dial
+
+### fov: delete FovOptions/cumulative_radius_budget; add a sight-radius override
+
+The budget was meant to be the radius, and after the depth-bound and artifact
+corrections it had become a second radius plus a per-hop crossing gate. Its
+default (`PLAYER_SIGHT_RADIUS`) was a no-op, and its only remaining effect was to
+shrink the view while running an artifact-prone gate. Removed:
+
+- `FovOptions`, `cumulative_radius_budget`, the `remaining_radius`/`spent`
+  accumulator and the gate; `max_extent` is now always `radius`.
+- The `_with_options` FOV entry points and `Game::set_fov_cumulative_radius`.
+- `--fov-budget` / `--no-fov-budget` (`FovToggles::cumulative_radius_budget`).
+
+Replaced by a real radius override: `Game::set_player_sight_radius` /
+`player_sight_radius` (clears the FOV cache), `--fov-radius <n>` on the binary,
+and `--radius=<n>` on the profiling harness. Default behavior is unchanged,
+because the old default was already the no-op case. Racetrack FOV with the dial:
+0.60 / 2.3 / 8.6 ms at R=4 / 8 / 16.
+
+Tests: dropped the budget-specific regressions
+(`test_cumulative_budget_keeps_a_distant_portal_window_open`,
+`test_budget_does_not_black_out_the_outer_fov_through_a_portal`,
+`test_budget_at_sight_radius_does_not_black_out_a_portal_hallway`,
+`test_fov_cumulative_budget_is_a_fidelity_dial`), kept
+`test_portal_recursion_depth_stays_near_the_sight_radius` on the plain API, and
+added `test_fov_sight_radius_override_changes_the_view_and_clears_the_cache`.
+Full suite green (551 passed / 9 skipped; 290 with debug-tools). PERFORMANCE.md
+records the removal.
+
+---
+
+## 2026-09-28 — Portal recursion depth is bounded; cost is exponential in the radius
+
+### docs: correct the FOV recursion depth/work framing in PERFORMANCE.md
+
+Measured the recursion depth directly with `FovTrace` and found the earlier
+"unbounded / only arc narrowing terminates" framing was wrong. Along a path the
+apparent image strictly advances (a deeper frame inherits the parent's
+`starting_step_in_fov_sequence` and starts past the near field) and each frame
+scans only `radius` squares, so **depth ≤ radius + 1**; a portal on the player's
+own square supplies the extra "zeroth" hop. At radius 5: three north portals to
+one common exit → depth 1, a portal north → 5, a portal on the player's own
+square → 6.
+
+So the frame-time driver is the number of **paths**, not depth. Racetrack FOV
+scales ~4.5x per +4 radius (0.42/1.8/8.2 ms at 4/8/16), i.e. exponential in the
+radius. Two consequences recorded in `docs/PERFORMANCE.md`:
+
+- Depth caps are not a useful perf lever; path/node count is.
+- The relative-radius budget is a *work* cap, and because the gate only fires
+  when `budget < radius`, the default `budget == radius` is a no-op. Dominance
+  pruning (approach C) is now framed as the preferred cap-free fix: it attacks
+  the exponential path count with no fidelity loss.
+
+New regression `test_portal_recursion_depth_stays_near_the_sight_radius` pins
+the measured depths. Full suite green (554 passed / 9 skipped).
+
+---
+
+## 2026-09-28 — Budget must not prune inside the sight radius
+
+### fov: only gate portal recursion when the budget is below the sight radius
+
+Follow-up to the two FOV fixes above, from the live `snapshot/` infinite portal
+hallway (player (18,20)). The cumulative accumulator is a per-hop *path* cost,
+not apparent distance: through the hallway's parallel portals it grows about
+twice as fast as the apparent image. Gating crossings at `budget == radius`
+therefore exhausted the 16-square budget after ~half the apparent distance —
+rel 7..16 rendered black while rel 4..6 and the adjacent column stayed visible.
+
+The gate is now active only when the budget is tighter than the sight radius
+(`budget < radius`). At or above the radius the sub-view is legacy, because
+`max_extent = min(radius, budget)` already caps apparent reach; the default
+budget (16) therefore no longer changes rendering at all. The budget stays a
+fidelity/perf dial for smaller values (8 → 1.8 ms/FOV, 4 → 0.42 ms, vs 8.3
+unbudgeted on racetrack).
+
+`test_fov_cumulative_budget_is_a_fidelity_dial` updated: budget ≥ radius equals
+unbounded; 8 and 4 differ. New regression
+`test_budget_at_sight_radius_does_not_black_out_a_portal_hallway` builds the
+snapshot's portal window (the live `snapshot/` is gitignored) and asserts the
+budgeted view matches legacy at every apparent distance inside the radius; it
+fails on the old gate at rel(0,7). Full suite green (553 passed / 9 skipped).
+
+---
+
+## 2026-09-28 — Fix through-portal FOV clipping and clip the starfield to the FOV
+
+### fov: keep the through-portal window open; clip starfield to FOV
+
+Two related "player field of view" defects, both reproducible from the planted
+issue snapshots.
+
+**Through-portal sight.** `issues/fov-budget-optimization-cant-see-through-portal/`
+(snapshot_2: player at (61,42), portal directly north at (61,50)/(61,51)) showed
+a portal you can enter but not see through. The cumulative-radius budget
+computed each sub-view's extent as `remaining_radius - spent`, but a portal
+sub-view is centered on the viewer's *virtual* image (the transformed player),
+so the exit lands at child-relative radius `spent` and child-relative distance
+already equals cumulative apparent distance. Subtracting `spent` again clipped
+the window to exactly the portal plane; for a portal more than half the sight
+radius away nothing remained.
+
+The recursion now gives every level the same apparent extent,
+`min(radius, budget)`, while `remaining_radius` only gates further crossings.
+Without a budget the extent is the legacy full `radius`. `explain` on
+snapshot_2 rel(0,9) now reports the depth-1 image of abs(82,53) instead of a
+black cell; regression `test_cumulative_budget_keeps_a_distant_portal_window_open`
+fails on the old metric and passes on the new one.
+
+**Debug tooling.** `player_field_of_view_traced` (used by
+`fov-trace`/`explain`/`invariants`) ignored the game's `FovOptions`, so it
+described the unbudgeted view rather than the rendered one. It now passes
+`self.fov_options`; this is what made the clipping visible in `explain`.
+
+**Starfield.** `Starfield::draw` only skipped on-board squares, so stars painted
+the off-board void regardless of the FOV and overwrote portal-view floor whose
+screen cell maps to an off-board world square
+(`starfield-visibility.md`, `starfield-on-top-of-portal-view/`). It now also
+skips any cell whose player-relative square is in the FOV (via an `Option<&fov>`,
+`None` for the dead player who renders the whole board).
+
+Perf: budget 4/8/16 → 0.43/1.8/7.5 ms/FOV on racetrack, versus 8.1 ms
+unbudgeted. The previous 24 ms at budget 16 came from the over-shrinking bug;
+the corrected metric keeps a full window through each portal, so the default 16
+is a milder ~7% saving. Measurements and narrative updated in
+`docs/PERFORMANCE.md`.
+
+Tests: full suite green (552 passed / 9 skipped); added
+`test_cumulative_budget_keeps_a_distant_portal_window_open`,
+`test_budget_does_not_black_out_the_outer_fov_through_a_portal`, and
+`no_stars_inside_the_field_of_view`.
+
+---
+
+## 2026-09-28 — Don't black out the outer FOV through a portal corridor
+
+### fov: sub-view extent is the budget, not the remaining budget
+
+Follow-up to the through-portal fix above. The first version made each
+sub-view's apparent extent the *remaining* budget (one hop behind), which
+shrinks with depth. In a portal corridor that leaves a black band *inside* the
+sight radius: the direct view is blocked by the portal wall and only the
+sub-view can fill the outer apparent squares, but the sub-view stops short of
+them.
+
+Repro from the live `snapshot/` (player (69,47) facing into a hall of portals,
+rotation makes world-east screen-up): rel 13–16 of the sight radius render black
+at budget 16, while rel 17 (outside the radius) is correctly black. The
+sub-view's extent is now the shared `min(radius, budget)` at every level; the
+budget still bounds apparent reach and gates deeper crossings via
+`remaining_radius`. `explain` now fills rel 1–16 and goes black at 17.
+
+Regression: `test_budget_does_not_black_out_the_outer_fov_through_a_portal`
+fails on the shrinking extent and passes on the constant one.
+
+---
+
 ## 2026-09-27 — Stop paying for gprof instrumentation on every test run
 
 ### test: make gprof instrumentation opt-in; trim charwise sampling

@@ -11,19 +11,19 @@ cargo run --release -p game --example profile_racetrack -- racetrack 200   # ms/
 cargo run --release -p game --example profile_racetrack -- fov racetrack 50 # ms per player-FOV
 ```
 
-Prototype toggles (harness defaults off; see "Fix approaches"):
-`--cache` (A) and `--budget=<squares>` (B).
+Harness toggles: `--cache` (A) and `--radius=<squares>` (override the sight
+radius, the single FOV dial).
 
-The same toggles are available on the real game binary, where they now
-**default on**. Opt out with `--no-fov-cache` / `--no-fov-budget`, or override
-the budget:
+The cache also defaults **on** on the real game binary. There is no separate
+budget: the sight radius is the one knob (see "The cumulative budget is
+removed" below). `--fov-radius <n>` shrinks the radius for profiling; opt out of
+the cache with `--no-fov-cache`:
 
 ```
-./play-game --map racetrack                       # cache + budget 16 (default)
+./play-game --map racetrack                       # cache + full 16-square sight (default)
 ./play-game --map racetrack --no-fov-cache        # recompute the FOV every draw
-./play-game --map racetrack --no-fov-budget       # legacy per-hop sight
-./play-game --map racetrack --fov-budget 8        # tighter budget
-./maps/racetrack.sh --no-fov-budget
+./play-game --map racetrack --fov-radius 8        # smaller sight radius
+./maps/racetrack.sh --fov-radius 8
 ```
 
 For function attribution, build and run the harness through
@@ -62,11 +62,14 @@ are noisy under PIE/ICF):
    `field_of_view_within_arc_in_single_octant` (`fov_stuff.rs:1064`).
    ~545k recursive calls/frame on racetrack, vs ~135k on demo and ~72k on
    hallways. The whole FOV is recomputed from scratch on every draw
-   (`game/mod.rs:601`), with **no memoization** and **no recursion depth cap or
-   visited-portal set**; recursion terminates only when the view arc narrows
-   below `NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES`. The racetrack's 19-face L
-   portal plus four 3-wide two-way corners give the recursion many branching
-   portal crossings, which is why it dominates this map specifically.
+   (`game/mod.rs:601`), with **no memoization** and **no visited-`(root, arc)`
+   set**. Depth is *not* unbounded (see [Depth
+   bound](#depth-bound-2026-09-28)); recursion stops when a frame's extent
+   `max_extent` is exceeded or the view arc narrows below
+   `NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES`. The cost is exponential in the
+   **branching**: each crossed square can spawn up to two portal sub-views, and
+   racetrack's 19-face L portal plus four 3-wide two-way corners give it many
+   branching crossings, which is why it dominates this map specifically.
 2. **Angle-interval + trig math** feeding that recursion:
    `AngleInterval::from_square_and_center_offset` (~9–28M calls/60 frames),
    `contains_or_touches_angle`, `overlaps_other_by_at_least_this_much`,
@@ -81,18 +84,21 @@ are noisy under PIE/ICF):
 
 ## Root cause
 
-Roadmap item W.C already records cumulative arc shrink (no depth cap) as the
-FOV correctness concern. The profile shows the same unbounded recursion is the
-*frame-time* driver on portal-dense maps.
-
-The existing `radius` bound is **per portal hop**, not cumulative:
+The `radius` bound is **per portal hop**, not cumulative:
 `field_of_view_within_arc_in_single_octant` measures `relative_square` from the
 current sub-view's transformed center (`fov_stuff.rs:1088-1092`), and every
-portal crossing passes a fresh `transformed_center` (`:1207-1219`). A sight line
-can therefore travel `radius` squares, cross a portal, travel `radius` again,
-and so on. Recursion terminates only when the view arc shrinks below
-`NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES = 0.001°`, which is what explodes on the
-racetrack. A cumulative budget is *not* implemented.
+portal crossing passes a fresh `transformed_center` (`:1207-1219`). A path can
+therefore cross many portals, each time re-applying the full `radius`. A
+cumulative budget is *not* implemented at the point of this profile.
+
+That does **not** make the recursion unbounded (corrected 2026-09-28, see [Depth
+bound](#depth-bound-2026-09-28)). Along any path the apparent image strictly
+advances — a deeper frame inherits the parent's `starting_step_in_fov_sequence`
+and starts past the near field — and each frame's scan stops at
+`max_extent = radius`, so **depth ≤ radius + 1**. The frame-time driver is the
+**number of paths**: each crossed square can spawn up to two portal sub-views
+(plus blocker-split sub-arcs at the same center), so the tree grows roughly
+`branching^radius`. Cost is exponential in the sight radius, not in the depth.
 
 Also relevant to every fix below: `player_field_of_view` (`game/mod.rs:1410`) is
 render-only, called once per draw (`:601`), and depends only on `player_square`
@@ -107,7 +113,7 @@ player's square.
 Store `Option<(WorldSquare, FieldOfViewResult)>` on `Game` and recompute only
 when `player_square()` (or a map/`blocks` version stamp) changes; reset on
 snapshot load. Expected: stationary frames drop 71 ms → ~24 ms (FOV is 47 of
-71 ms). Moving still pays ~47 ms/step, so pair with B or C. Low risk; the
+71 ms). Moving still pays ~47 ms/step, so pair with C. Low risk; the
 result is `Clone`, and `FieldOfViewResult` is pure. Verify with a
 recompute-count test plus the existing golden render tests.
 
@@ -117,26 +123,15 @@ recompute-count test plus the existing golden render tests.
 > `map_version: u64` keyed cache would allow partial invalidation instead of a
 > full clear, but the maps are small enough that a clear is cheap.
 
-### B. Cumulative *relative-radius* cap
-Thread a `remaining_radius: f32` through the recursion, initialized to the
-budget (top-level extent clamped to `radius`), and at each portal crossing
-subtract how far sight travelled **in the current frame** to reach the portal
-(the portal square's Chebyshev offset), not the portal's absolute jump. The
-current frame's extent is `min(radius, remaining_radius)`. This bounds total
-relative sight travel (and thus recursion) without charging a portal its
-unwrapped jump distance — so an adjacent portal that leads far away stays
-see-through. It is a radius cap, not a depth cap. Medium risk: it changes
-visible results (it shrinks peripheral views as the budget is spent), so pick a
-budget that preserves intended views. Verify against the FOV invariant oracle,
-`test_portal_slice_arcs_union_to_full_visibility`, the racetrack L-wall render
-test, and snapshot goldens.
-
-> Earlier cuts were wrong in two ways: (1) `remaining` was initialized to
-> `radius`, silently ignoring the budget's magnitude (every budget ≥ radius
-> behaved identically); (2) the spend was the portal's absolute
-> entrance↔exit separation, which hides adjacent portals that lead far (see the
-> issue snapshot below). Both are fixed; the numbers below reflect the
-> relative-radius metric.
+### B. Cumulative *relative-radius* budget — **removed (2026-09-28)**
+An experiment that threaded a `remaining_radius` accumulator through the
+recursion and shrank each sub-view's extent to `min(radius, budget)`, gating
+crossings once spent. It was tried, debugged several times (see the corrections
+below), and then **deleted**: the budget was only ever "the radius" (its default
+was `PLAYER_SIGHT_RADIUS`, and its remaining effect was to shrink the view), and
+the extra crossing gate produced artifact-prone pruning. The sight radius is now
+the single FOV dial (`Game::set_player_sight_radius`, `--fov-radius`). Details of
+what was learned are kept below for the record.
 
 ### C. Dominance pruning (no cap at all)
 Track, per transformed root (or `(root, octant)`), the union of arcs already
@@ -170,12 +165,15 @@ and the FOV pipeline.)
 
 ## Prototype results (2026-09-27)
 
-Both prototypes are on by default on `Game` (the cache at construction, the
-budget initialized to `PLAYER_SIGHT_RADIUS`), and are also reachable from the
-game binary as opt-outs `--no-fov-cache` / `--no-fov-budget` (with
-`--fov-budget <n>` to override the value). Placing a block or portal
-invalidates the cache, since its key is only the player square. The full suite
-is green. Tests cover: cache-matches-fresh, cache-invalidation-on-move,
+> Historical. The budget rows below used the over-shrinking metric corrected on
+> 2026-09-28, and the budget feature itself was removed later that day; see the
+> corrections, the depth bound, and "The cumulative budget is removed".
+
+At the time, both prototypes were on by default on `Game` (the cache at
+construction, the budget initialized to `PLAYER_SIGHT_RADIUS`), reachable from
+the game binary as `--no-fov-cache` / `--no-fov-budget` / `--fov-budget <n>`.
+Placing a block or portal invalidates the cache, since its key is only the
+player square. Tests covered cache-matches-fresh, cache-invalidation-on-move,
 cache-invalidation-on-map-change, defaults-on, budget-as-a-fidelity-dial,
 deterministic portal iteration, and byte-identical frames.
 
@@ -209,14 +207,97 @@ Findings:
   player. It does nothing for the per-step hitch while moving.
 - **A + B(16)** compounds to 17.0 ms/frame.
 
-### The portal-window bug is fixed by the relative metric
-The issue snapshot `issues/fov-budget-optimization-cant-see-through-portal/`
-has the player at (53,27), adjacent to the L portal's exit at (54,27). The old
+### Correction history (2026-09-28): budget artifacts (feature later removed)
+
+> The budget was removed after these corrections; kept for the record. See "The
+> cumulative budget is removed" below.
+
+The original metric subtracted the portal's `spent` radius from the child
+sub-view's *extent*. That is geometrically wrong: a sub-view is centered on the
+viewer's virtual image (the transformed player), so the portal exit sits at
+child-relative radius `spent`, and child-relative distance already equals
+cumulative apparent distance. Subtracting `spent` again clipped the window to
+the portal plane. For a portal more than half the sight radius away (`spent >
+budget/2`) nothing was visible through it — the residual reported by
+`issues/fov-budget-optimization-cant-see-through-portal/` after the earlier
+"relative metric" fix (snapshot_2, portal 8–9 squares north).
+
+`field_of_view_within_arc_in_single_octant_impl` now gives every level the same
+apparent extent, `min(radius, budget)`. The `remaining_radius` accumulator is a
+per-hop *path* cost, not apparent distance: through the parallel portals of a
+hall of mirrors it grows roughly twice as fast as the image, so using it to gate
+at `budget == radius` blacked out the far half of the view (the live `snapshot/`
+infinite portal hallway: rel 7..16 black, rel 4..6 visible). The gate is now
+active only when the budget is *tighter* than the sight radius
+(`budget < radius`); at or above the radius the view is legacy, because
+`max_extent` already caps apparent reach. Re-measured racetrack FOV:
+
+| budget | ms / FOV |
+|-------:|---------:|
+| none   |     8.3  |
+| 4      |     0.42 |
+| 8      |     1.8  |
+| 16     |     8.2  |
+| 1000   |     8.3  |
+
+The old 24 ms figure for budget 16 was an artifact of the over-shrinking. The
+corrected metric makes budget ≥ radius a no-op (the default 16 included);
+tighter budgets still buy large speedups by shrinking the per-level extent and
+pruning crossings.
+
+### Depth bound (2026-09-28)
+
+The per-hop `radius` does not bound recursion depth *directly*, but the
+recursion is not unbounded. Along a path the apparent image strictly advances:
+a deeper frame inherits the parent's `starting_step_in_fov_sequence`, so it
+starts past the near field, and each frame scans only `radius` squares
+(`max_extent`). A portal on the player's own square adds at most one extra
+"zeroth" hop at apparent distance 0. So **depth ≤ radius + 1**, whatever the
+portal layout. Measured at radius 5
+(`test_portal_recursion_depth_stays_near_the_sight_radius`):
+
+| setup (radius 5) | max depth |
+|---|---:|
+| 3 portals immediately north → one common exit | 1 |
+| single portal north, exit on its own square | 5 |
+| single portal on the player's own square | 6 |
+
+No tested configuration reached deeper, and no zero-advance loop formed: a child
+frame skips its near field, so it cannot re-cross a portal at the same apparent
+distance.
+
+The **frame-time consequence** is that cost is exponential in the *radius*, not
+the depth: each crossed square can spawn up to two sub-views, so the path count
+grows like `branching^radius`. Measured racetrack FOV with `--radius`
+(`0.60 ms` at R=4 → `2.3 ms` at R=8 → `8.6 ms` at R=16) scales ~`3.7x` per `+4`
+radius, i.e. an effective branching factor ~1.4. Raising `PLAYER_SIGHT_RADIUS` is
+therefore super-linearly expensive; lowering it is super-linearly cheap.
+
+Because depth is already bounded, a **depth cap is not a useful lever**. The
+lever is the number of paths/nodes: that is what a sub-radius budget trimmed and
+what [dominance pruning (C)](#c-dominance-pruning-no-cap-at-all) would collapse
+without a fidelity cost.
+
+### The cumulative budget is removed (2026-09-28)
+
+With depth bounded and the budget's default (`PLAYER_SIGHT_RADIUS`) a no-op, the
+budget was redundant: its only remaining effect was to shrink the effective
+sight radius *and* run a per-hop crossing gate that produced artifacts. It was
+deleted. `FovOptions` / `cumulative_radius_budget` / `FovOptions` threading and
+the `--fov-budget` / `--no-fov-budget` flags are gone; the recursion's extent is
+now always `max_extent = radius`. The radius is the single FOV dial, exposed as
+`Game::set_player_sight_radius` (`--fov-radius <n>` on the binary; `--radius=<n>`
+on the harness). Default behavior is unchanged (the old default was already the
+no-op case).
+
+### The portal-window bug and the relative metric
+The original issue snapshot `issues/fov-budget-optimization-cant-see-through-portal/`
+had the player at (53,27), adjacent to the L portal's exit at (54,27). The old
 *absolute-distance* cap charged that crossing the L pair's ~17-square
 entrance↔exit separation, so everything seen through the adjacent portal was
 hidden. The relative-radius metric charges only the ~1 square travelled in the
-current frame to reach it, so the window is preserved (verified: the previously
-hidden squares are visible again at budget 16).
+current frame to reach it, so an adjacent portal window is preserved; this
+correction extends that to distant portals as well.
 
 ### Byte-identical frames + deterministic portal ordering
 
@@ -246,8 +327,10 @@ frames.
 
 ## Staging
 
-1. **A** — quick, safe symptom relief; re-profile.
-2. **B** — the cumulative distance cap; bounds the recursion generically.
-3. **D** — if still over budget.
-4. **C** — only if B+D leave the moving-player hitch too high, or if a
-   cap-free fix is wanted.
+1. **A** — cache, done, default on.
+2. **B** — cumulative relative-radius budget: tried, debugged, **removed** (it
+   was only ever the radius plus an artifact-prone crossing gate).
+3. **D** — constant-factor cleanups; safe, no behavior change.
+4. **C** — dominance pruning. The remaining *cap-free* fix: it attacks the
+   exponential path count directly (the real cost, since depth is already
+   bounded) with no fidelity loss.
