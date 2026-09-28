@@ -13,6 +13,9 @@
 //!   explain <dir> X Y     explain how screen cell (X,Y) got its glyph
 //!   invariants <dir>      FOV visibility-consistency violations
 //!   minimize <dir> X Y [out]
+//!       Writes minimized JSON to `out` (default <dir>/minimized.json) and,
+//!       for a `*.json` out, a loadable `<out-dir>/game_state.json` plus
+//!       `<out-dir>/screen.txt` (final render) for manual visual review.
 //!       --review[=<path>]   write a screen-by-screen review transcript
 //!       --review-explain    include the full explain block per step
 //!       --review-plain      strip ANSI colors from the transcript

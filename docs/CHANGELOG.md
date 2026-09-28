@@ -9,6 +9,23 @@ Newest first.
 
 ---
 
+## 2026-09-28 — Minimizer writes a final screen.txt for visual review
+
+### snapshot_tool: emit `game_state.json` + `screen.txt` beside the minimized JSON
+
+`minimize <dir> X Y <out.json>` now also writes a loadable snapshot directory at
+`<out-dir>` (the out path with `.json` stripped): `game_state.json` and
+`screen.txt`, the final render at the captured world time. So the result can be
+eyeballed (`cat`/open `screen.txt`) or re-loaded with `render`/`explain`/`diff`
+without any manual copying. For the touching-death-square issue this regenerates
+`issues/touching-floating-square-background/minimized/` (`game_state.json` +
+`screen.txt`; `snapshot_tool diff` confirms they match). New test
+`minimize_writes_screen_txt_next_to_the_json`.
+
+Full suite green (553 passed / 9 skipped; 293 with debug-tools).
+
+---
+
 ## 2026-09-28 — Generalize the snapshot minimizer; minimize the touching-death-square bug
 
 ### snapshot_tool: anchor the minimizer on a rendered cell, not only FOV partials

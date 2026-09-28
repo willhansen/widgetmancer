@@ -1408,11 +1408,42 @@ pub mod debug {
             .map_err(|error| format!("Could not serialize minimized snapshot: {error}"))?;
         std::fs::write(out_path, &minimized)
             .map_err(|error| format!("Could not write {}: {error}", out_path.display()))?;
-        let summary = format!(
-            "minimized in {} renders (cap {MINIMIZE_RENDER_CAP}); {step} steps; wrote {}",
-            renders.get(),
-            out_path.display()
-        );
+
+        // Also emit a loadable snapshot directory next to a `*.json` output:
+        // `<out-dir>/game_state.json` plus `<out-dir>/screen.txt` (the final
+        // render at the captured time) for manual visual verification.
+        let out_dir = out_path.with_extension("");
+        let screen_path = if out_path.extension().is_some() && out_dir != out_path {
+            std::fs::create_dir_all(&out_dir)
+                .map_err(|error| format!("Could not create {}: {error}", out_dir.display()))?;
+            std::fs::write(out_dir.join("game_state.json"), &minimized).map_err(|error| {
+                format!(
+                    "Could not write {}/game_state.json: {error}",
+                    out_dir.display()
+                )
+            })?;
+            let rendered = render_value_at_captured_time(&value)?;
+            let path = out_dir.join("screen.txt");
+            std::fs::write(&path, screen_text(&rendered))
+                .map_err(|error| format!("Could not write {}: {error}", path.display()))?;
+            Some(path)
+        } else {
+            None
+        };
+
+        let summary = match &screen_path {
+            Some(path) => format!(
+                "minimized in {} renders (cap {MINIMIZE_RENDER_CAP}); {step} steps; wrote {} and {}",
+                renders.get(),
+                out_path.display(),
+                path.display()
+            ),
+            None => format!(
+                "minimized in {} renders (cap {MINIMIZE_RENDER_CAP}); {step} steps; wrote {}",
+                renders.get(),
+                out_path.display()
+            ),
+        };
         if let Some(writer) = writer.as_mut() {
             writeln!(writer, "\n### done: {summary}").map_err(|error| error.to_string())?;
             writer.flush().map_err(|error| error.to_string())?;
@@ -1725,6 +1756,48 @@ pub mod debug {
                 derive_artifact_anchor(&game, (cell.x / 2) as usize, cell.y as usize).expect("anchor");
             assert!(anchor.visibility.is_none());
             assert_eq!(anchor.relative_square, utility::WorldStep::new(0, 0));
+        }
+
+        #[test]
+        fn minimize_writes_screen_txt_next_to_the_json() {
+            use euclid::vec2;
+
+            let mut game = set_up_game_with_player();
+            let player = game.player_square();
+            // A zero-velocity death cube overlapping the player's own square
+            // makes the player's cell appearance an anchorable artifact.
+            game.place_linear_death_cube(player.to_f32() + vec2(0.3, 0.0), vec2(0.0, 0.0));
+            game.world_time = game.world_start_time;
+            let json = game_state_json(&game, Some("test"));
+
+            let dir = std::env::temp_dir().join(format!(
+                "widgetmancer_minimize_screen_{}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&dir).expect("create temp dir");
+            std::fs::write(dir.join("game_state.json"), json).expect("write snapshot");
+
+            let player_cell = game
+                .graphics()
+                .screen
+                .world_square_to_left_screen_buffer_character_square(player);
+            let out = dir.join("min.json");
+            let result = minimize_snapshot(
+                &dir,
+                (player_cell.x / 2) as usize,
+                player_cell.y as usize,
+                &out,
+            );
+
+            let screen = dir.join("min").join("screen.txt");
+            let game_state = dir.join("min").join("game_state.json");
+            let screen_len = std::fs::metadata(&screen).map(|m| m.len()).unwrap_or(0);
+            let state_exists = game_state.exists();
+            std::fs::remove_dir_all(&dir).ok();
+
+            assert!(result.is_ok(), "minimize failed: {result:?}");
+            assert!(state_exists, "expected {}/game_state.json", dir.display());
+            assert!(screen_len > 0, "expected a non-empty screen.txt");
         }
 
         #[test]
