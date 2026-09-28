@@ -2304,6 +2304,53 @@ mod tests {
     }
 
     #[test]
+    fn test_portal_recursion_depth_is_bounded_by_sight_radius() {
+        // Strengthens `test_portal_recursion_depth_stays_near_the_sight_radius`:
+        // over random portal layouts the recursion never goes deeper than
+        // radius + 1. (Empirical, deterministic seeds; see docs/PERFORMANCE.md.)
+        use rand::{Rng, SeedableRng};
+        use rand_chacha::ChaCha8Rng;
+
+        let steps = [STEP_RIGHT, STEP_LEFT, STEP_UP, STEP_DOWN];
+        for radius in 2u32..=6 {
+            for seed in 0..20u64 {
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+                let mut portal_geometry = PortalGeometry::default();
+                let mut entrances = std::collections::HashSet::new();
+                for _ in 0..30 {
+                    let entrance = SquareWithOrthogonalDir::from_square_and_step(
+                        point2(rng.gen_range(-6..=6), rng.gen_range(-6..=6)),
+                        steps[rng.gen_range(0..4)],
+                    );
+                    if !entrances.insert(entrance) {
+                        continue;
+                    }
+                    let exit = SquareWithOrthogonalDir::from_square_and_step(
+                        point2(rng.gen_range(-6..=6), rng.gen_range(-6..=6)),
+                        steps[rng.gen_range(0..4)],
+                    );
+                    if exit == entrance.stepped() {
+                        continue;
+                    }
+                    portal_geometry.create_portal(entrance, exit);
+                }
+
+                let (_fov, trace) = portal_aware_field_of_view_from_square_traced(
+                    point2(0, 0),
+                    radius,
+                    &Default::default(),
+                    &portal_geometry,
+                );
+                let max_depth = trace.nodes.iter().map(|n| n.depth).max().unwrap_or(0);
+                assert!(
+                    max_depth <= radius + 1,
+                    "depth {max_depth} exceeded radius+1 for radius {radius}, seed {seed}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_sub_view_through_portal_has_correct_transform() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);

@@ -602,20 +602,21 @@ impl Game {
 
     fn update_screen_from_draw_buffer(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
         self.graphics.screen.fill_screen_buffer(BLACK);
-        let player_fov = if self.player_is_alive() {
+        let (player_fov, drawn) = if self.player_is_alive() {
             self.graphics
                 .screen
                 .set_screen_center_by_world_square(self.player_square());
             let fov = self.player_fov_for_draw();
-            self.graphics.load_screen_buffer_from_fov(&fov);
-            Some(fov)
+            let drawn = self.graphics.load_screen_buffer_from_fov(&fov);
+            (Some(fov), drawn)
         } else {
             self.graphics
                 .load_screen_buffer_from_absolute_positions_in_draw_buffer();
-            None
+            (None, std::collections::HashSet::new())
         };
 
-        self.graphics.draw_starfield(self.board_size, player_fov.as_ref());
+        self.graphics
+            .draw_starfield(self.board_size, player_fov.as_ref(), &drawn);
         self.graphics.draw_debug_overlays();
         self.graphics.display(&mut writer);
     }

@@ -277,7 +277,14 @@ impl Graphics {
         )
     }
 
-    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: &FieldOfViewResult) {
+    /// Composite the FOV into the screen buffer and return the set of screen
+    /// squares that were filled, so the starfield pass can avoid overwriting
+    /// them (a portal view can occupy off-board screen cells).
+    pub fn load_screen_buffer_from_fov(
+        &mut self,
+        field_of_view: &FieldOfViewResult,
+    ) -> HashSet<ScreenBufferSquare> {
+        let mut drawn: HashSet<ScreenBufferSquare> = HashSet::new();
         for screen_square in self.screen.all_screen_squares() {
             let world_square = self
                 .screen
@@ -288,12 +295,14 @@ impl Graphics {
                 self.maybe_drawable_for_rel_square_of_fov(field_of_view, relative_world_square);
 
             if let Some(unrotated) = maybe_unrotated {
+                drawn.insert(screen_square);
                 let rotated: DrawableEnum =
                     unrotated.rotated(-self.screen.rotation().quarter_turns());
                 self.screen
                     .draw_glyphs_straight_to_screen_square(rotated.to_glyphs(), screen_square);
             }
         }
+        drawn
     }
 
     pub fn load_screen_buffer_from_absolute_positions_in_draw_buffer(&mut self) {
@@ -594,15 +603,18 @@ impl Graphics {
             Glyph::new(character, RGB8::new(255, 0, 255), existing.bg_color);
     }
 
-    /// Paint off-board stars. Must run after the FOV composite so the board
-    /// and visible contents stay on top; on-board squares are never touched.
-    /// Also clipped to the player's field of view: a star is only drawn where
-    /// the FOV left the cell dark (off-board *and* outside the view), so stars
-    /// never appear beyond the sight radius nor on top of a portal-view floor.
-    /// Uses the frame's `current_time`, so the caller need not thread it.
-    pub fn draw_starfield(&mut self, board_size: BoardSize, fov: Option<&FieldOfViewResult>) {
+    /// Paint off-board stars where the player's FOV sees empty void. Runs after
+    /// the FOV composite; `fov` is `None` for the dead player (whole void), and
+    /// `drawn` are the screen squares the FOV filled (e.g. portal-view floor),
+    /// which are left alone. Uses the frame's `current_time`.
+    pub fn draw_starfield(
+        &mut self,
+        board_size: BoardSize,
+        fov: Option<&FieldOfViewResult>,
+        drawn: &HashSet<ScreenBufferSquare>,
+    ) {
         self.starfield
-            .draw(&mut self.screen, board_size, self.current_time, fov);
+            .draw(&mut self.screen, board_size, self.current_time, fov, drawn);
     }
 
     /// Debug-only overlays applied after the FOV composite (roadmap W.G).

@@ -67,7 +67,7 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
 - **What:** given a screen-buffer cell (e.g. the issue's `(49,37)`), return the
   ordered contributions: drawable, absolute world square,
   `PositionedSquareVisibilityInFov`/`portal_depth`, transform/rotation, tint
-  alpha (`0.1 * depth`, `fov_stuff.rs:760`), and why that glyph/color won.
+  alpha (`0.1 * depth`, `fov_stuff.rs:849`), and why that glyph/color won.
 - **Anchors:** `SquareVisibility::as_string` (`fov_stuff.rs:131`);
   `PositionedSquareVisibilityInFov` is `pub` + `Debug` (`:215`);
   `screen_text`/`graphics.screen` (`game/snapshot.rs:62`); the issue's observed
@@ -87,13 +87,15 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   `transformed_center`, portal transform, `visible_arc_of_portal`, resulting
   visibilities. Plus a "hall of mirrors" unfolded map showing the view arc and
   shadow half-plane per depth, and a depth heatmap.
-- **Anchors:** recursion at `fov_stuff.rs:~831`, portal block `:909-993`
-  (`transform_arc(view_arc.intersection(portal_view_arc))`, `transformed_center`
-  at `:938-943`); no depth cap; `player_field_of_view` private (`game/mod.rs:1371`);
-  `load_snapshot_game` `pub(crate)` (`snapshot.rs:547`) — reachable from an
-  in-crate `#[cfg(test)]` dump without API changes.
-- **Tests the issue's hypothesis:** cumulative arc shrink / missing depth cap at
-  depth 3.
+- **Anchors:** recursion at `fov_stuff.rs:1109`, portal block `:1195-1285`
+  (`transform_arc(view_arc.intersection(portal_view_arc))` at `:1229-1231`,
+  `transformed_center` at `:1224`); depth is bounded by `radius + 1` (see
+  `docs/PERFORMANCE.md` "Depth bound"); `player_field_of_view` private
+  (`game/mod.rs:1428`); `load_snapshot_game` `pub(crate)` (`snapshot.rs:547`) —
+  reachable from an in-crate `#[cfg(test)]` dump without API changes.
+- **Tests the issue's hypothesis:** the depth-3 black-block artifact (since
+  fixed by arc unioning); depth itself turned out to be bounded, so the
+  frame-time concern is branching, not missing-depth-cap.
 - **Landed (2026-09):** `FovTrace`/`FovTraceNode` (`fov_stuff.rs`) with
   `single_octant_field_of_view_traced`, `portal_aware_field_of_view_from_square_traced`,
   and `Game::player_field_of_view_traced` (debug-tools). Threads `depth` +

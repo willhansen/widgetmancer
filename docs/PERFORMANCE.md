@@ -59,10 +59,10 @@ are noisy under PIE/ICF):
 
 1. **Portal-recursive FOV.** `Game::player_field_of_view` →
    `portal_aware_field_of_view_from_point_traced` →
-   `field_of_view_within_arc_in_single_octant` (`fov_stuff.rs:1064`).
+   `field_of_view_within_arc_in_single_octant` (`fov_stuff.rs:1076`).
    ~545k recursive calls/frame on racetrack, vs ~135k on demo and ~72k on
    hallways. The whole FOV is recomputed from scratch on every draw
-   (`game/mod.rs:601`), with **no memoization** and **no visited-`(root, arc)`
+   (`game/mod.rs:603`), with **no memoization** and **no visited-`(root, arc)`
    set**. Depth is *not* unbounded (see [Depth
    bound](#depth-bound-2026-09-28)); recursion stops when a frame's extent
    `max_extent` is exceeded or the view arc narrows below
@@ -86,8 +86,8 @@ are noisy under PIE/ICF):
 
 The `radius` bound is **per portal hop**, not cumulative:
 `field_of_view_within_arc_in_single_octant` measures `relative_square` from the
-current sub-view's transformed center (`fov_stuff.rs:1088-1092`), and every
-portal crossing passes a fresh `transformed_center` (`:1207-1219`). A path can
+current sub-view's transformed center (`fov_stuff.rs:1109`), and every
+portal crossing passes a fresh `transformed_center` (`:1224`). A path can
 therefore cross many portals, each time re-applying the full `radius`. A
 cumulative budget is *not* implemented at the point of this profile.
 
@@ -100,7 +100,7 @@ and starts past the near field — and each frame's scan stops at
 (plus blocker-split sub-arcs at the same center), so the tree grows roughly
 `branching^radius`. Cost is exponential in the sight radius, not in the depth.
 
-Also relevant to every fix below: `player_field_of_view` (`game/mod.rs:1410`) is
+Also relevant to every fix below: `player_field_of_view` (`game/mod.rs:1428`) is
 render-only, called once per draw (`:601`), and depends only on `player_square`
 + `blocks.blocks` + `portal_geometry`. Blocks are only inserted during map setup
 (`place_block`; no runtime removal) and portals are fixed, and the player's
@@ -144,7 +144,7 @@ coverage set reuses `FieldOfViewResult::view_arcs` /
 
 ### D. Constant-factor cleanups
 Faster hasher for the `WorldSquare` / point-tuple keys on the FOV and
-angled-block paths; drop the `portal_view_arcs.clone()` (`:1162`) and repeated
+angled-block paths; avoid repeated
 `portals_entering_from_square` allocations; hoist
 `from_square_and_center_offset` per octant pass. ~1.5–2.5x, no behavior change.
 
@@ -219,7 +219,7 @@ child-relative radius `spent`, and child-relative distance already equals
 cumulative apparent distance. Subtracting `spent` again clipped the window to
 the portal plane. For a portal more than half the sight radius away (`spent >
 budget/2`) nothing was visible through it — the residual reported by
-`issues/fov-budget-optimization-cant-see-through-portal/` after the earlier
+the original portal-window report after the earlier
 "relative metric" fix (snapshot_2, portal 8–9 squares north).
 
 `field_of_view_within_arc_in_single_octant_impl` now gives every level the same
@@ -252,9 +252,10 @@ recursion is not unbounded. Along a path the apparent image strictly advances:
 a deeper frame inherits the parent's `starting_step_in_fov_sequence`, so it
 starts past the near field, and each frame scans only `radius` squares
 (`max_extent`). A portal on the player's own square adds at most one extra
-"zeroth" hop at apparent distance 0. So **depth ≤ radius + 1**, whatever the
-portal layout. Measured at radius 5
-(`test_portal_recursion_depth_stays_near_the_sight_radius`):
+"zeroth" hop at apparent distance 0. So **depth ≤ radius + 1 in every
+configuration tested** (not proven in general). Measured at radius 5
+(`test_portal_recursion_depth_stays_near_the_sight_radius`, plus a
+randomized check over 100 portal layouts at radius 2..6).
 
 | setup (radius 5) | max depth |
 |---|---:|
@@ -291,8 +292,8 @@ on the harness). Default behavior is unchanged (the old default was already the
 no-op case).
 
 ### The portal-window bug and the relative metric
-The original issue snapshot `issues/fov-budget-optimization-cant-see-through-portal/`
-had the player at (53,27), adjacent to the L portal's exit at (54,27). The old
+The original portal-window report had the player at (53,27), adjacent to the
+L portal's exit at (54,27). The old
 *absolute-distance* cap charged that crossing the L pair's ~17-square
 entrance↔exit separation, so everything seen through the adjacent portal was
 hidden. The relative-radius metric charges only the ~1 square travelled in the

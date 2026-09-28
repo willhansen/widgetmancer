@@ -857,6 +857,7 @@ pub mod debug {
 
     use regex::Regex;
     use rgb::RGB8;
+    use terminal_rendering::glyph::Glyph;
     use terminal_rendering::ScreenBufferCharacterSquare;
     use utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
 
@@ -947,10 +948,19 @@ pub mod debug {
     }
 
     /// The artifact to preserve while minimizing, anchored to the player so it
-    /// survives a virtual-screen resize (the screen is player-centered).
+    /// survives a virtual-screen resize (the screen is player-centered). It
+    /// records the captured rendered cell (both halves: characters + colors) and,
+    /// when applicable, the FOV visibility that drew it.
     #[derive(Clone, Copy, Debug)]
     pub struct ArtifactAnchor {
         pub relative_square: WorldStep,
+        pub visibility: Option<ArtifactVisibility>,
+        pub expected: [Glyph; 2],
+    }
+
+    /// The FOV-path identity of a partially-visible artifact square.
+    #[derive(Clone, Copy, Debug)]
+    pub struct ArtifactVisibility {
         pub depth: u32,
         pub absolute_square: WorldSquare,
     }
@@ -959,18 +969,23 @@ pub mod debug {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(
                 f,
-                "rel({},{}) depth {} abs({},{})",
-                self.relative_square.x,
-                self.relative_square.y,
-                self.depth,
-                self.absolute_square.x,
-                self.absolute_square.y,
-            )
+                "rel({},{})",
+                self.relative_square.x, self.relative_square.y,
+            )?;
+            match self.visibility {
+                Some(v) => write!(
+                    f,
+                    " depth {} abs({},{})",
+                    v.depth, v.absolute_square.x, v.absolute_square.y
+                ),
+                None => write!(f, " appearance"),
+            }
         }
     }
 
-    /// Derive the anchor from a buffer square `(sx, sy)`: its world square, its
-    /// player-relative offset, and the partial FOV visibility that draws it.
+    /// Derive the anchor from a buffer square `(sx, sy)`: its player-relative
+    /// offset, the captured rendered cell, and (if any) the partial FOV
+    /// visibility that draws it.
     pub fn derive_artifact_anchor(
         game: &Game,
         sx: usize,
@@ -986,67 +1001,88 @@ pub mod debug {
         }
         let buffer_square = ScreenBufferCharacterSquare::new(x as i32, sy as i32);
         let world_square = screen.screen_buffer_character_square_to_world_square(buffer_square);
+        let relative_square = world_square - game.player_square();
+        anchor_for_relative_square(game, relative_square)
+    }
+
+    /// Capture the rendered cell at a player-relative square (must be in the FOV
+    /// and on screen), with any partial FOV visibility that draws it.
+    pub fn anchor_for_relative_square(
+        game: &Game,
+        relative_square: WorldStep,
+    ) -> Result<ArtifactAnchor, String> {
         let (fov, _trace) = game.player_field_of_view_traced();
-        let relative_square = world_square - fov.root_square();
+        if !fov.can_see_relative_square(relative_square) {
+            return Err(format!(
+                "relative square ({},{}) is outside the player FOV",
+                relative_square.x, relative_square.y
+            ));
+        }
+        let expected = rendered_cell_at_relative(game, relative_square).ok_or_else(|| {
+            format!(
+                "relative square ({},{}) is off screen",
+                relative_square.x, relative_square.y
+            )
+        })?;
         let visibility = fov
             .visibilities_of_relative_square(relative_square)
             .into_iter()
             .find(|v| v.square_visibility_in_absolute_frame().is_partially_visible())
-            .ok_or_else(|| {
-                format!(
-                    "no partially-visible FOV square at buffer ({sx},{sy}) (world ({},{}))",
-                    world_square.x, world_square.y
-                )
-            })?;
+            .map(|v| ArtifactVisibility {
+                depth: v.portal_depth(),
+                absolute_square: v.absolute_square(),
+            });
         Ok(ArtifactAnchor {
             relative_square,
-            depth: visibility.portal_depth(),
-            absolute_square: visibility.absolute_square(),
+            visibility,
+            expected,
         })
     }
 
-    /// `true` if the render still shows the anchored artifact: an
-    /// `OUT_OF_SIGHT`-tinted (red-on-black) partial at the anchor's cell, with
-    /// the same portal depth and absolute square.
-    fn artifact_present_at(game: &Game, anchor: &ArtifactAnchor) -> bool {
+    /// The rendered cell at a player-relative square, if on screen.
+    fn rendered_cell_at_relative(game: &Game, relative_square: WorldStep) -> Option<[Glyph; 2]> {
         let screen = &game.graphics.screen;
-        let world = game.player_square() + anchor.relative_square;
+        let world = game.player_square() + relative_square;
         let cell = screen.world_square_to_left_screen_buffer_character_square(world);
         if cell.x < 0
             || cell.y < 0
-            || cell.x >= screen.terminal_width as i32
+            || cell.x + 1 >= screen.terminal_width as i32
             || cell.y >= screen.terminal_height as i32
         {
+            return None;
+        }
+        let screen_square =
+            screen.screen_buffer_character_square_to_screen_buffer_square(cell);
+        Some(screen.get_glyphs_at_screen_square(screen_square))
+    }
+
+    /// `true` if the render still shows the anchored cell exactly as captured
+    /// (characters and colors). For OUT_OF_SIGHT-partial anchors, the FOV
+    /// visibility identity must also survive.
+    fn artifact_present_at(game: &Game, anchor: &ArtifactAnchor) -> bool {
+        if rendered_cell_at_relative(game, anchor.relative_square) != Some(anchor.expected) {
             return false;
         }
-        let bg = screen.screen_buffer[cell.x as usize][cell.y as usize].bg_color;
-        if !(bg.r > 0 && bg.g == 0 && bg.b == 0) {
-            return false;
+        match anchor.visibility {
+            None => true,
+            Some(vis) => {
+                let (fov, _trace) = game.player_field_of_view_traced();
+                fov.visibilities_of_relative_square(anchor.relative_square)
+                    .into_iter()
+                    .any(|v| {
+                        v.portal_depth() == vis.depth
+                            && v.absolute_square() == vis.absolute_square
+                            && v.square_visibility_in_absolute_frame().is_partially_visible()
+                    })
+            }
         }
-        let (fov, _trace) = game.player_field_of_view_traced();
-        fov.visibilities_of_relative_square(anchor.relative_square)
-            .into_iter()
-            .any(|v| {
-                v.portal_depth() == anchor.depth
-                    && v.absolute_square() == anchor.absolute_square
-                    && v.square_visibility_in_absolute_frame().is_partially_visible()
-            })
     }
 
     /// Short signature of the artifact's rendered cell + FOV identity.
     fn artifact_signature(game: &Game, anchor: &ArtifactAnchor) -> String {
-        let screen = &game.graphics.screen;
-        let world = game.player_square() + anchor.relative_square;
-        let cell = screen.world_square_to_left_screen_buffer_character_square(world);
-        let in_bounds = cell.x >= 0
-            && cell.y >= 0
-            && cell.x < screen.terminal_width as i32
-            && cell.y < screen.terminal_height as i32;
-        let (fg, bg) = if in_bounds {
-            let glyph = screen.screen_buffer[cell.x as usize][cell.y as usize];
-            (glyph.fg_color, glyph.bg_color)
-        } else {
-            (RGB8::new(0, 0, 0), RGB8::new(0, 0, 0))
+        let (fg, bg) = match rendered_cell_at_relative(game, anchor.relative_square) {
+            Some([left, _right]) => (left.fg_color, left.bg_color),
+            None => (RGB8::new(0, 0, 0), RGB8::new(0, 0, 0)),
         };
         format!(
             "{} fg({},{},{}) bg({},{},{})",
@@ -1239,7 +1275,7 @@ pub mod debug {
         let anchor = derive_artifact_anchor(&baseline_game, sx, sy)?;
         if !artifact_present_at(&baseline_game, &anchor) {
             return Err(format!(
-                "no OUT_OF_SIGHT partial for anchor {anchor} in the original snapshot"
+                "anchor {anchor} not present in the original snapshot"
             ));
         }
 
@@ -1659,7 +1695,7 @@ pub mod debug {
         }
 
         #[test]
-        fn minimize_reports_error_when_no_artifact() {
+        fn minimize_errors_on_out_of_bounds_cell() {
             let game = set_up_game_with_player();
             let json = game_state_json(&game, Some("test"));
             let dir = std::env::temp_dir().join(format!(
@@ -1669,34 +1705,39 @@ pub mod debug {
             std::fs::create_dir_all(&dir).expect("create temp dir");
             std::fs::write(dir.join("game_state.json"), json).expect("write snapshot");
 
-            let result = minimize_snapshot(&dir, 0, 0, &dir.join("min.json"));
+            let result = minimize_snapshot(&dir, 0, 999, &dir.join("min.json"));
             std::fs::remove_dir_all(&dir).ok();
 
-            assert!(result.is_err(), "expected no-artifact error, got {result:?}");
+            assert!(result.is_err(), "expected out-of-bounds error, got {result:?}");
         }
 
         #[test]
-        fn derive_anchor_errors_without_partial_visibility() {
+        fn derive_anchor_captures_fully_visible_cell() {
             let mut game = set_up_game_with_player();
             game.draw_headless_at_duration_from_start(Duration::ZERO);
-            // Open board, no portals: every visible square is fully visible.
-            assert!(derive_artifact_anchor(&game, 0, 0).is_err());
+            // Open board, no portals: the player's cell is fully visible, and is
+            // still anchorable by its rendered appearance.
+            let cell = game
+                .graphics()
+                .screen
+                .world_square_to_left_screen_buffer_character_square(game.player_square());
+            let anchor =
+                derive_artifact_anchor(&game, (cell.x / 2) as usize, cell.y as usize).expect("anchor");
+            assert!(anchor.visibility.is_none());
+            assert_eq!(anchor.relative_square, utility::WorldStep::new(0, 0));
         }
 
         #[test]
         fn screen_crop_candidate_bounds_artifact_with_margin() {
-            use utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
+            use utility::coordinate_frame_conversions::WorldStep;
 
             let mut game = Game::new(200, 100, LogicalTime::ZERO);
             let mid = game.mid_square();
             game.place_player(mid);
             game.draw_headless_at_duration_from_start(Duration::ZERO);
 
-            let anchor = ArtifactAnchor {
-                relative_square: WorldStep::new(15, 1),
-                depth: 3,
-                absolute_square: WorldSquare::new(mid.x + 15, mid.y + 1),
-            };
+            let anchor =
+                anchor_for_relative_square(&game, WorldStep::new(15, 1)).expect("anchor");
             let (width, height) = screen_crop_candidate(&game, &anchor, 4);
             assert!(width < 200 && height < 100, "crop did not shrink: {width}x{height}");
             assert!(width >= 3 && height >= 3, "crop too small: {width}x{height}");
@@ -1712,11 +1753,8 @@ pub mod debug {
 
             let mut game = set_up_game_with_player();
             game.draw_headless_at_duration_from_start(Duration::ZERO);
-            let anchor = ArtifactAnchor {
-                relative_square: WorldStep::new(0, 0),
-                depth: 0,
-                absolute_square: game.player_square(),
-            };
+            let anchor =
+                anchor_for_relative_square(&game, WorldStep::new(0, 0)).expect("anchor");
 
             let brief = format_review_step(2, "removed pieces[0]", &game, &anchor, false, false);
             assert!(brief.contains("--- step 2 — removed pieces[0]"), "{brief}");

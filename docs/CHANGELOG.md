@@ -9,6 +9,76 @@ Newest first.
 
 ---
 
+## 2026-09-28 — Generalize the snapshot minimizer; minimize the touching-death-square bug
+
+### snapshot_tool: anchor the minimizer on a rendered cell, not only FOV partials
+
+The minimizer (`snapshot_tool minimize`) could only anchor on an
+`OUT_OF_SIGHT`-partial FOV square, so it refused the touching-death-square
+artifact (a fully-visible player cell made wrong by a remapped floating square).
+`ArtifactAnchor` now records the captured rendered cell — both halves'
+characters and colors — plus the FOV visibility identity when one exists;
+`artifact_present_at` requires the rendered cell to match exactly (and the FOV
+identity to survive for partial anchors). `derive_artifact_anchor` no longer
+requires a partial; it errors only for out-of-FOV/out-of-bounds cells, and
+`anchor_for_relative_square` captures from the current render.
+
+Result: the touching issue reproduces and minimizes to **one death cube + one
+portal**. `issues/touching-floating-square-background/minimized/` (+
+`minimized.json`): player (47,29), zero-velocity cube (53.2727,17), portal
+`(53,17) E → (47,29) N`. The portal remaps the cube's drawable onto the player's
+square; the arrow `drawn_over` then fills the left half's transparent bg with
+the below drawable's solid color (left char bg = death color, right char a
+death lower-block). Root cause recorded in the issue: `TextDrawable` over
+`PartialVisibilityDrawable` compositing. Tests updated for the new anchor
+(`derive_anchor_captures_fully_visible_cell`,
+`minimize_errors_on_out_of_bounds_cell`).
+
+Also corrected the issue's reproduction note: the earlier "not reproducible"
+claim was wrong — the death cube is adjacent *through portal geometry*, not in
+absolute space.
+
+Full suite green (553 passed / 9 skipped; 292 with debug-tools).
+
+---
+
+## 2026-09-28 — Starfield inside the FOV; doc hygiene; repro attempts
+
+### game: starfield draws only FOV-visible off-board void; doc cleanup
+
+**Starfield mask was inverted.** `Starfield::draw` skipped off-board cells whose
+relative square was in the FOV, so stars appeared *outside* the sight radius and
+the void *inside* the FOV stayed black — the opposite of
+`issues/starfield-visibility.md`. The discriminator is not visibility but
+whether the FOV composite *drew* the cell. Now
+`Graphics::load_screen_buffer_from_fov` returns the set of screen squares it
+filled, `draw_starfield` takes that set plus the FOV, and a star is drawn only
+for an off-board cell that is FOV-visible and undrawn. Portal-view floor (drawn
+into off-board screen cells) is still left alone; `fov == None` (dead player)
+decorates the whole void. Verified on `leftover-portal-.../snapshot`: all stars
+are off-board-in-FOV, none outside. Tests replaced
+(`stars_only_inside_the_fov_over_undrawn_void`,
+`stars_are_not_drawn_where_the_fov_composite_drew`).
+
+**Doc hygiene.** Deleted the resolved issue records per `issues/README.md`:
+`starfield-visibility.md`, `starfield-on-top-of-portal-view/`,
+`fov-budget-optimization-cant-see-through-portal/` (budget removed).
+`black-*` kept as design records (referenced by ROADMAP). Fixed stale anchors in
+`docs/PERFORMANCE.md`/`docs/ROADMAP.md` and the outdated "no depth cap" note.
+Softened the depth bound to "≤ radius + 1 in every configuration tested" and
+added a randomized check over 100 portal layouts at radius 2..6
+(`test_portal_recursion_depth_is_bounded_by_sight_radius`).
+
+**Reproduction attempts** recorded in the two remaining bug issues:
+`touching-floating-square-background` is absent from its snapshot (nearest death
+cube 6.03 away); a synthetic overlapping-cube repro shows the whole left
+character background taking the death color. `leftover-portal-...` is absent
+from its snapshot (0 red-tinted cells up-right), matching the issue's own note.
+
+Full suite green (553 passed / 9 skipped).
+
+---
+
 ## 2026-09-28 — Remove the cumulative budget; the sight radius is the one dial
 
 ### fov: delete FovOptions/cumulative_radius_budget; add a sight-radius override
