@@ -148,8 +148,14 @@ The actual game. Modules:
 ### Profiling (what actually runs in this sandbox)
 
 `flake.nix` lists more profilers than resolve here, so don't trust it as an
-inventory. `.cargo/config.toml` builds with `-Zinstrument-mcount` (plus frame
-pointers), so the toolchain is already mcount-instrumented.
+inventory. `.cargo/config.toml` keeps frame pointers on, but
+`-Zinstrument-mcount` is **opt-in** via `scripts/profile.sh`: leaving it in
+`[build].rustflags` instruments every function of every target (tests
+included) and roughly quadruples the test suite. Run any command through the
+script when you need `gmon.out` call counts or uftrace's mcount hooks, e.g.
+`scripts/profile.sh cargo run --release -p game --example profile_racetrack`.
+Note `RUSTFLAGS` replaces the config flags, so the script repeats the frame
+pointer flag.
 
 | Tool | Status | Use |
 |------|--------|-----|

@@ -26,11 +26,16 @@ the budget:
 ./maps/racetrack.sh --no-fov-budget
 ```
 
-For function attribution, run the harness from a scratch directory (it drops a
-`gmon.out` on exit) and feed it to `gprof`:
+For function attribution, build and run the harness through
+`scripts/profile.sh` (mcount instrumentation is opt-in; see
+[ARCHITECTURE.md](ARCHITECTURE.md#profiling-what-actually-runs-in-this-sandbox)),
+from a scratch directory so it drops a `gmon.out` on exit, then feed that to
+`gprof`:
 
 ```
-gprof target/release/examples/profile_racetrack gmon.out
+scripts/profile.sh cargo build --release -p game --example profile_racetrack
+cd /tmp && /root/project/target/release/examples/profile_racetrack racetrack 200
+gprof /root/project/target/release/examples/profile_racetrack gmon.out
 ```
 
 Measured in release on the sandbox host (i5-8400). The loop sleeps 21 ms per

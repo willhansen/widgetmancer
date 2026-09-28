@@ -51,8 +51,15 @@ fn measure(
         (0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);
     let (mut sum_area, mut sum_center, mut sum_pc, mut sum_jag, mut sum_disp) =
         (0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);
-    for xi in 0..16 {
-        for yi in 0..16 {
+    // Odd 1/16 steps: an 8x8 offset grid that deliberately avoids the
+    // eighth-block-aligned round offsets (which would zero the family-snapped
+    // area error and flatter the comparison). The bounds below are loose
+    // max/mean guards, so a coarser grid still catches blowups while keeping
+    // this characterization test fast (16x16 made it the slowest in the
+    // suite by far). `displacement_sensitivity` still probes the omitted
+    // 1/16 midpoints.
+    for xi in (1..16).step_by(2) {
+        for yi in (1..16).step_by(2) {
             let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
             let (grid, center) = neighborhood(pos);
             let actual = sampled(&grid, center);
@@ -79,7 +86,7 @@ fn measure(
             sum_disp += disp;
         }
     }
-    let n = 256.0;
+    let n = 64.0;
     println!(
         "{name:<20} mean(|area| {:.3} center {:.3} per-char {:.3} jagged {:.3} disp {:.3})  \
          max(|area| {:.3} center {:.3} per-char {:.3} jagged {:.3} disp {:.3})",

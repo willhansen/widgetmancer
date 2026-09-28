@@ -9,6 +9,34 @@ Newest first.
 
 ---
 
+## 2026-09-27 — Stop paying for gprof instrumentation on every test run
+
+### test: make gprof instrumentation opt-in; trim charwise sampling
+
+The test suite was ~30s (the issue reported 40s). Root cause: `.cargo/config.toml`
+put `-Zinstrument-mcount` (gprof call-count instrumentation) in `[build].rustflags`,
+so every target — all test binaries included — carried an `mcount` call at every
+function entry. Measured by varying only `RUSTFLAGS`: full suite **30.1s → 7.3s**.
+
+- `.cargo/config.toml` now keeps only `-Cforce-frame-pointers=yes` by default.
+  The mcount flags moved to `scripts/profile.sh`, which sets `RUSTFLAGS`
+  (replacing, not appending to, the config flags — so it repeats the frame
+  pointer flag) and runs whatever command you give it. `RUSTFLAGS` is also what
+  previously made this invisible: `cargo nextest` inherited the instrumentation.
+- Remaining hotspot was `terminal_rendering::charwise_rendering
+  test_approach_comparison_metrics` (5.8s, 75% of the un-instrumented suite):
+  a characterization/print test whose assertions are explicitly loose. Its
+  offset grid went 16x16 → 8x8 at odd 1/16 steps (avoiding eighth-block-aligned
+  offsets, which zeroed the family-snapped area error). Bounds still pass with
+  margin, `displacement_sensitivity` still probes the omitted midpoints.
+- Full suite: **30.1s → 5.2s**; no single test over ~2s. nextest's `slow-timeout`
+  comment updated to match.
+
+Docs: ARCHITECTURE.md "Profiling" and PERFORMANCE.md now say to run through
+`scripts/profile.sh`; resolved and removed `issues/tests-take-too-long.md`.
+
+---
+
 ## 2026-09-27 — Default the FOV cache and cumulative-radius budget on
 
 ### perf: default FOV cache and cumulative-radius budget on

@@ -1,9 +1,13 @@
+# Frame pointers are cheap and make backtraces/profiler stacks usable, so
+# they stay on for every build. The gprof call-count instrumentation
+# (`-Zinstrument-mcount`) is deliberately *not* here: putting it in
+# `[build].rustflags` instruments every target, including test binaries,
+# and roughly quadruples the test run. Profiling needs it, tests don't, so
+# it is opt-in via `scripts/profile.sh` (see docs/ARCHITECTURE.md).
 [build]
 rustflags = [
   # '-Cinstrument-coverage',
   '-Cforce-frame-pointers=yes',
-  '-Zinstrument-mcount',
-  '-Cpasses=ee-instrument<post-inline>'
 ]
 
 [env]
