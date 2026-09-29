@@ -324,11 +324,13 @@ impl Game {
         if !self.square_is_on_board(end_square) {
             // Only widgets may leave the board; anything else (notably the
             // player) refuses to take the step. A widget falls: it vanishes
-            // from its edge square with a shrinking-square animation, then the
-            // rest of the chain shifts forward on the unwind.
+            // from its edge square and a shrinking-circle animation plays on
+            // the off-board square it would have landed on (so the box behind
+            // it can slide into the edge square with no overlap), then the rest
+            // of the chain shifts forward on the unwind.
             if matches!(pushee, Some(GridEntity::Widget(_))) {
                 self.widgets.remove(&start_square);
-                self.graphics.start_falling_box_animation(start_square);
+                self.graphics.start_falling_box_animation(end_square);
                 return Ok(end_pose);
             }
             return Err(());

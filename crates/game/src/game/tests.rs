@@ -2063,6 +2063,33 @@
     }
 
     #[test]
+    fn test_falling_box_renders_on_the_off_board_square() {
+        let mut game = set_up_10x10_game();
+        let start = point2(8, 5);
+        game.place_player(start);
+        game.place_widget(Widget::new(1), start + STEP_RIGHT);
+        game.try_slide_player(STEP_RIGHT).expect("push off edge");
+
+        game.draw_headless_now();
+
+        // The player is now on the edge square; the animation is one square
+        // further out, over the void.
+        let glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT);
+        assert_eq!(glyphs[0].character, FALLING_BOX_GLYPHS[0]);
+
+        // Past its 600 ms the fall is finished and no circle remains.
+        game.draw_headless_at_duration_from_start(std::time::Duration::from_millis(700));
+        let glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT);
+        assert!(!FALLING_BOX_GLYPHS.contains(&glyphs[0].character));
+    }
+
+    #[test]
     fn test_tail_of_a_chain_pushed_off_the_edge_falls() {
         let mut game = set_up_10x10_game();
         let start = point2(6, 5);

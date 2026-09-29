@@ -7,5 +7,9 @@ edition.workspace = true
 rgb = "0.8.34"
 euclid = "0.22.7"
 termion = "2.0.1"
+# Rasterizes real font files for the `pixels` mode: the only way to see the
+# true shape/coverage of glyphs the analytic oracle doesn't model (geometric
+# shapes, and any font-specific metric). Dev tool only.
+fontdue = "0.9.3"
 
 terminal_rendering.workspace = true

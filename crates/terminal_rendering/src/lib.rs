@@ -26,7 +26,7 @@ pub mod frame;
 pub use frame::*;
 
 
-pub_mod_and_use!(angled_blocks, braille, floating_square, hextant_blocks);
+pub_mod_and_use!(angled_blocks, braille, emoji_presentation, floating_square, hextant_blocks);
 
 // Debug-tooling oracle shared by the floating-square coherence test and the
 // floating_square_debug tool. Plain `mod` (not pub_mod_and_use!) so its

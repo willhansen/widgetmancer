@@ -104,6 +104,37 @@ impl Style {
     }
 }
 
+/// The filled region of a braille character as axis-aligned dot rectangles in
+/// cell coordinates. A character cell holds a 2x4 braille dot grid; each dot
+/// is modelled as a small square centered in its slot (the same Voronoi cell
+/// the renderer's point->dot rounding produces). `row` 0 is the bottom, to
+/// match `braille_bit_for_pos`.
+fn braille_dot_rects(c: char) -> Vec<[f32; 4]> {
+    use crate::braille::{braille_bit_for_pos, char_is_braille};
+    if !char_is_braille(c) {
+        return vec![];
+    }
+    let bits = c as u32 & 0xFF;
+    let mut out = Vec::new();
+    for col in 0..2i32 {
+        for row in 0..4i32 {
+            let bit = braille_bit_for_pos(euclid::point2(col, row));
+            if bits & bit == 0 {
+                continue;
+            }
+            let center_x = 0.25 + 0.5 * col as f32;
+            let center_y = 0.125 + 0.25 * row as f32;
+            out.push([
+                center_x - 0.125,
+                center_y - 0.125,
+                center_x + 0.125,
+                center_y + 0.125,
+            ]);
+        }
+    }
+    out
+}
+
 /// Exact coverage model for every glyph the renderer can emit.
 /// `fx`, `fy` are in [0, 1) within the character cell; `fy` is measured
 /// from the bottom (world +y is up).
@@ -113,6 +144,11 @@ pub fn glyph_filled(c: char, fx: f32, fy: f32) -> bool {
     }
     if c == FULL_BLOCK {
         return true;
+    }
+    if crate::braille::char_is_braille(c) {
+        return braille_dot_rects(c)
+            .iter()
+            .any(|[x0, y0, x1, y1]| fx >= *x0 && fx < *x1 && fy >= *y0 && fy < *y1);
     }
     // eighth blocks, all four orientations (partials only; the arrays also
     // contain SPACE at 0 and FULL_BLOCK at 8, handled above)
@@ -1365,6 +1401,9 @@ fn glyph_rects(c: char) -> Vec<[f32; 4]> {
     if c == FULL_BLOCK {
         return vec![[0.0, 0.0, 1.0, 1.0]];
     }
+    if crate::braille::char_is_braille(c) {
+        return braille_dot_rects(c);
+    }
     for k in 1..8usize {
         let k = k as f32;
         if c == EIGHTH_BLOCKS_FROM_LEFT[k as usize] {
@@ -1765,6 +1804,28 @@ mod charwise_tests {
                         glyph_filled(f.c, fx, fy),
                         "glyph {} at ({fx}, {fy})",
                         f.c
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_braille_rects_match_glyph_filled() {
+        // Same contract as the block-glyph test, for the whole braille block.
+        for cp in 0x2800u32..=0x28FF {
+            let c = char::from_u32(cp).unwrap();
+            for i in 0..SY {
+                for j in 0..HX {
+                    let fx = (j as f32 + 0.5) / HX as f32;
+                    let fy = (i as f32 + 0.5) / SY as f32;
+                    let in_rects = glyph_rects(c).iter().any(|[x0, y0, x1, y1]| {
+                        fx >= *x0 && fx < *x1 && fy >= *y0 && fy < *y1
+                    });
+                    assert_eq!(
+                        in_rects,
+                        glyph_filled(c, fx, fy),
+                        "braille U+{cp:04X} at ({fx}, {fy})"
                     );
                 }
             }

@@ -1165,6 +1165,212 @@ fn print_glyph_table() {
     }
 }
 
+/// `pixels` mode: the *actual* pixels of arbitrary characters, rasterized from
+/// a real font file, next to the analytic oracle's view when the oracle models
+/// the glyph. This is the tool for glyphs the oracle does not know (geometric
+/// shapes and their font-specific sizes) and for catching presentation bugs
+/// like a codepoint that defaults to emoji.
+///
+/// Usage: pixels [--font PATH] [--size N] <chars...>
+/// Each argument is either a single character, a run of characters, or a code
+/// point written `U+25FE` / `0x25FE`.
+fn run_pixels(args: &[String]) -> Result<(), String> {
+    let mut font_path: Option<String> = None;
+    let mut size: usize = 64;
+    let mut chars: Vec<char> = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--font" {
+            i += 1;
+            font_path = Some(
+                args.get(i)
+                    .cloned()
+                    .ok_or_else(|| "--font needs a path".to_string())?,
+            );
+        } else if let Some(path) = arg.strip_prefix("--font=") {
+            font_path = Some(path.to_string());
+        } else if arg == "--size" {
+            i += 1;
+            size = args
+                .get(i)
+                .and_then(|s| s.parse().ok())
+                .ok_or_else(|| "--size needs a pixel height".to_string())?;
+        } else if let Some(n) = arg.strip_prefix("--size=") {
+            size = n
+                .parse()
+                .map_err(|_| format!("bad --size value: {n}"))?;
+        } else if let Some(hex) = arg.strip_prefix("U+").or_else(|| arg.strip_prefix("0x")) {
+            let cp = u32::from_str_radix(hex, 16).map_err(|_| format!("bad code point: {arg}"))?;
+            chars.push(
+                char::from_u32(cp).ok_or_else(|| format!("not a scalar value: {arg}"))?,
+            );
+        } else {
+            chars.extend(arg.chars());
+        }
+        i += 1;
+    }
+    if chars.is_empty() {
+        return Err("pixels: give at least one character or code point".to_string());
+    }
+
+    let font_path = resolve_font_path(font_path)?;
+    let bytes = std::fs::read(&font_path)
+        .map_err(|e| format!("could not read font {font_path}: {e}"))?;
+    let font = fontdue::Font::from_bytes(bytes, fontdue::FontSettings::default())
+        .map_err(|e| format!("could not parse font {font_path}: {e}"))?;
+
+    println!("font: {font_path}");
+    println!("real-font pixel view; · empty, ▀/▄/█ filled (cell aspect 1:2)");
+    for c in chars {
+        println!();
+        println!("{c}  U+{:04X}", c as u32);
+        if char_is_emoji_presentation(c) {
+            println!("  ** Emoji_Presentation=Yes: terminals draw this with the color-emoji font");
+            println!("     (the 'dark gray square' bug). Pick a text-presentation glyph. **");
+        }
+        for line in real_font_pane(&font, c, size) {
+            println!("  {line}");
+        }
+        if oracle_supports(c) {
+            println!("  analytic oracle (font-independent):");
+            for line in analytic_zoom(c) {
+                println!("  {line}");
+            }
+        } else {
+            println!("  (no analytic oracle model for this glyph — real font only)");
+        }
+    }
+    Ok(())
+}
+
+/// Locate a font: explicit `--font`, then `$GLYPH_FONT`, then a few common
+/// system locations. No font is vendored, so the caller supplies the one whose
+/// rendering they want to see (e.g. `--font ~/.fonts/CascadiaCode.ttf`).
+fn resolve_font_path(explicit: Option<String>) -> Result<String, String> {
+    if let Some(path) = explicit {
+        return Ok(path);
+    }
+    if let Ok(path) = std::env::var("GLYPH_FONT") {
+        if !path.is_empty() {
+            return Ok(path);
+        }
+    }
+    const CANDIDATES: &[&str] = &[
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+        "/Library/Fonts/CascadiaCode.ttf",
+        "/System/Library/Fonts/Menlo.ttc",
+    ];
+    for path in CANDIDATES {
+        if std::path::Path::new(path).exists() {
+            return Ok((*path).to_string());
+        }
+    }
+    Err("pixels: no font found; pass --font <path> or set GLYPH_FONT".to_string())
+}
+
+/// Rasterize `c` from `font` and render it centered in a 1:2 cell as plain
+/// ASCII half-block art. `size` is the cell height in source pixels.
+fn real_font_pane(font: &fontdue::Font, c: char, size: usize) -> Vec<String> {
+    const PW: usize = 16; // display pixel columns
+    const PH: usize = 32; // display pixel rows; PH = 2*PW keeps the cell 1:2
+    let (metrics, bitmap) = font.rasterize(c, size as f32);
+    let cell_w = size / 2;
+    let cell_h = size;
+    let origin_x = (cell_w as i32 - metrics.width as i32) / 2;
+    let origin_y = (cell_h as i32 - metrics.height as i32) / 2;
+    let covered = |px: usize, py: usize| -> bool {
+        let cx = (px as f32 + 0.5) / PW as f32 * cell_w as f32;
+        let cy = (py as f32 + 0.5) / PH as f32 * cell_h as f32;
+        let sx = cx as i32 - origin_x;
+        let sy = cy as i32 - origin_y;
+        if sx < 0 || sy < 0 || sx >= metrics.width as i32 || sy >= metrics.height as i32 {
+            return false;
+        }
+        bitmap[sy as usize * metrics.width + sx as usize] > 127
+    };
+    (0..PH / 2)
+        .map(|t| {
+            (0..PW)
+                .map(|px| {
+                    let up = covered(px, 2 * t);
+                    let lo = covered(px, 2 * t + 1);
+                    match (up, lo) {
+                        (true, true) => '█',
+                        (true, false) => '▀',
+                        (false, true) => '▄',
+                        (false, false) => '·',
+                    }
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Whether the analytic coverage oracle models `c`. Mirrors the accepted
+/// branches of `coverage::glyph_filled` without tripping its panic.
+fn oracle_supports(c: char) -> bool {
+    use terminal_rendering::glyph_constants::named_chars::{
+        EIGHTH_BLOCKS_FROM_LEFT, EIGHTH_BLOCKS_FROM_RIGHT, EIGHTH_BLOCKS_FROM_TOP,
+        EIGHTH_BLOCKS_FROM_BOTTOM, FULL_BLOCK, LOWER_ONE_THIRD_BLOCK, LOWER_TWO_THIRD_BLOCK,
+        UPPER_ONE_THIRD_BLOCK, UPPER_TWO_THIRD_BLOCK,
+    };
+    if c == SPACE || c == FULL_BLOCK || char_is_braille(c) {
+        return true;
+    }
+    if (FIRST_HEXTANT..=LAST_HEXTANT).contains(&c) {
+        return true;
+    }
+    let eighth_arrays = [
+        EIGHTH_BLOCKS_FROM_LEFT,
+        EIGHTH_BLOCKS_FROM_RIGHT,
+        EIGHTH_BLOCKS_FROM_BOTTOM,
+        EIGHTH_BLOCKS_FROM_TOP,
+    ];
+    if eighth_arrays.iter().any(|arr| arr[1..8].contains(&c)) {
+        return true;
+    }
+    if [
+        UPPER_ONE_THIRD_BLOCK,
+        UPPER_TWO_THIRD_BLOCK,
+        LOWER_ONE_THIRD_BLOCK,
+        LOWER_TWO_THIRD_BLOCK,
+    ]
+    .contains(&c)
+    {
+        return true;
+    }
+    ['▖', '▗', '▘', '▝', '▌', '▐', '▄', '▀'].contains(&c)
+}
+
+/// The oracle's exact big-pixel zoom of one glyph (the same 8x24 view as the
+/// `glyphs` table), for side-by-side comparison with the real-font render.
+fn analytic_zoom(c: char) -> Vec<String> {
+    (0..TABLE_PX_H / 2)
+        .map(|t| {
+            (0..TABLE_PX_W)
+                .map(|i| {
+                    let filled = |j: usize| {
+                        glyph_filled(
+                            c,
+                            (i as f32 + 0.5) / TABLE_PX_W as f32,
+                            (j as f32 + 0.5) / TABLE_PX_H as f32,
+                        )
+                    };
+                    match (filled(TABLE_PX_H - 1 - 2 * t), filled(TABLE_PX_H - 2 - 2 * t)) {
+                        (true, true) => '█',
+                        (true, false) => '▀',
+                        (false, true) => '▄',
+                        (false, false) => '·',
+                    }
+                })
+                .collect()
+        })
+        .collect()
+}
+
 /// Official Unicode name (UCD) of one table glyph. The fallback is the
 /// bare code point; the test below fails if any used glyph reaches it,
 /// so names cannot silently go missing when the vocabulary grows.
@@ -1998,6 +2204,12 @@ fn usage() {
           \x20      with its Unicode name and an exact 8x24 big-pixel zoom\n  \
           \x20      (1/16 x 1/24 world per pixel), framed with position\n  \
           \x20      rulers; plain text, redirect to a file\n  \
+           pixels [--font P] [--size N] <chars...>\n  \
+          \x20      the ACTUAL pixels of characters, rasterized from a real\n  \
+          \x20      font file (--font, else $GLYPH_FONT, else a system font),\n  \
+          \x20      with an Emoji_Presentation warning; also shows the\n  \
+          \x20      analytic oracle's view when it models the glyph. Args may\n  \
+          \x20      be chars, runs, or U+25FE / 0x25FE code points\n  \
            animate [N]   orbiting square, two-method comparison: the in-use\n  \
           \x20      game path (family-snapped) and a candidate replacement\n  \
           \x20      cycled with [ and ] (charwise, charwise + protrusion,\n  \
@@ -2077,6 +2289,7 @@ fn main() {
         },
         Some("sweep") => show_sweep(),
         Some("glyphs") => print_glyph_table(),
+        Some("pixels") => run_pixels(&args[1..]).unwrap_or_else(die),
         Some("animate") => match args.get(1).map(|s| s.parse::<u32>()) {
             None => run_animation(None).unwrap_or_else(die),
             Some(Ok(n)) => run_animation(Some(n)).unwrap_or_else(die),

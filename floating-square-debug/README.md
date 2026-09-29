@@ -5,7 +5,9 @@ the game uses (one world square = 2 terminal columns) on a checkerboard of
 square centers, plus sampled actual-vs-ideal coverage panes and per-method
 error metrics. All diagnostics go through the sampled-coverage oracle in
 `terminal_rendering` (shared with the `floating_square_coherence` test), so
-the tool cannot drift from what the game draws.
+the tool cannot drift from what the game draws. The `pixels` mode is the
+exception by design: it rasterizes a real font file, for glyphs the analytic
+oracle does not model.
 
 ## Run
 
@@ -27,6 +29,13 @@ or directly:
   its auto-picked family: a decision-boundary map.
 - `glyphs` — reference table: every block character the renderer can emit
   with an exact big-pixel zoom. Plain text; redirect to a file.
+- `pixels [--font P] [--size N] <chars…>` — the *actual* pixels of arbitrary
+  characters, rasterized from a real font file (`--font`, else `$GLYPH_FONT`,
+  else a system font), with an `Emoji_Presentation` warning and, when the
+  oracle models the glyph, the analytic view beside it. This is how to see
+  glyphs the oracle doesn't know (geometric shapes such as `⬤ ● • ·`) and to
+  catch codepoints that default to the color-emoji font. Args may be single
+  characters, runs, or `U+25FE` / `0x25FE` code points.
 - `animate` (default) — square on the alternate screen (q quits): orbit,
   arrow-key nudge, line trajectories, preset jumps (`0`–`9`, paused — the
   roadmap's tear corner among them), `r` to reset histories and switches,

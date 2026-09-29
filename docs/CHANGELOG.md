@@ -9,6 +9,40 @@ Newest first.
 
 ---
 
+## 2026-09-29 — Filled-circle falls, and in-repo glyph-pixel debugging
+
+### game: fall as filled circles into the void; add glyph-pixel debugging tools
+
+The first cut of the falling-box animation used braille and was tuned blind:
+the coverage oracle panics on braille and geometric shapes, and
+`floating-square-debug` could not draw either, so there was no way to see the
+actual glyphs. Fixed by changing the animation and building the missing
+debugging ability.
+
+**Animation.** `FallingBoxAnimation` now steps through the text-presentation
+filled circles `⬤ ● • ·` (U+2B24/25CF/2022/00B7) over 600 ms, fading to black,
+and plays at the **off-board square** the box would have landed on — so the box
+behind it slides into the edge square with no overlap, and it reads as dropping
+into the void. The glyph sequence and color are pinned by tests.
+
+**Debug ability (in-repo):**
+- `terminal_rendering::emoji_presentation` embeds the Unicode 16.0
+  `Emoji_Presentation` ranges with `char_is_emoji_presentation`. This is the
+  bug class that made `◾` (U+25FE) render as a gray emoji square; the falling
+  glyphs are now asserted text-presentation.
+- The coverage oracle (`glyph_filled`/`glyph_rects`) now models braille, so the
+  `glyphs` table and panes no longer panic on the line-drawing vocabulary.
+- `floating-square-debug pixels [--font P] [--size N] <chars…>` rasterizes
+  arbitrary characters from a real font file (new `fontdue` dependency, dev
+  tool only) and prints the true pixel shape beside the analytic view, with an
+  `Emoji_Presentation` warning. This is how glyphs the oracle does not model
+  are inspected, using the caller's own font.
+
+Full workspace suite green: game lib 269 passed / 6 ignored, terminal_rendering
+145 passed / 1 ignored, utility 103 passed / 1 ignored.
+
+---
+
 ## 2026-09-29 — `numbered-boxes` map, capped push chains, boxes fall off the edge
 
 ### game: add the numbered-boxes map with pushable boxes that fall off the edge
