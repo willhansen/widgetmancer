@@ -69,8 +69,9 @@ pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
         None | Some("demo") => game.set_up_demo_map(),
         Some("racetrack") => game.set_up_portal_cube_racetrack_map(),
         Some("hallways") => game.set_up_portal_pair_hallways_map(),
+        Some("numbered-boxes") => game.set_up_numbered_boxes_map(),
         Some(unknown) => {
-            panic!("Unknown map '{unknown}'. Known maps: demo, racetrack, hallways.")
+            panic!("Unknown map '{unknown}'. Known maps: demo, racetrack, hallways, numbered-boxes.")
         }
     }
 }
@@ -104,11 +105,12 @@ pub fn do_everything(
     //let (width, height) = (40, 20);
     // The racetrack map's exhibits span ~30x19 squares around the player,
     // and the board is half the terminal width in squares, so that map
-    // needs at least a 96x26-character terminal.
-    let (width, height) = if map_name.as_deref() == Some("racetrack") {
-        (width.max(96), height.max(26))
-    } else {
-        (width, height)
+    // needs at least a 96x26-character terminal. The numbered-boxes map is a
+    // fixed 20x20 board, needing at least 40x20 characters.
+    let (width, height) = match map_name.as_deref() {
+        Some("racetrack") => (width.max(96), height.max(26)),
+        Some("numbered-boxes") => (width.max(40), height.max(20)),
+        _ => (width, height),
     };
 
     let mut game = match &load_path {

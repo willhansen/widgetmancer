@@ -39,6 +39,11 @@ pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, Floo
 
 pub const PLAYER_SIGHT_RADIUS: u32 = 16;
 
+/// The most grid entities a single push may move. A player shoving a row of
+/// numbered boxes can move at most three; a fourth in the row makes the step
+/// impossible.
+pub const MAX_GRID_ENTITIES_IN_A_PUSH_CHAIN: u32 = 3;
+
 use floating_entities::FloatingEntityEnum;
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
@@ -287,15 +292,54 @@ impl Game {
         start_square: WorldSquare,
         push_direction: KingWorldStep,
     ) -> Result<SquareWithKingDir, ()> {
+        self.try_push_grid_entity_with_remaining_pushes(
+            start_square,
+            push_direction,
+            MAX_GRID_ENTITIES_IN_A_PUSH_CHAIN,
+        )
+    }
+
+    /// Push the entity on `start_square` one step, recursively pushing whatever
+    /// occupies the destination. `remaining_pushes` is how many entities this
+    /// chain may still move; a pushee there with no budget left refuses the
+    /// push, which is how a row longer than the cap blocks the step. All moves
+    /// happen on the unwind, so a refused push leaves the board untouched.
+    fn try_push_grid_entity_with_remaining_pushes(
+        &mut self,
+        start_square: WorldSquare,
+        push_direction: KingWorldStep,
+        remaining_pushes: u32,
+    ) -> Result<SquareWithKingDir, ()> {
         let pushee = self.get_grid_entity_at_square(start_square);
         if pushee.is_none() || pushee == Some(GridEntity::Block) {
+            return Err(());
+        }
+        if remaining_pushes == 0 {
             return Err(());
         }
         let end_pose =
             self.portal_aware_single_step(SquareWithKingDir::new(start_square, push_direction))?;
         let (end_square, end_dir) = end_pose.tuple();
+
+        if !self.square_is_on_board(end_square) {
+            // Only widgets may leave the board; anything else (notably the
+            // player) refuses to take the step. A widget falls: it vanishes
+            // from its edge square with a shrinking-square animation, then the
+            // rest of the chain shifts forward on the unwind.
+            if matches!(pushee, Some(GridEntity::Widget(_))) {
+                self.widgets.remove(&start_square);
+                self.graphics.start_falling_box_animation(start_square);
+                return Ok(end_pose);
+            }
+            return Err(());
+        }
+
         if self.square_has_grid_entity(end_square) {
-            self.try_push_grid_entity(end_square, end_dir)?;
+            self.try_push_grid_entity_with_remaining_pushes(
+                end_square,
+                end_dir,
+                remaining_pushes - 1,
+            )?;
         }
 
         // do the movement
@@ -1286,6 +1330,34 @@ impl Game {
                 point2(left_x as f32, y as f32),
                 STEP_RIGHT.to_f32() * 4.0,
             );
+        }
+    }
+
+    /// A 20x20 sandbox for the pushable numbered boxes. The boxes are widgets
+    /// (already pushable and rendered as enclosed digits); this map just
+    /// scatters a handful of them, including a vertical triple that is exactly
+    /// the longest chain the player can shove. Widgets near the edges can be
+    /// pushed off the board, where they fall with a shrinking-square animation.
+    pub fn set_up_numbered_boxes_map(&mut self) {
+        self.board_size = BoardSize::new(20, 20);
+        self.place_player(point2(10, 10));
+
+        let box_positions = [
+            // A ready-made chain of three (the maximum) at x = 4.
+            (4, 5),
+            (4, 6),
+            (4, 7),
+            // Scattered singles, some within shoving distance of an edge.
+            (8, 3),
+            (14, 4),
+            (15, 14),
+            (6, 15),
+            (17, 10),
+            (11, 17),
+            (3, 12),
+        ];
+        for (i, &(x, y)) in box_positions.iter().enumerate() {
+            self.place_widget(Widget::new(i as u32 + 1), point2(x, y));
         }
     }
 

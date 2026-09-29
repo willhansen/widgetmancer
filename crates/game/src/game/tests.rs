@@ -1990,6 +1990,102 @@
     }
 
     #[test]
+    fn test_numbered_boxes_map_is_20x20_with_numbered_widgets() {
+        let mut game = set_up_10x10_game();
+        game.set_up_numbered_boxes_map();
+
+        assert_eq!(game.board_size().width, 20);
+        assert_eq!(game.board_size().height, 20);
+        assert_eq!(game.player_square(), point2(10, 10));
+        assert_eq!(game.widgets.len(), 10);
+        let mut values: Vec<u32> = game.widgets.values().map(|widget| widget.val()).collect();
+        values.sort_unstable();
+        assert_eq!(values, (1..=10).collect::<Vec<u32>>());
+        // The hand-authored chain of three is on the board.
+        for y in 5..=7 {
+            assert!(game.widgets.contains_key(&point2(4, y)));
+        }
+    }
+
+    #[test]
+    fn test_push_chain_of_three_widgets() {
+        let mut game = set_up_10x10_game();
+        let start = point2(2, 5);
+        game.place_player(start);
+        for i in 0..3 {
+            game.place_widget(Widget::new(i + 1), start + STEP_RIGHT * (i as i32 + 1));
+        }
+
+        game.try_slide_player(STEP_RIGHT).expect("should push the chain");
+
+        assert_eq!(game.player_square(), start + STEP_RIGHT);
+        assert!(!game.widgets.contains_key(&(start + STEP_RIGHT)));
+        for i in 2..=4 {
+            assert!(game.widgets.contains_key(&(start + STEP_RIGHT * i)));
+        }
+    }
+
+    #[test]
+    fn test_four_widgets_in_a_row_block_the_step() {
+        let mut game = set_up_10x10_game();
+        let start = point2(2, 5);
+        game.place_player(start);
+        for i in 0..4 {
+            game.place_widget(Widget::new(i + 1), start + STEP_RIGHT * (i as i32 + 1));
+        }
+
+        assert!(game.try_slide_player(STEP_RIGHT).is_err());
+
+        // Refused pushes must not move anything.
+        assert_eq!(game.player_square(), start);
+        for i in 1..=4 {
+            assert!(game.widgets.contains_key(&(start + STEP_RIGHT * i)));
+        }
+    }
+
+    #[test]
+    fn test_widget_pushed_off_the_edge_falls_with_animation() {
+        let mut game = set_up_10x10_game();
+        let start = point2(8, 5);
+        game.place_player(start);
+        game.place_widget(Widget::new(1), start + STEP_RIGHT);
+        let animations_before = game.graphics.num_active_animations();
+
+        game.try_slide_player(STEP_RIGHT)
+            .expect("should push the box off the edge");
+
+        assert_eq!(game.player_square(), start + STEP_RIGHT);
+        assert!(game.widgets.is_empty());
+        assert_eq!(
+            game.graphics.num_active_animations(),
+            animations_before + 1
+        );
+    }
+
+    #[test]
+    fn test_tail_of_a_chain_pushed_off_the_edge_falls() {
+        let mut game = set_up_10x10_game();
+        let start = point2(6, 5);
+        game.place_player(start);
+        for i in 0..3 {
+            game.place_widget(Widget::new(i + 1), start + STEP_RIGHT * (i as i32 + 1));
+        }
+        let animations_before = game.graphics.num_active_animations();
+
+        game.try_slide_player(STEP_RIGHT)
+            .expect("should push the chain, dropping its tail");
+
+        assert_eq!(game.player_square(), start + STEP_RIGHT);
+        assert!(!game.widgets.contains_key(&(start + STEP_RIGHT)));
+        assert!(game.widgets.contains_key(&(start + STEP_RIGHT * 2)));
+        assert!(game.widgets.contains_key(&(start + STEP_RIGHT * 3)));
+        assert_eq!(
+            game.graphics.num_active_animations(),
+            animations_before + 1
+        );
+    }
+
+    #[test]
     fn test_widget_visible_next_to_turning_portal() {
         let mut game = set_up_10x10_game();
         let start_square = point2(2, 2);

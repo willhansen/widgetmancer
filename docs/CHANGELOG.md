@@ -9,6 +9,37 @@ Newest first.
 
 ---
 
+## 2026-09-29 — `numbered-boxes` map, capped push chains, boxes fall off the edge
+
+### game: add the numbered-boxes map with pushable boxes that fall off the edge
+
+New map `--map numbered-boxes` (also `maps/numbered-boxes.sh`): a fixed 20×20
+board with the player at `(10,10)` and ten pushable numbered widgets scattered
+around — including a vertical triple that is exactly the longest chain the
+player can shove. `do_everything` clamps the terminal to ≥40×20 for it, like
+`racetrack`.
+
+The widget push machinery (`try_push_grid_entity`) gained two rules:
+
+- **Max three in a row.** The recursive push now carries a budget
+  (`MAX_GRID_ENTITIES_IN_A_PUSH_CHAIN = 3`); an occupied square with no budget
+  left refuses the push, so a fourth box in the row blocks the step. Because
+  moves happen on the unwind, a refused push leaves the board untouched.
+- **Falling off the edge.** When the destination is off-board and the pushee
+  is a widget, it is removed and a `FallingBoxAnimation` starts on the edge
+  square it left; the rest of the chain then shifts forward and the player
+  advances. (Previously the widget was silently deleted with no animation.)
+  The animation draws a solid braille square shrinking toward a dot over
+  700 ms, so it reads as dropping away into the distance.
+
+Widgets keep their existing enclosed-digit rendering; no new entity type or
+snapshot fields were needed.
+
+Full workspace suite green: game lib 266 passed / 6 ignored, terminal_rendering
+142 passed / 1 ignored, utility 103 passed / 1 ignored.
+
+---
+
 ## 2026-09-28 — Static dodgerblue FOV border
 
 ### game: draw a decorative border one square outside the player FOV

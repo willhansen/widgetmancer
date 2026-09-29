@@ -53,6 +53,8 @@ pub mod game_colors {
     pub const SPEAR_COLOR: RGB8 = MAROON;
     pub const HUNTER_DRONE_COLOR: RGB8 = BRICK_RED;
     pub const SIGHT_LINE_SEEKING_COLOR: RGB8 = GREEN;
+    /// The shrinking outline of a numbered box falling off the board edge.
+    pub const FALLING_BOX_COLOR: RGB8 = WHITE;
 }
 use game_colors::*;
 
@@ -569,6 +571,10 @@ impl Graphics {
 
     pub fn start_piece_death_animation_at(&mut self, square: WorldSquare) {
         self.push_animation(AnimationEnum::PieceDeath(PieceDeathAnimation::new(square)));
+    }
+
+    pub fn start_falling_box_animation(&mut self, square: WorldSquare) {
+        self.push_animation(AnimationEnum::FallingBox(FallingBoxAnimation::new(square)));
     }
 
     pub fn do_blink_animation(&mut self, start_square: WorldSquare, end_square: WorldSquare) {
