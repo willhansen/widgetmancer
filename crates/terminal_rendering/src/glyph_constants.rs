@@ -13,6 +13,7 @@ pub mod named_colors {
     pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
     pub const DARK_GREEN: RGB8 = RGB8::new(0, 127, 0);
     pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
+    pub const DODGER_BLUE: RGB8 = RGB8::new(30, 144, 255);
     pub const PURPLE: RGB8 = RGB8::new(160, 32, 240);
     pub const COBALT_BLUE: RGB8 = RGB8::new(0, 71, 171);
     pub const LIGHTISH_BLUE: RGB8 = RGB8::new(0, 130, 170);

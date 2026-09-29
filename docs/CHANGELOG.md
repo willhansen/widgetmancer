@@ -9,6 +9,33 @@ Newest first.
 
 ---
 
+## 2026-09-28 — Static dodgerblue FOV border
+
+### game: draw a decorative border one square outside the player FOV
+
+The FOV edge to the rest of the screen is now framed by a static border
+(`crates/game/src/graphics/fov_border.rs`), drawn in the black ring at Chebyshev
+distance `player_sight_radius + 1` so it never covers board contents:
+
+- full-block capitals/bases at the four corners (top and bottom of the side
+  pillars);
+- inner-half shafts down the left/right sides (`▐` / `▌`);
+- inner-half top/bottom beams (`▄` / `▀`), with a centred outer-half run on the
+  top edge of length `2·(radius/3)+1` (≈ 1/3 of the FOV diameter, odd so it is
+  symmetric);
+- dodgerblue (`named_colors::DODGER_BLUE = (30,144,255)`) on black only.
+
+Pure function of `(player square, radius, camera)` → no animation/scrolling, and
+`test_headless_frames_are_byte_identical` stays green. Drawn after the FOV
+composite and starfield, only while the player is alive. Tests cover the ring
+geometry/colors, the 1/3 centre run, and axis symmetry. Verified on the live
+`snapshot/`: corners `█`, top centre `▀` / flanks `▄`, bottom `▀`, sides
+`▐`/`▌`, all fg(30,144,255) bg(0,0,0).
+
+Full suite green (556 passed / 9 skipped; 296 with debug-tools).
+
+---
+
 ## 2026-09-28 — Minimizer writes a final screen.txt for visual review
 
 ### snapshot_tool: emit `game_state.json` + `screen.txt` beside the minimized JSON

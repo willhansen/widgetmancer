@@ -617,6 +617,10 @@ impl Game {
 
         self.graphics
             .draw_starfield(self.board_size, player_fov.as_ref(), &drawn);
+        if self.player_is_alive() {
+            self.graphics
+                .draw_fov_border(self.player_square(), self.player_sight_radius);
+        }
         self.graphics.draw_debug_overlays();
         self.graphics.display(&mut writer);
     }

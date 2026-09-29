@@ -37,6 +37,9 @@ pub use animations::*;
 pub mod starfield;
 use starfield::Starfield;
 
+pub mod fov_border;
+use fov_border::FovBorder;
+
 pub mod game_colors {
     use super::*;
 
@@ -96,6 +99,8 @@ pub struct Graphics {
     pub debug_overlay: DebugOverlayFlags,
     /// Off-board background stars. Stateless; see `starfield`.
     starfield: Starfield,
+    /// Static border around the player's FOV. Stateless; see `fov_border`.
+    fov_border: FovBorder,
 }
 
 /// Toggles for the live debug overlay.
@@ -124,6 +129,7 @@ impl Graphics {
             floating_entities_drawn_this_frame: HashSet::new(),
             debug_overlay: DebugOverlayFlags::default(),
             starfield: Starfield::new(),
+            fov_border: FovBorder::new(),
         };
         g.screen.fill_screen_buffer(BLACK);
         g
@@ -615,6 +621,11 @@ impl Graphics {
     ) {
         self.starfield
             .draw(&mut self.screen, board_size, self.current_time, fov, drawn);
+    }
+
+    /// Paint the static FOV border, one square outside the sight radius.
+    pub fn draw_fov_border(&mut self, player_square: WorldSquare, radius: u32) {
+        self.fov_border.draw(&mut self.screen, player_square, radius);
     }
 
     /// Debug-only overlays applied after the FOV composite (roadmap W.G).
