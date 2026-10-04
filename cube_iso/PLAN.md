@@ -30,7 +30,7 @@ be represented while keeping terminal rendering?
 | Projection | **P: shared-vertical** top-down top faces + vertical south walls |
 | Physics | All three schemes behind a toggle; default **#3 grid + move-gated gravity** |
 | Location | New standalone `cube_iso` package; no changes to `game`/`Screen`/`Graphics` |
-| Cube data | 4 equal cubes in a 2x2 with a gap; 3D voxel model |
+| Cube data | 4 equal cubes in a 2x2 with a gap; 3D voxel model; later enlarged to 10x10x10 with side platforms |
 
 The "shared-vertical" rule came from the brief: *one vertical character on the
 screen is equivalent to one step north-south or also up-down.* In projection P
@@ -52,6 +52,57 @@ share the screen's vertical axis.
       `q` quit; HUD line.
 - [x] Headless structural + projection + physics tests.
 - [x] `README.md` and this plan.
+
+## Follow-up: larger cubes + side platforms
+
+After the first demo, the cubes were enlarged to **10x10x10** and each was given
+**side platforms** so the sidescroller can actually be exercised:
+
+- The world model moved from "per-column top height" to a **voxel set**, which
+  is required for overhangs — a platform is a thin slab with empty space beneath
+  it. Rendering now draws the exposed top face and exposed south face of each
+  solid voxel.
+- Each cube gets a descending **south staircase** (slabs at altitudes 8, 6, 4, 2
+  drifting east) plus **east ledges** at 7 and 4.
+- `CUBE_GAP` grew to 14 so the 10-row south wall still fits within the gap with
+  a band of visible void.
+- `--scenario top|stairs|fall` was added so a single headless dump can show the
+  player on a cube top, on the staircase, or falling into space.
+
+## Readability pass: color + checkerboard only
+
+**Problem.** In projection P, a ledge's screen row is `d + (H − z)` — standoff
+plus height drop collapsed into one axis. So you cannot tell how far a ledge is
+from the cube wall, and warm shelves of the same material as their background
+were hard to place at all. Rejected fixes (for this prototype): oblique shear,
+Projection Q, a minimap inset, connector "stems".
+
+**Decision.** Keep projection P; recover the lost depth with the channels P
+leaves free. A flat top face is one screen row, so a checkerboard painted on it
+only varies in x and folds back into the same collapsed axis — therefore
+**color must carry the depth**, and the checkerboard is the grid reference.
+
+**Landed:**
+
+- **Material split** — cool cube (block-checkered top, smooth gradient wall,
+  bright front rim) vs warm ledges.
+- **Standoff hue** — `standoff` = Manhattan distance from a ledge column to the
+  nearest full-height cube column; mapped amber(1) → orange(2) → crimson(3) →
+  violet(4+). Exact depth; independent of row.
+- **Block checker** — 3-square parity `(x/3 + y/3 + z/3) mod 2` on exposed top
+  faces only; walls stay smooth so ledges pop.
+- **End caps** — bright shade of the standoff hue at a ledge run's ends.
+- **Depth fog** — `clamp(1 − (|cam.y−y| + 0.5|cam.x−x|)/FOG_SPAN, FOG_MIN, 1)`
+  multiplied into every face, so far cubes become dim silhouettes.
+- **East/west ledges** — three-square horizontal protrusions (altitudes 7 and 4)
+  whose standoff is directly visible because x is the screen's horizontal axis.
+  `--scenario east|west` added.
+
+**Separate channels, by design:** hue = standoff, checker/shade = grid,
+brightness(with fog) = distance.
+
+**Honest limit:** checkerboard alone can only report depth modulo its period;
+the hue is what makes standoff exact. If hue is ever dropped, depth goes coarse.
 
 ## Projection P details
 

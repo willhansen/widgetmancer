@@ -1,9 +1,17 @@
 //! Rasterizes the voxel world into a terminal [`Frame`] using projection P.
 //!
 //! Painter's algorithm: columns are visited north-to-south (larger `y` first)
-//! so nearer, southern geometry overwrites the far geometry behind it. Each
-//! column draws its lit top face, then its south wall when the square to the
-//! south is not at the same altitude (edge of a cube, or across a gap).
+//! so nearer, southern geometry overwrites the far geometry behind it.
+//!
+//! Readability, all through color and checkerboard (no projection change):
+//! - **Material**: cool cube faces (block-checkered top, smooth wall, bright
+//!   front rim) versus warm ledge faces.
+//! - **Standoff hue**: a ledge's distance from the nearest cube is mapped to a
+//!   warm hue ramp, which is the one channel projection P leaves free for the
+//!   depth it collapsed into the vertical axis.
+//! - **Block checker**: a 3-square checker on exposed top faces gives the
+//!   surface grid (and a coarse phase backup for depth).
+//! - **Depth fog**: distant columns are dimmed so only near geometry competes.
 
 use crate::physics::Player;
 use crate::project::{project, project_double, Camera};
@@ -16,10 +24,30 @@ const TOP_LIGHT: RGB8 = RGB8::new(150, 150, 162);
 const TOP_DARK: RGB8 = RGB8::new(112, 112, 124);
 const WALL_TOP: RGB8 = RGB8::new(92, 92, 122);
 const WALL_BOTTOM: RGB8 = RGB8::new(32, 32, 56);
+
+/// Bright cool line where a cube top falls away to its wall.
+const RIM: RGB8 = RGB8::new(214, 214, 228);
+
+/// Warm standoff ramp: 1 square out = amber, further = hotter/cooler.
+const STANDOFF_HUE: [RGB8; 4] = [
+    RGB8::new(240, 176, 64), // 1 out: amber
+    RGB8::new(232, 120, 44), // 2 out: orange
+    RGB8::new(214, 64, 72),  // 3 out: crimson
+    RGB8::new(176, 64, 156), // 4+ out: violet
+];
+
 const PLAYER_COLOR: RGB8 = RGB8::new(255, 214, 40);
 const TRAIL_COLOR: RGB8 = RGB8::new(120, 86, 30);
 const STAR_DIM: RGB8 = RGB8::new(64, 64, 88);
 const STAR_BRIGHT: RGB8 = RGB8::new(150, 150, 195);
+
+/// Checker block size, in world squares (3 matches the game's floor pattern).
+const CHECKER_BLOCK: i32 = 3;
+/// Camera distance (in world squares, y weighted 1x and x 0.5x) at which fog
+/// reaches its floor.
+const FOG_SPAN: f32 = 18.0;
+/// Fog never goes fully black, so far geometry stays a readable silhouette.
+const FOG_MIN: f32 = 0.2;
 
 /// A solid cell: the fill is carried by both fg and bg so the shape is visible
 /// even in an uncolored dump, while the terminal still renders it flat.
@@ -39,12 +67,13 @@ pub fn render_frame(
     draw_stars(&mut frame);
 
     let cam = Camera::at(player.x.round(), player.y.round());
+    let cube_columns = world.cube_columns();
 
     // Far (north, high y) to near (south, low y).
-    let mut squares = world.all_top_squares();
-    squares.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-    for (x, y) in squares {
-        draw_column(&mut frame, world, &cam, width, height, x, y);
+    let mut columns = world.columns();
+    columns.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    for (x, y) in columns {
+        draw_column(&mut frame, world, &cube_columns, &cam, width, height, x, y);
     }
 
     draw_trail(&mut frame, &cam, width, height, player);
@@ -52,42 +81,123 @@ pub fn render_frame(
     frame
 }
 
+/// Draw the exposed faces of every solid voxel in one column. A voxel shows a
+/// lit top face when nothing is above it, and a shaded south face when the
+/// column to its south has no solid at the same altitude.
 fn draw_column(
     frame: &mut Frame,
     world: &World,
+    cube_columns: &[(i32, i32)],
     cam: &Camera,
     width: usize,
     height: usize,
     x: i32,
     y: i32,
 ) {
-    let top_z = world.top_height(x, y).expect("top squares are solid");
-    let (left, right, row) = project_double(cam, width, height, x as f32, y as f32, top_z as f32);
-    let top_color = if (x + y).rem_euclid(2) == 0 {
-        TOP_LIGHT
+    let zmax = world
+        .top_voxel(x, y)
+        .expect("columns are built from solid voxels");
+    let fog = fog_factor(cam, x, y);
+    let is_cube = world.is_cube_top_column(x, y);
+    let standoff = if is_cube {
+        0
     } else {
-        TOP_DARK
+        nearest_cube_distance(cube_columns, x, y)
     };
-    put(frame, left, row, solid(FULL_BLOCK, top_color));
-    put(frame, right, row, solid(FULL_BLOCK, top_color));
 
-    // Only the south face is visible in projection P, and only where the
-    // surface drops away.
-    let south_z = world.top_height(x, y - 1);
-    if south_z == Some(top_z) {
-        return;
+    for z in (0..=zmax).rev() {
+        if !world.is_solid(x, y, z) {
+            continue;
+        }
+        if !world.is_solid(x, y - 1, z) {
+            let (wl, wr, row) = project_double(cam, width, height, x as f32, y as f32, z as f32);
+            let t = if zmax > 0 {
+                z as f32 / zmax as f32
+            } else {
+                1.0
+            };
+            let color = apply_fog(lerp_rgb(WALL_BOTTOM, WALL_TOP, t), fog);
+            put(frame, wl, row, solid('▒', color));
+            put(frame, wr, row, solid('▒', color));
+        }
+        if !world.is_solid(x, y, z + 1) {
+            let (tl, tr, row) =
+                project_double(cam, width, height, x as f32, y as f32, (z + 1) as f32);
+            let color = top_face_color(world, x, y, z, zmax, is_cube, standoff);
+            let color = apply_fog(color, fog);
+            put(frame, tl, row, solid(FULL_BLOCK, color));
+            put(frame, tr, row, solid(FULL_BLOCK, color));
+        }
     }
-    for z in (0..top_z).rev() {
-        let (wl, wr, wrow) = project_double(cam, width, height, x as f32, y as f32, z as f32);
-        let t = if top_z > 1 {
-            z as f32 / (top_z - 1) as f32
+}
+
+/// Color for an exposed top face: a cool checker for cube tops (with a bright
+/// rim where the top falls away), or the warm standoff hue for ledges (with
+/// bright end caps and a darker checker shade).
+fn top_face_color(
+    world: &World,
+    x: i32,
+    y: i32,
+    z: i32,
+    zmax: i32,
+    is_cube: bool,
+    standoff: i32,
+) -> RGB8 {
+    if is_cube && z == zmax {
+        if !world.is_solid(x, y - 1, z) {
+            return RIM;
+        }
+        return if checker_light(x, y, z) {
+            TOP_LIGHT
         } else {
-            0.0
+            TOP_DARK
         };
-        let color = lerp_rgb(WALL_BOTTOM, WALL_TOP, t);
-        put(frame, wl, wrow, solid('▒', color));
-        put(frame, wr, wrow, solid('▒', color));
     }
+
+    let hue = standoff_hue(standoff);
+    let end_cap = !world.is_solid(x - 1, y, z) || !world.is_solid(x + 1, y, z);
+    if end_cap {
+        scale_rgb(hue, 1.35)
+    } else if checker_light(x, y, z) {
+        hue
+    } else {
+        scale_rgb(hue, 0.72)
+    }
+}
+
+/// Standoff hue ramp, indexed 1-based (0 is treated as 1).
+fn standoff_hue(distance: i32) -> RGB8 {
+    STANDOFF_HUE[(distance.clamp(1, STANDOFF_HUE.len() as i32) - 1) as usize]
+}
+
+/// 3-square block checker parity; `true` selects the light shade.
+fn checker_light(x: i32, y: i32, z: i32) -> bool {
+    let block = |v: i32| v.div_euclid(CHECKER_BLOCK);
+    (block(x) + block(y) + block(z)).rem_euclid(2) == 0
+}
+
+/// Manhattan distance to the nearest full-height cube column.
+fn nearest_cube_distance(cube_columns: &[(i32, i32)], x: i32, y: i32) -> i32 {
+    cube_columns
+        .iter()
+        .map(|(cx, cy)| (cx - x).abs() + (cy - y).abs())
+        .min()
+        .unwrap_or(i32::MAX)
+}
+
+/// Dimming factor by camera distance (y weighted 1x, x 0.5x).
+fn fog_factor(cam: &Camera, x: i32, y: i32) -> f32 {
+    let distance = (cam.y - y as f32).abs() + 0.5 * (cam.x - x as f32).abs();
+    (1.0 - distance / FOG_SPAN).clamp(FOG_MIN, 1.0)
+}
+
+fn apply_fog(color: RGB8, fog: f32) -> RGB8 {
+    scale_rgb(color, fog)
+}
+
+fn scale_rgb(color: RGB8, factor: f32) -> RGB8 {
+    let scale = |v: u8| ((v as f32) * factor).round().clamp(0.0, 255.0) as u8;
+    RGB8::new(scale(color.r), scale(color.g), scale(color.b))
 }
 
 fn draw_trail(frame: &mut Frame, cam: &Camera, width: usize, height: usize, player: &Player) {
@@ -97,7 +207,7 @@ fn draw_trail(frame: &mut Frame, cam: &Camera, width: usize, height: usize, play
             frame,
             col,
             row,
-            DrawableGlyph::new_colored('·', TRAIL_COLOR, BLACK),
+            DrawableGlyph::new_colored('│', TRAIL_COLOR, BLACK),
         );
     }
 }
@@ -116,9 +226,9 @@ fn draw_stars(frame: &mut Frame) {
     for row in 0..height {
         for col in 0..width {
             let h = hash(col as i32, row as i32);
-            let glyph = if h % 41 == 0 {
+            let glyph = if h % 211 == 0 {
                 DrawableGlyph::new_colored('+', STAR_BRIGHT, BLACK)
-            } else if h % 13 == 0 {
+            } else if h % 61 == 0 {
                 DrawableGlyph::new_colored('·', STAR_DIM, BLACK)
             } else {
                 continue;
@@ -175,13 +285,48 @@ mod tests {
     }
 
     #[test]
-    fn scene_contains_top_faces_walls_and_the_player() {
+    fn fog_factor_shrinks_with_distance_and_floors() {
+        let cam = Camera::at(0.0, 0.0);
+        assert!(fog_factor(&cam, 0, 0) > fog_factor(&cam, 0, -8));
+        assert!((fog_factor(&cam, 0, -100) - FOG_MIN).abs() < 1e-6);
+        assert_eq!(fog_factor(&cam, 0, 0), 1.0);
+    }
+
+    #[test]
+    fn standoff_hues_are_all_distinct() {
+        let hues: Vec<RGB8> = (1..=4).map(standoff_hue).collect();
+        for i in 0..hues.len() {
+            for j in i + 1..hues.len() {
+                assert_ne!(hues[i], hues[j], "standoff {i} and {j} share a hue");
+            }
+        }
+        assert_eq!(standoff_hue(0), standoff_hue(1));
+        assert_eq!(standoff_hue(9), standoff_hue(4));
+    }
+
+    #[test]
+    fn checker_advances_every_three_squares() {
+        assert_eq!(checker_light(0, 0, 0), checker_light(2, 0, 0));
+        assert_ne!(checker_light(0, 0, 0), checker_light(3, 0, 0));
+        assert_ne!(checker_light(0, 0, 0), checker_light(0, 3, 0));
+    }
+
+    #[test]
+    fn scene_has_cool_cube_warm_ledge_and_player() {
         let world = World::four_cubes();
-        let player = Player::new(PhysicsMode::GridMoveGated);
-        let frame = render_frame(&world, &player, 0.0, 80, 30);
+        let mut player = Player::new(PhysicsMode::GridMoveGated);
+        // Walk off the south edge onto the warm staircase.
+        for _ in 0..7 {
+            player.apply_intent(&world, Intent::South);
+        }
+        let frame = render_frame(&world, &player, 0.0, 100, 48);
         let colors = painted(&frame);
-        assert!(colors.contains(&TOP_LIGHT) || colors.contains(&TOP_DARK));
-        assert!(colors.contains(&WALL_BOTTOM) || colors.contains(&WALL_TOP));
+        let warm = colors
+            .iter()
+            .any(|c| c.r > 150 && c.r > c.b + 40 && c.g < c.r);
+        let cool = colors.iter().any(|c| c.b >= c.r && c.r > 20);
+        assert!(warm, "a warm ledge hue should be visible");
+        assert!(cool, "cool cube/wall geometry should be visible");
         assert!(frame.glyphs().any(|g| g.bg_color == Some(PLAYER_COLOR)));
     }
 

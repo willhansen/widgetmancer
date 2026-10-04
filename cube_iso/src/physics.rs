@@ -100,9 +100,9 @@ impl Player {
     }
 
     pub fn respawn(&mut self) {
-        let half = (crate::world::CUBE_SIZE as f32 - 1.0) / 2.0;
-        self.x = half;
-        self.y = half;
+        let center = (crate::world::CUBE_SIZE / 2) as f32;
+        self.x = center;
+        self.y = center;
         self.z = crate::world::CUBE_HEIGHT as f32;
         self.vx = 0.0;
         self.vy = 0.0;

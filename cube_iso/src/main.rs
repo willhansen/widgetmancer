@@ -24,8 +24,8 @@ use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
 use world::World;
 
-const DEFAULT_DUMP_WIDTH: usize = 100;
-const DEFAULT_DUMP_HEIGHT: usize = 36;
+const DEFAULT_DUMP_WIDTH: usize = 120;
+const DEFAULT_DUMP_HEIGHT: usize = 48;
 const FRAME_MS: u64 = 16;
 
 struct Args {
@@ -33,6 +33,7 @@ struct Args {
     width: Option<usize>,
     height: Option<usize>,
     mode: PhysicsMode,
+    scenario: String,
     help: bool,
 }
 
@@ -42,6 +43,7 @@ fn parse_args() -> Args {
         width: None,
         height: None,
         mode: PhysicsMode::GridMoveGated,
+        scenario: "top".to_string(),
         help: false,
     };
     let mut it = std::env::args().skip(1);
@@ -50,6 +52,7 @@ fn parse_args() -> Args {
             "--dump" => args.dump = it.next(),
             "--width" => args.width = it.next().and_then(|s| s.parse().ok()),
             "--height" => args.height = it.next().and_then(|s| s.parse().ok()),
+            "--scenario" => args.scenario = it.next().unwrap_or_else(|| "top".to_string()),
             "--mode" => {
                 args.mode = match it.next().as_deref() {
                     Some("smooth") => PhysicsMode::SmoothRealtime,
@@ -70,7 +73,7 @@ fn main() {
     if args.help {
         println!(
             "cube_iso — pseudo-isometric floating-cube prototype\n\n\
-             USAGE:\n  cube_iso [--dump FILE] [--width N] [--height N] [--mode smooth|grid|gated]\n\n\
+             USAGE:\n  cube_iso [--dump FILE] [--width N] [--height N] [--mode smooth|grid|gated] [--scenario top|stairs|fall|east|west]\n\n\
              CONTROLS:\n  arrows / wasd  move\n  g              cycle physics scheme\n  r              respawn\n  q / esc        quit"
         );
         return;
@@ -79,19 +82,41 @@ fn main() {
         dump_frame(&path, &args);
         return;
     }
-    if let Err(error) = run_interactive(args.mode) {
+    if let Err(error) = run_interactive(args.mode, &args.scenario) {
         eprintln!("cube_iso: {error}");
     }
 }
 
-fn build_scene(mode: PhysicsMode) -> (World, Player) {
-    (World::four_cubes(), Player::new(mode))
+fn build_scene(mode: PhysicsMode, scenario: &str) -> (World, Player) {
+    let world = World::four_cubes();
+    let mut player = Player::new(mode);
+    apply_scenario(&world, &mut player, scenario);
+    (world, player)
+}
+
+/// Jump the player to a named starting situation, mainly so a single headless
+/// dump can show the side platforms without recording a whole play session.
+fn apply_scenario(world: &World, player: &mut Player, scenario: &str) {
+    let intents: Vec<Intent> = match scenario {
+        "top" => vec![],
+        "stairs" => vec![Intent::South; 7], // off the south edge, down the staircase
+        "fall" => vec![Intent::South; 12],  // overshoot the staircase into open space
+        "east" => vec![Intent::East; 8],    // off the east face, onto the east ledges
+        "west" => vec![Intent::West; 8],    // off the west face, onto the west ledges
+        other => {
+            eprintln!("unknown scenario {other:?}; using \"top\"");
+            vec![]
+        }
+    };
+    for intent in intents {
+        player.apply_intent(world, intent);
+    }
 }
 
 fn dump_frame(path: &str, args: &Args) {
     let width = args.width.unwrap_or(DEFAULT_DUMP_WIDTH);
     let height = args.height.unwrap_or(DEFAULT_DUMP_HEIGHT);
-    let (world, player) = build_scene(args.mode);
+    let (world, player) = build_scene(args.mode, &args.scenario);
     let frame = render_frame(&world, &player, 0.0, width, height);
     std::fs::write(path, frame.string_for_regular_display()).expect("write dump");
     // Also echo a plain (uncolored) view so the shape is readable in a log.
@@ -126,7 +151,7 @@ fn install_panic_hook() {
     }));
 }
 
-fn run_interactive(initial_mode: PhysicsMode) -> std::io::Result<()> {
+fn run_interactive(initial_mode: PhysicsMode, scenario: &str) -> std::io::Result<()> {
     install_panic_hook();
     let (width, height) = termion::terminal_size()?;
     let (width, height) = (width as usize, height as usize);
@@ -134,7 +159,7 @@ fn run_interactive(initial_mode: PhysicsMode) -> std::io::Result<()> {
     let mut out = HideCursor::from(stdout().into_raw_mode()?).into_alternate_screen()?;
     let events = spawn_input();
 
-    let (world, mut player) = build_scene(initial_mode);
+    let (world, mut player) = build_scene(initial_mode, scenario);
     let mut previous: Option<Frame> = None;
     let started = Instant::now();
     let mut last = Instant::now();

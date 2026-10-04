@@ -19,7 +19,20 @@ cargo run -p cube_iso -- --dump /tmp/frame.txt   # headless single frame
 ```
 
 Options: `--dump FILE`, `--width N`, `--height N`,
-`--mode smooth|grid|gated`, `--help`.
+`--mode smooth|grid|gated`, `--scenario top|stairs|fall|east|west`, `--help`.
+
+`--scenario` jumps the player to a starting situation, which is handy for a
+single headless dump:
+
+```sh
+cargo run -p cube_iso -- --dump /tmp/frame.txt --scenario stairs --height 48
+```
+
+- `top` — standing on a cube top (default).
+- `stairs` — walked off the south edge onto the side staircase.
+- `fall` — overshot the staircase and is falling into open space (leaves a
+  `│` trail).
+- `east` / `west` — walked off that face onto the protruding x-facing ledges.
 
 The dump writes the ANSI frame to `FILE` and echoes an uncolored character
 view to stdout, so the shape is readable in a log or test output.
@@ -65,13 +78,51 @@ darkens toward its base, and a procedural starfield in the void. Solid surfaces
 use block characters (`█` top, `▒` wall) whose fill is carried by both fg and bg,
 so they render flat in color but stay readable in an uncolored dump.
 
+### Readability (color + checkerboard only)
+
+Projection P collapses north-south distance and altitude into one vertical axis,
+so a ledge's *screen row* alone cannot say how far it is from the cube. The
+renderer recovers the lost depth with channels P leaves free, without changing
+the projection:
+
+- **Material**: cube faces are cool (block-checkered top, smooth wall, a bright
+  front rim), ledges are warm. A warm shelf on a cool wall reads immediately.
+- **Standoff hue**: each ledge's distance to the nearest cube maps to a warm hue
+  ramp — amber (1 square out) → orange → crimson → violet (4+). This is the exact
+  depth channel; `standoff` is measured from the ledge column to the nearest
+  full-height cube column.
+- **Block checker**: a 3-square checker on exposed top faces gives the surface
+  grid and a coarse phase backup for depth. Walls stay a smooth gradient so
+  ledges stand out.
+- **End caps**: the left/right ends of a ledge run are drawn in a bright shade of
+  its hue, so the shelf's extent is legible.
+- **Depth fog**: columns dim with camera distance (`1 − d/FOG_SPAN`, floored at
+  `FOG_MIN`), so far cubes fall back to a silhouette and only near geometry
+  competes.
+
+The channels are separate: hue = standoff, checker/shade = grid, brightness
+(with fog) = distance, so they don't fight.
+
 ## World model
 
-Four equal `CUBE_SIZE x CUBE_SIZE` footprints in a 2x2 arrangement, each
-`CUBE_HEIGHT` tall, separated by `CUBE_GAP`. A column is either the top of a
-cube (`z == CUBE_HEIGHT`) or empty void — there is no floor plane, so the cubes
-genuinely float and the gaps are bottomless (falling far enough marks the player
-lost). See [`src/world.rs`](src/world.rs).
+Four equal `CUBE_SIZE x CUBE_SIZE` footprints (10x10) in a 2x2 arrangement,
+each `CUBE_HEIGHT` (10) tall, separated by `CUBE_GAP` (14). The world is a set
+of solid **voxels**, so columns can have overhangs: a voxel shows a lit top face
+where nothing sits above it and a shaded south face where the column to its
+south has no solid at that altitude.
+
+Each cube carries **side platforms** for testing the sidescroller:
+
+- a descending **south staircase** (thin one-voxel slabs at altitudes 8, 6, 4,
+  2 drifting east) so a player who walks off the south edge can step down it;
+- **east and west ledges** (three squares of horizontal protrusion at altitudes
+  7 and 4). These read unambiguously in projection P, because x is the screen's
+  horizontal axis — unlike the south staircase, whose standoff is recovered via
+  the standoff hue.
+
+There is no floor plane, so the cubes genuinely float and the gaps are
+bottomless: falling past the platforms marks the player lost until `r`. See
+[`src/world.rs`](src/world.rs).
 
 ## Physics schemes
 
@@ -106,8 +157,10 @@ cargo test -p cube_iso
 ```
 
 Covers the projection identities (including "one altitude step == one N-S step"
-and square aspect), the world layout/gap invariant, all three physics schemes,
-and structural render checks (top faces, walls, player centering, fall trail).
+and square aspect), the world layout/gap invariant and platform slabs, all three
+physics schemes, and the readability channels (distinct standoff hues, fog
+monotonicity, 3-square checker parity, warm-ledge/cool-cube presence) plus
+structural render checks (player centering, fall trail).
 
 ## Limitations / next ideas
 
@@ -115,4 +168,6 @@ and structural render checks (top faces, walls, player centering, fall trail).
   compatibility.
 - Smooth mode has no horizontal collision and glides via velocity damping.
 - Only south walls are drawn; east/west bevels would need projection Q.
+- Platforms are one-voxel-thick slabs; the player is supported by the top
+  surface only, so head-bonking on undersides is not modeled.
 - Portals, FOV, and the turn engine are out of scope until the look is settled.
