@@ -36,6 +36,11 @@ or directly:
   glyphs the oracle doesn't know (geometric shapes such as `⬤ ● • ·`) and to
   catch codepoints that default to the color-emoji font. Args may be single
   characters, runs, or `U+25FE` / `0x25FE` code points.
+- `which-font [--dir D]… <chars…>` — scan the system font directories (or
+  `--dir`s) and list which fonts contain the requested characters, sorted by
+  coverage. Use it to find the terminal's fallback for a glyph the configured
+  font lacks; on Linux `fc-match -s ':charset=<U+XXXX>'` gives the OS's first
+  pick.
 - `animate` (default) — square on the alternate screen (q quits): orbit,
   arrow-key nudge, line trajectories, preset jumps (`0`–`9`, paused — the
   roadmap's tear corner among them), `r` to reset histories and switches,

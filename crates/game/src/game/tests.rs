@@ -1956,7 +1956,28 @@
             .graphics
             .screen
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT);
-        assert_eq!(widget_glyphs.to_clean_string(), "④ ")
+        assert_eq!(widget_glyphs.to_clean_string(), "❹ ")
+    }
+
+    #[test]
+    fn test_widget_glyphs_are_filled_text_presentation_circles() {
+        // The negative/filled circled digits, across both Unicode families
+        // (1-10 Dingbats, 11-20 Enclosed Alphanumerics) plus zero.
+        let boundaries = [
+            (0, '⓿'),
+            (1, '❶'),
+            (10, '❿'),
+            (11, '⓫'),
+            (20, '⓴'),
+        ];
+        for (val, expected) in boundaries {
+            let widget = Widget::new(val);
+            assert_eq!(widget.character(), expected, "widget {val}");
+            assert!(
+                !char_is_emoji_presentation(widget.character()),
+                "widget {val} glyph must be text presentation"
+            );
+        }
     }
 
     #[test]

@@ -124,11 +124,15 @@ fn braille_dot_rects(c: char) -> Vec<[f32; 4]> {
             }
             let center_x = 0.25 + 0.5 * col as f32;
             let center_y = 0.125 + 0.25 * row as f32;
+            // Dot half-sizes are chosen so no dot edge lands on a sample
+            // center of the HX x SY lattice the oracle samples on (x: the
+            // quarter/eighth grid; y: 0.1 keeps rows visually separate and
+            // off the (i+0.5)/24 centers).
             out.push([
                 center_x - 0.125,
-                center_y - 0.125,
+                center_y - 0.1,
                 center_x + 0.125,
-                center_y + 0.125,
+                center_y + 0.1,
             ]);
         }
     }

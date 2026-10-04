@@ -23,3 +23,6 @@ gmon.out
 
 # Debug snapshots dumped at runtime with the 'p' key
 /snapshot/
+
+# Fonts collected locally by scripts/collect-fonts.sh (not redistributed)
+/local-fonts/

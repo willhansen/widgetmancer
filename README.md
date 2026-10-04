@@ -25,3 +25,35 @@ continues where it left off. Transient visuals that are not serialized
 (in-flight animations, selectors) reset. Snapshots can be combined with
 `--map` only when not loading.
 
+## Font debugging
+
+Many glyphs the game draws are not in the configured terminal font, so the
+terminal renders them from a fallback. `scripts/glyph-fonts.sh` reports which
+font the local stack actually picks for each glyph the game can draw. On Linux
+it queries fontconfig *with the configured family*
+(`fc-match '<family>:charset=<U+XXXX>'`), so results that differ from that
+family are the true fallbacks:
+
+    scripts/glyph-fonts.sh          # all glyphs, grouped by rendering font
+    scripts/glyph-fonts.sh ❶ ◾     # just these
+    scripts/glyph-fonts.sh --files  # add the font file path
+    scripts/glyph-fonts.sh --all U+1F880   # ranked candidates per glyph
+
+The family defaults to `CaskaydiaMono Nerd Font` (the author's terminal);
+override with `--family NAME`. Without `fc-match` it falls back to listing a
+font that contains each glyph.
+
+See also the `floating_square_debug` tool's `pixels` (true glyph pixels from a
+font file) and `which-font` (fonts containing a glyph) modes.
+
+`scripts/collect-fonts.sh` bundles the fonts the game actually needs into the
+gitignored `local-fonts/`: it resolves the terminal's ordered fallback chain,
+truncates it at the last font that renders a glyph in the vocabulary, copies
+those files (order-preserving `NNN-` names, `MANIFEST.tsv`), then runs the
+`cover` mode over the copy to flag any glyph with no renderer:
+
+    scripts/collect-fonts.sh                 # game vocabulary -> local-fonts/
+    scripts/collect-fonts.sh ► ▲ U+1F880    # also check symbols you may add
+    scripts/collect-fonts.sh --chain=full    # whole fc-match -s chain
+    scripts/collect-fonts.sh --dry-run
+

@@ -9,6 +9,164 @@ Newest first.
 
 ---
 
+## 2026-09-29 — Bundle the game's fonts locally and verify coverage
+
+### game: collect-fonts.sh bundles the fallback chain; cover mode verifies it
+
+The game reaches into several fallback fonts. New tooling collects exactly the
+fonts it needs into a gitignored local dir and checks nothing is missing:
+
+- `floating_square_debug cover --dir DIR <chars…>` loads the fonts under DIR in
+  filename order and reports, per glyph, the first font that contains it — or
+  `MISSING` (fontdue `has_glyph`). TSV on stdout, summary on stderr. This is the
+  missing-render check.
+- `scripts/collect-fonts.sh` resolves the ordered fontconfig chain
+  (`fc-match -s '<family>'`), truncates it at the last font that renders any
+  glyph in the set (default; `--chain=full` copies the whole chain,
+  `--chain=used` only the renderers), copies the files into `local-fonts/` as
+  `NNN-<family>-<name>` (order-preserving, content-deduped), writes
+  `MANIFEST.tsv`, then runs `cover` over the copy and exits non-zero if any
+  glyph has no renderer. Extra future symbols via args or `--glyphs-file`;
+  `--dry-run`/`--clean`; `--family` default `CaskaydiaMono Nerd Font`.
+  `local-fonts/` is gitignored (fonts are copied for local use only).
+
+Verified with a fake `fc-match` shim over real fonts: needed/full/used modes,
+missing-glyph detection (exit 1), and dry-run.
+
+Full workspace suite green.
+
+---
+
+## 2026-09-29 — `glyph-fonts.sh` queries fontconfig with the terminal family
+
+### scripts: make glyph-fonts.sh family-aware
+
+The report asked `fc-match ':charset=<U+XXXX>'` *without* the configured
+family, so fontconfig answered with its default (sans) and credited DejaVu /
+Noto Sans for glyphs the terminal's own font actually renders (e.g. block
+elements, braille, ASCII pieces). Now it resolves the primary family once
+(`fc-match -f '%{family}' '<family>'`) and queries
+`'<family>:charset=<hex>'`, exactly as a fontconfig-based terminal does:
+a result whose family differs from the primary is marked `fallback`, and the
+summary splits configured-font vs fallback glyphs. New flags: `--family`
+(default `CaskaydiaMono Nerd Font`, the author's terminal), `--files` (font
+path), `--all` (ranked candidates). The no-`fc-match` path still uses
+`floating_square_debug which-font` and marks status unknown.
+
+Verified with a fake `fc-match` shim: ASCII -> primary, `❶` -> DejaVu
+(fallback), `◾` -> Noto Color Emoji, and both `--files`/`--all`.
+
+Full workspace suite green.
+
+---
+
+## 2026-09-29 — `scripts/glyph-fonts.sh`: the font behind every game glyph
+
+### game: glyph vocabulary + `scripts/glyph-fonts.sh` font-fallback report
+
+The game draws many glyphs its configured font lacks (e.g. `❶`, `◾`), so the
+terminal renders them from a fallback. New tooling shows exactly which font
+wins for each:
+
+- `terminal_rendering::renderable_block_glyphs()` — the block-family render
+  vocabulary, moved out of the debug tool so it has one source of truth.
+- `game::glyph_vocabulary::game_glyph_vocabulary()` (behind `debug-tools`)
+  gathers every character the game can draw from the real sources: block
+  families, braille, angled blocks, arrows, move markers, chess pieces, widget
+  digits, floor arrows, starfield/debug markers. `glyph_vocabulary` is a new
+  debug binary that prints it (`U+XXXX <char>`); it also accepts chars /
+  `U+XXXX` args.
+- `scripts/glyph-fonts.sh` feeds those codepoints to the local font stack
+  (`fc-match ':charset=<U+XXXX>'` on Linux; else `floating_square_debug
+  which-font`), lists each glyph's font, and summarizes by font.
+
+On this machine it confirms the earlier finding: the block/braille/arrow
+vocabulary resolves to DejaVu Sans, and the two-digit enclosed digits resolve
+to a color-emoji fallback.
+
+Full workspace suite green: game lib 270 passed / 6 ignored, terminal_rendering
+145 passed / 1 ignored, utility 103 passed / 1 ignored.
+
+---
+
+## 2026-09-29 — Keep demo widgets inside the fallback-covered 1–10
+
+### game: keep set_up_test_map widgets within 1-10; note fallback coverage
+
+fontconfig picks DejaVu Sans as the fallback for the negative circled digits,
+and DejaVu covers 1-10 (`❶`–`❿`) but not 11-20 (`⓫`–`⓴`) or zero. The
+`set_up_test_map` demo placed `Widget(13)` (`⓭`), which would tofu there, so it
+now uses `Widget(8)`. `Widget::new`'s comment records the coverage and points
+at `floating_square_debug which-font`; the `numbered-boxes` map already uses
+1-10 only.
+
+Full workspace suite green.
+
+---
+
+## 2026-09-29 — `which-font` finds the terminal's glyph fallback
+
+### floating-square-debug: add a which-font mode
+
+Scan font directories (`--dir`, else per-OS defaults) and list which installed
+fonts contain the requested characters, sorted by coverage; `.ttc` collections
+are resolved by trying face indices. Complements `pixels`: when the configured
+font lacks a glyph the terminal draws it from a fallback font, and this finds
+the candidates (on Linux, `fc-match -s ':charset=<U+XXXX>'` gives the OS's
+first pick). Confirmed against the provided Cascadia Code: it carries
+`⬤ ● • ·` but not `❶ ①`, which DejaVu Sans does.
+
+Full workspace suite green: game lib 270 passed / 6 ignored, terminal_rendering
+145 passed / 1 ignored, utility 103 passed / 1 ignored.
+
+---
+
+## 2026-09-29 — Analytic braille dots get gaps; Cascadia Code coverage noted
+
+### terminal_rendering: braille dots with gaps; record Cascadia Code coverage
+
+The coverage oracle modelled each braille dot as its whole slot, so a full
+`⣿` rendered as solid vertical bars in the analytic panes. Dots now use a
+smaller vertical extent (half-height 0.1, chosen never to land on the HX×SY
+sample lattice), so the analytic view shows the real 2×4 dot grid; the
+rects-vs-filled parity test stays green.
+
+A Cascadia Code copy became available, and
+`floating_square_debug pixels --font .../CascadiaCode-Regular.ttf` shows it
+contains the falling-circle sequence (`⬤ ● • ·`), block elements, and braille,
+but **not** the enclosed digits (`①` U+2460, `❶` U+2776, `⓫` U+24EB,
+`⓿` U+24FF): those are drawn by the terminal's fallback font, which is how a
+geometric codepoint can come back as a color-emoji square. The falling
+animation deliberately uses only glyphs Cascadia itself carries.
+
+Full workspace suite green: game lib 270 passed / 6 ignored, terminal_rendering
+145 passed / 1 ignored, utility 103 passed / 1 ignored.
+
+---
+
+## 2026-09-29 — Widgets use filled circled digits
+
+### game: render widgets with negative (filled) circled digits
+
+The widgets (pushable numbered boxes) used the positive circled digits
+(`①`, `②`, …) — an outline circle with a hole. They now use the Unicode
+**negative/filled** circled digits, a solid disc with the numeral knocked out:
+
+- `⓿` zero (U+24FF);
+- `❶`–`❿` 1–10 (U+2776–277F, Dingbat set);
+- `⓫`–`⓴` 11–20 (U+24EB–24F4, Enclosed Alphanumerics set).
+
+All are `Emoji_Presentation=No` (checked against Unicode 16.0 `emoji-data.txt`
+and pinned by a test), so they stay monochrome text. Note the 11–20 set is not
+in every font (DejaVuSans lacks it; the `numbered-boxes` map only uses 1–10);
+verify a font's coverage with
+`floating_square_debug pixels --font <path> U+24EB`.
+
+Full workspace suite green: game lib 270 passed / 6 ignored, terminal_rendering
+145 passed / 1 ignored, utility 103 passed / 1 ignored.
+
+---
+
 ## 2026-09-29 — Filled-circle falls, and in-repo glyph-pixel debugging
 
 ### game: fall as filled circles into the void; add glyph-pixel debugging tools

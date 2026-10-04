@@ -370,6 +370,38 @@ pub fn characters_for_full_square_with_looping_1d_offset(
     )
 }
 
+/// Every block character the renderer can emit, by sweeping the four snap
+/// families' generators over their full input domains (deduped, SPACE
+/// dropped). Calling the real generators means the list cannot drift from the
+/// render vocabulary. Used by the debug tooling (glyph table, font lookup).
+pub fn renderable_block_glyphs() -> Vec<char> {
+    let mut glyphs: Vec<char> = Vec::new();
+    let mut push = |c: char| {
+        if c != SPACE && !glyphs.contains(&c) {
+            glyphs.push(c);
+        }
+    };
+    for &vertical in &[false, true] {
+        for eighths in -8..=8 {
+            push(character_for_half_square_with_1d_eighths_offset(vertical, eighths));
+        }
+    }
+    for thirds in -3..=3 {
+        push(character_for_half_square_with_vertical_thirds_offset(thirds));
+    }
+    for dy in -2..=2 {
+        for dx in -2..=2 {
+            push(quadrant_block_by_offset(euclid::vec2(dx, dy)));
+        }
+    }
+    for dy in -3..=3 {
+        for dx in -2..=2 {
+            push(hextant_block_by_offset(euclid::vec2(dx, dy)));
+        }
+    }
+    glyphs
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -39,6 +39,10 @@ pub mod piece;
 pub mod portal_geometry;
 pub mod utils_for_tests;
 
+/// The complete glyph vocabulary, for font-fallback tooling (debug-tools only).
+#[cfg(feature = "debug-tools")]
+pub mod glyph_vocabulary;
+
 pub use logical_time::LogicalTime;
 
 fn set_up_panic_hook() {

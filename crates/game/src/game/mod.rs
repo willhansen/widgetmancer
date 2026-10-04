@@ -76,9 +76,21 @@ pub struct Widget {
 
 impl Widget {
     pub fn new(val: u32) -> Self {
+        // Filled ("negative") circled digits: the numeral is knocked out of a
+        // solid disc, so the widget reads as a number in a filled circle
+        // rather than the outline of the positive circled digits. 1-10 are the
+        // Dingbat set (U+2776..277F), 11-20 the Enclosed Alphanumerics set
+        // (U+24EB..24F4); all are Emoji_Presentation=No (see
+        // `char_is_emoji_presentation`).
+        //
+        // These are not in most monospace terminal fonts, so the terminal
+        // draws them from a fallback. DejaVu Sans (the common fontconfig
+        // fallback) covers 1-10 but not 11-20 or zero, so maps should prefer
+        // 1-10; check a machine with `floating_square_debug which-font`.
         let character = char::from_u32(match val {
-            0 => 0x24EA,
-            1..=20 => 0x2460 - 1 + val,
+            0 => 0x24FF,                   // NEGATIVE CIRCLED DIGIT ZERO
+            1..=10 => 0x2776 - 1 + val,    // DINGBAT NEGATIVE CIRCLED DIGIT ONE..TEN
+            11..=20 => 0x24EB - 11 + val,  // NEGATIVE CIRCLED NUMBER ELEVEN..TWENTY
             _ => panic!("invalid widget value: {}", val),
         })
         .unwrap();
@@ -1073,7 +1085,9 @@ impl Game {
         let base_square = self.player_square();
 
         self.place_widget(Widget::new(5), base_square + STEP_UP * 4);
-        self.place_widget(Widget::new(13), base_square + STEP_UP * 5);
+        // Stays in 1..=10: only the single-digit negative circled digits are
+        // in DejaVu Sans, the usual fontconfig fallback (see `which-font`).
+        self.place_widget(Widget::new(8), base_square + STEP_UP * 5);
         for i in 0..3 {
             self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT * i, STEP_RIGHT);
             self.place_conveyor_belt(base_square + STEP_UP * 8 + STEP_RIGHT * i, STEP_LEFT);

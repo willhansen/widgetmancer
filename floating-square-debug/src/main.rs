@@ -80,6 +80,7 @@
 //!   cargo run -p floating_square_debug -- animate
 
 use std::io::{stdin, stdout, IsTerminal, Write};
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
@@ -1072,36 +1073,10 @@ fn show_sweep() {
 const TABLE_PX_W: usize = 8;
 const TABLE_PX_H: usize = 24;
 
-/// Every block character the renderer can emit, by sweeping the four
-/// family generators over their full input domains (deduped, SPACE
-/// dropped). Calling the real generators means the list cannot drift
-/// from the render vocabulary.
+/// Every block character the renderer can emit (see
+/// `terminal_rendering::renderable_block_glyphs`).
 fn used_block_glyphs() -> Vec<char> {
-    let mut glyphs: Vec<char> = Vec::new();
-    let mut push = |c: char| {
-        if c != SPACE && !glyphs.contains(&c) {
-            glyphs.push(c);
-        }
-    };
-    for &vertical in &[false, true] {
-        for eighths in -8..=8 {
-            push(character_for_half_square_with_1d_eighths_offset(vertical, eighths));
-        }
-    }
-    for thirds in -3..=3 {
-        push(character_for_half_square_with_vertical_thirds_offset(thirds));
-    }
-    for dy in -2..=2 {
-        for dx in -2..=2 {
-            push(quadrant_block_by_offset(euclid::vec2(dx, dy)));
-        }
-    }
-    for dy in -3..=3 {
-        for dx in -2..=2 {
-            push(hextant_block_by_offset(euclid::vec2(dx, dy)));
-        }
-    }
-    glyphs
+    renderable_block_glyphs()
 }
 
 /// The glyph table: one entry per block character (first column) with its
@@ -1369,6 +1344,245 @@ fn analytic_zoom(c: char) -> Vec<String> {
                 .collect()
         })
         .collect()
+}
+
+/// `which-font` mode: scan font directories and report which fonts actually
+/// contain the requested characters. This is how to find the terminal's
+/// fallback for a codepoint the configured font lacks: the OS picks a font
+/// containing the glyph, and on Linux fontconfig's pick is
+/// `fc-match ':charset=<U+XXXX>'`. Here we list every candidate so it works
+/// on any OS.
+///
+/// Usage: which-font [--dir DIR]... <chars...>
+fn run_which_font(args: &[String]) -> Result<(), String> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    let mut chars: Vec<char> = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--dir" {
+            i += 1;
+            dirs.push(PathBuf::from(
+                args.get(i)
+                    .cloned()
+                    .ok_or_else(|| "--dir needs a path".to_string())?,
+            ));
+        } else if let Some(path) = arg.strip_prefix("--dir=") {
+            dirs.push(PathBuf::from(path));
+        } else if let Some(hex) = arg.strip_prefix("U+").or_else(|| arg.strip_prefix("0x")) {
+            let cp = u32::from_str_radix(hex, 16).map_err(|_| format!("bad code point: {arg}"))?;
+            chars.push(char::from_u32(cp).ok_or_else(|| format!("not a scalar: {arg}"))?);
+        } else {
+            chars.extend(arg.chars());
+        }
+        i += 1;
+    }
+    if chars.is_empty() {
+        return Err("which-font: give at least one character or code point".to_string());
+    }
+    if dirs.is_empty() {
+        dirs = default_font_dirs();
+    }
+
+    let files = collect_font_files(&dirs);
+    println!(
+        "scanned {} font files under {} directories",
+        files.len(),
+        dirs.len()
+    );
+    println!("looking for: {}", chars.iter().collect::<String>());
+
+    let mut rows: Vec<(usize, String, String, Vec<char>)> = Vec::new();
+    for path in &files {
+        let Some(font) = load_first_font(path) else {
+            continue;
+        };
+        let present: Vec<char> = chars.iter().copied().filter(|&c| font.has_glyph(c)).collect();
+        if present.is_empty() {
+            continue;
+        }
+        let missing: Vec<char> = chars
+            .iter()
+            .copied()
+            .filter(|c| !present.contains(c))
+            .collect();
+        let name = font.name().unwrap_or("<unnamed>").to_string();
+        rows.push((present.len(), name, path.display().to_string(), missing));
+    }
+    rows.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.2.cmp(&b.2)));
+
+    if rows.is_empty() {
+        println!("no installed font contains any of those characters");
+        return Ok(());
+    }
+    println!();
+    for (count, name, path, missing) in rows {
+        let all = if missing.is_empty() {
+            "  (all requested)".to_string()
+        } else {
+            format!("  missing: {}", missing.iter().collect::<String>())
+        };
+        println!("{name}  [{count}/{}]\n  {path}{all}", chars.len());
+    }
+    println!();
+    println!("the OS fallback is the first of these the font stack picks; on Linux");
+    println!("that is `fc-match -s ':charset=<U+XXXX>' | head -1`.");
+    Ok(())
+}
+
+/// `cover` mode: which of a set of glyphs can be rendered from a directory of
+/// fonts, and by which one (in filename order)?
+///
+/// Loads every font under `--dir`(s), sorted by filename, and for each glyph
+/// reports the first font that contains it — or MISSING. Used to verify a
+/// collected local font bundle actually renders the game's vocabulary; an
+/// `NNN-` filename prefix from `scripts/collect-fonts.sh` encodes the
+/// terminal's fallback order.
+///
+/// TSV on stdout: `U+XXXX<TAB><char><TAB><index><TAB><family><TAB><file>`
+/// (or `MISSING` in the index field). Summary goes to stderr.
+fn run_cover(args: &[String]) -> Result<(), String> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    let mut chars: Vec<char> = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--dir" {
+            i += 1;
+            dirs.push(PathBuf::from(
+                args.get(i)
+                    .cloned()
+                    .ok_or_else(|| "--dir needs a path".to_string())?,
+            ));
+        } else if let Some(path) = arg.strip_prefix("--dir=") {
+            dirs.push(PathBuf::from(path));
+        } else if let Some(hex) = arg.strip_prefix("U+").or_else(|| arg.strip_prefix("0x")) {
+            let cp = u32::from_str_radix(hex, 16).map_err(|_| format!("bad code point: {arg}"))?;
+            chars.push(char::from_u32(cp).ok_or_else(|| format!("not a scalar: {arg}"))?);
+        } else {
+            chars.extend(arg.chars());
+        }
+        i += 1;
+    }
+    if chars.is_empty() {
+        return Err("cover: give at least one character or code point".to_string());
+    }
+    if dirs.is_empty() {
+        return Err("cover: give at least one --dir".to_string());
+    }
+
+    let mut files = collect_font_files(&dirs);
+    files.sort();
+    let fonts: Vec<(String, String, fontdue::Font)> = files
+        .iter()
+        .filter_map(|path| {
+            let font = load_first_font(path)?;
+            let family = font.name().unwrap_or("<unnamed>").to_string();
+            Some((path.display().to_string(), family, font))
+        })
+        .collect();
+    if fonts.is_empty() {
+        return Err("cover: no parseable fonts under the given directories".to_string());
+    }
+
+    let mut missing: Vec<char> = Vec::new();
+    for &c in &chars {
+        let hit = fonts
+            .iter()
+            .enumerate()
+            .find(|(_, (_, _, font))| font.has_glyph(c));
+        match hit {
+            Some((index, (path, family, _))) => {
+                println!("U+{:04X}\t{c}\t{index}\t{family}\t{path}", c as u32);
+            }
+            None => {
+                missing.push(c);
+                println!("U+{:04X}\t{c}\tMISSING\t\t", c as u32);
+            }
+        }
+    }
+    let covered = chars.len() - missing.len();
+    eprintln!(
+        "cover: {} glyphs from {} fonts, {covered} covered, {} missing",
+        chars.len(),
+        fonts.len(),
+        missing.len()
+    );
+    if !missing.is_empty() {
+        eprintln!("missing: {}", missing.iter().collect::<String>());
+    }
+    Ok(())
+}
+
+/// Recursively collect `.ttf`/`.otf`/`.ttc` files under `dirs`.
+fn collect_font_files(dirs: &[PathBuf]) -> Vec<PathBuf> {
+    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if matches!(
+                    ext.to_ascii_lowercase().as_str(),
+                    "ttf" | "otf" | "ttc"
+                ) {
+                    out.push(path);
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for dir in dirs {
+        walk(dir, &mut out);
+    }
+    out
+}
+
+/// Parse a font file, trying collection indices 0..8 so `.ttc` collections
+/// resolve to a real face. Returns the first face that parses.
+fn load_first_font(path: &Path) -> Option<fontdue::Font> {
+    let bytes = std::fs::read(path).ok()?;
+    for collection_index in 0..8u32 {
+        let settings = fontdue::FontSettings {
+            collection_index,
+            ..fontdue::FontSettings::default()
+        };
+        if let Ok(font) = fontdue::Font::from_bytes(bytes.clone(), settings) {
+            return Some(font);
+        }
+    }
+    None
+}
+
+/// Common font directories per platform; nonexistent ones are skipped.
+fn default_font_dirs() -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    let home = std::env::var("HOME").ok();
+    if cfg!(target_os = "macos") {
+        dirs.push(PathBuf::from("/System/Library/Fonts"));
+        dirs.push(PathBuf::from("/Library/Fonts"));
+        if let Some(home) = &home {
+            dirs.push(PathBuf::from(format!("{home}/Library/Fonts")));
+        }
+    } else if cfg!(windows) {
+        dirs.push(PathBuf::from("C:\\Windows\\Fonts"));
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            dirs.push(PathBuf::from(format!(
+                "{local}\\Microsoft\\Windows\\Fonts"
+            )));
+        }
+    } else {
+        dirs.push(PathBuf::from("/usr/share/fonts"));
+        dirs.push(PathBuf::from("/usr/local/share/fonts"));
+        if let Some(home) = &home {
+            dirs.push(PathBuf::from(format!("{home}/.local/share/fonts")));
+            dirs.push(PathBuf::from(format!("{home}/.fonts")));
+        }
+    }
+    dirs
 }
 
 /// Official Unicode name (UCD) of one table glyph. The fallback is the
@@ -2210,6 +2424,14 @@ fn usage() {
           \x20      with an Emoji_Presentation warning; also shows the\n  \
           \x20      analytic oracle's view when it models the glyph. Args may\n  \
           \x20      be chars, runs, or U+25FE / 0x25FE code points\n  \
+           which-font [--dir D]... <chars...>\n  \
+          \x20      scan font directories and list which fonts contain the\n  \
+          \x20      requested characters: finds the OS fallback for a glyph\n  \
+          \x20      the configured font lacks\n  \
+           cover --dir D <chars...>\n  \
+          \x20      per glyph, the first font under D (filename order) that\n  \
+          \x20      renders it, or MISSING: verifies a collected local font\n  \
+          \x20      bundle (see scripts/collect-fonts.sh)\n  \
            animate [N]   orbiting square, two-method comparison: the in-use\n  \
           \x20      game path (family-snapped) and a candidate replacement\n  \
           \x20      cycled with [ and ] (charwise, charwise + protrusion,\n  \
@@ -2290,6 +2512,8 @@ fn main() {
         Some("sweep") => show_sweep(),
         Some("glyphs") => print_glyph_table(),
         Some("pixels") => run_pixels(&args[1..]).unwrap_or_else(die),
+        Some("which-font") => run_which_font(&args[1..]).unwrap_or_else(die),
+        Some("cover") => run_cover(&args[1..]).unwrap_or_else(die),
         Some("animate") => match args.get(1).map(|s| s.parse::<u32>()) {
             None => run_animation(None).unwrap_or_else(die),
             Some(Ok(n)) => run_animation(Some(n)).unwrap_or_else(die),

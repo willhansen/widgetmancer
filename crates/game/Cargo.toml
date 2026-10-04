@@ -24,6 +24,11 @@ name = "snapshot_tool"
 path = "src/bin/snapshot_tool.rs"
 required-features = ["debug-tools"]
 
+[[bin]]
+name = "glyph_vocabulary"
+path = "src/bin/glyph_vocabulary.rs"
+required-features = ["debug-tools"]
+
 [features]
 default = []
 # Headless snapshot render/diff tooling (W.F) and the introspection helpers it
