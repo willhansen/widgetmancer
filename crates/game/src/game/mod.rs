@@ -32,10 +32,12 @@ mod map_diagram;
 mod realtime;
 pub mod snapshot;
 mod spawning;
+mod terrain;
 mod turns;
 pub use spawning::IncubatingPawn;
 pub use floating_entities::{DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
 pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
+pub use terrain::{Terrain, SLAB_TOP, SLAB_VOXEL_Z};
 
 pub const PLAYER_SIGHT_RADIUS: u32 = 16;
 
@@ -111,6 +113,7 @@ pub struct Game {
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
     blocks: Blocks,
+    terrain: Terrain,
     widgets: HashMap<WorldSquare, Widget>,
     floor_push_arrows: HashMap<WorldSquare, OrthogonalWorldStep>,
     turn_count: u32,
@@ -149,6 +152,8 @@ pub const GAME_RNG_SEED: u64 = 5;
 impl Game {
     pub fn new(terminal_width: u16, terminal_height: u16, start_time: LogicalTime) -> Game {
         let board_size = BoardSize::new(terminal_width as u32 / 2, terminal_height as u32);
+        let mut terrain = Terrain::new();
+        terrain.seed_board_slab(board_size);
         let mut game = Game {
             board_size,
             running: true,
@@ -156,6 +161,7 @@ impl Game {
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
             blocks: Blocks::new(),
+            terrain,
             widgets: HashMap::new(),
             floor_push_arrows: HashMap::new(),
             turn_count: 0,
@@ -287,7 +293,7 @@ impl Game {
     fn get_grid_entity_at_square(&self, square: WorldSquare) -> Option<GridEntity> {
         if self.try_get_player_square() == Some(square) {
             Some(GridEntity::Player)
-        } else if self.blocks.is_block_at(square) {
+        } else if self.is_block_at(square) {
             Some(GridEntity::Block)
         } else if let Some(&widget) = self.widgets.get(&square) {
             Some(GridEntity::Widget(widget))
@@ -608,7 +614,8 @@ impl Game {
             self.squares_threatened_by_any_piece(true),
         );
 
-        self.graphics.draw_blocks(&self.blocks.blocks);
+        let block_squares = self.block_squares();
+        self.graphics.draw_blocks(&block_squares);
         for (&square, &piece) in &self.pieces {
             if piece.piece_type == Arrow {
                 self.graphics.draw_arrow(square, piece.faced_direction());
@@ -939,12 +946,37 @@ impl Game {
         conveyor_belt_speed()
     }
 
+    /// Place a one-voxel-tall solid column: the gameplay "block" and the
+    /// trivial case of placed terrain.
     pub fn place_block(&mut self, square: WorldSquare) {
-        self.blocks.place_block(square);
+        self.terrain.place_solid_column(square, 1);
         self.invalidate_fov_cache();
     }
+    pub fn place_voxel(&mut self, voxel: WorldVoxel) {
+        self.terrain.place_voxel(voxel);
+        if voxel.z >= SLAB_TOP {
+            self.invalidate_fov_cache();
+        }
+    }
+    /// Fill a solid column of `top_height` voxels sitting on the slab.
+    pub fn place_solid_column(&mut self, square: WorldSquare, top_height: u32) {
+        self.terrain.place_solid_column(square, top_height);
+        self.invalidate_fov_cache();
+    }
+    pub fn is_solid_at(&self, x: i32, y: i32, z: i32) -> bool {
+        self.terrain.is_solid_at(x, y, z)
+    }
+    pub fn height_at(&self, square: WorldSquare) -> Option<i32> {
+        self.terrain.height_at(square)
+    }
+    /// Every square solid at the gameplay block altitude (`0`), i.e. the sight
+    /// blockers and the flat "block" glyphs. The slab is at `-1`, so bare board
+    /// is excluded.
+    pub fn block_squares(&self) -> SquareSet {
+        self.terrain.solid_squares_at_altitude(SLAB_TOP)
+    }
     pub fn is_block_at(&self, square: WorldSquare) -> bool {
-        self.blocks.is_block_at(square)
+        self.is_solid_at(square.x, square.y, SLAB_TOP)
     }
     pub fn set_up_vs_arrows(&mut self) {
         (0..10).for_each(|i| {
@@ -1016,6 +1048,15 @@ impl Game {
     }
     pub fn set_up_n_pillars(&mut self, n: u32) {
         (0..n).for_each(|i| self.place_block(self.player_square() + STEP_RIGHT * (i as i32 + 4)));
+    }
+
+    /// A few solid columns of differing heights, to exercise the terrain API
+    /// and snapshot round-trip before the z renderer lands.
+    pub fn set_up_terrain_demo(&mut self) {
+        let base = self.player_square() + STEP_UP * 3;
+        for (i, height) in [1u32, 3, 2, 4].into_iter().enumerate() {
+            self.place_solid_column(base + STEP_RIGHT * i as i32, height);
+        }
     }
     pub fn set_up_simple_portal_map(&mut self) {
         let entrance_square = self.player_square() + STEP_RIGHT * 2;
@@ -1519,10 +1560,11 @@ impl Game {
     }
     fn player_field_of_view(&self) -> FieldOfViewResult {
         let start_square = self.player_square();
+        let block_squares = self.block_squares();
         portal_aware_field_of_view_from_square(
             start_square,
             self.player_sight_radius,
-            &self.blocks.blocks,
+            &block_squares,
             &self.portal_geometry,
         )
     }
@@ -1568,10 +1610,11 @@ impl Game {
         &self,
     ) -> (FieldOfViewResult, crate::fov_stuff::FovTrace) {
         let start_square = self.player_square();
+        let block_squares = self.block_squares();
         crate::fov_stuff::portal_aware_field_of_view_from_square_traced(
             start_square,
             self.player_sight_radius,
-            &self.blocks.blocks,
+            &block_squares,
             &self.portal_geometry,
         )
     }

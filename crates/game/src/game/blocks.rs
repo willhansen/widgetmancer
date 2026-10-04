@@ -1,8 +1,9 @@
-//! Self-contained "placed world features": solid blocks, conveyor belts, and
-//! upgrades. Owns the three storage collections and the pure accessors; the
-//! orchestrating `Game` methods delegate to this via thin shims.
+//! Self-contained "placed world features": conveyor belts and upgrades. Solid
+//! blocks live in the terrain voxel set (see `terrain.rs`); this module owns the
+//! non-solid floor features plus the pure accessors. The orchestrating `Game`
+//! methods delegate to this via thin shims.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::piece::Upgrade;
@@ -36,21 +37,12 @@ pub fn conveyor_period_just_elapsed(prev_time_since_start: Duration, delta: Dura
 #[derive(Clone, Debug, Default)]
 pub struct Blocks {
     pub upgrades: HashMap<WorldSquare, Upgrade>,
-    pub blocks: HashSet<WorldSquare>,
     pub conveyor_belts: HashMap<WorldSquare, OrthogonalWorldStep>,
 }
 
 impl Blocks {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn place_block(&mut self, square: WorldSquare) {
-        self.blocks.insert(square);
-    }
-
-    pub fn is_block_at(&self, square: WorldSquare) -> bool {
-        self.blocks.contains(&square)
     }
 
     pub fn place_conveyor_belt(&mut self, square: WorldSquare, dir: WorldStep) {

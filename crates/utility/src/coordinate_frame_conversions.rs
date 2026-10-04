@@ -15,6 +15,13 @@ pub type WorldPoint = Point2D<f32, SquareGridInWorldFrame>;
 pub type WorldSquareRect = Box2D<i32, SquareGridInWorldFrame>;
 pub type BoardSize = Size2D<u32, SquareGridInWorldFrame>;
 
+// Altitude-bearing frames. `z` is altitude in voxels; a solid voxel at index
+// `z` occupies `[z, z+1)`, so its top surface is at altitude `z + 1`. `x`/`y`
+// share the 2D world frame so a `WorldVoxel` column projects like a `WorldSquare`.
+pub type WorldVoxel = Point3D<i32, SquareGridInWorldFrame>;
+pub type WorldPoint3 = Point3D<f32, SquareGridInWorldFrame>;
+pub type VoxelSet = HashSet<WorldVoxel>;
+
 pub type WorldStep = Vector2D<i32, SquareGridInWorldFrame>;
 pub type WorldMove = Vector2D<f32, SquareGridInWorldFrame>;
 

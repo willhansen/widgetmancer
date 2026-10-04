@@ -16,7 +16,7 @@ use crate::game::{DeathCube, FloatingEntityId, FloatingHunterDrone, Game, Incuba
 use crate::piece::{Faction, Piece, PieceType, Upgrade};
 use terminal_rendering::glyph::Glyph;
 use utility::coordinate_frame_conversions::{
-    BoardSize, WorldMove, WorldPoint, WorldSquare, WorldStep,
+    BoardSize, WorldMove, WorldPoint, WorldSquare, WorldStep, WorldVoxel,
 };
 use utility::{KingWorldStep, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir};
 
@@ -89,7 +89,14 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
         ),
         ("player", player_json(game)),
         ("pieces", json_sorted_array(game.pieces.iter().map(|(&square, &piece)| piece_json(square, &piece)))),
-        ("blocks", json_sorted_array(game.blocks.blocks.iter().map(|&square| square_json(square)))),
+        (
+            "voxels",
+            json_sorted_array(
+                game.terrain
+                    .placed_voxels()
+                    .map(|voxel| voxel_json(voxel)),
+            ),
+        ),
         (
             "upgrades",
             json_sorted_array(game.blocks.upgrades.iter().map(|(&square, &upgrade)| {
@@ -326,6 +333,10 @@ fn square_json(square: WorldSquare) -> String {
     format!("[{}, {}]", square.x, square.y)
 }
 
+fn voxel_json(voxel: WorldVoxel) -> String {
+    format!("[{}, {}, {}]", voxel.x, voxel.y, voxel.z)
+}
+
 fn point_json(point: WorldPoint) -> String {
     format!("[{}, {}]", point.x, point.y)
 }
@@ -399,8 +410,12 @@ struct SnapshotData {
     player: Option<PlayerDto>,
     #[serde(default)]
     pieces: Vec<PieceDto>,
+    /// Legacy single-height block squares, from snapshots before terrain
+    /// voxels existed. Loaded as one-voxel columns.
     #[serde(default)]
     blocks: Vec<[i32; 2]>,
+    #[serde(default)]
+    voxels: Vec<[i32; 3]>,
     #[serde(default)]
     upgrades: Vec<UpgradeDto>,
     #[serde(default)]
@@ -576,6 +591,9 @@ impl Game {
         // The terminal-derived board size can differ from the captured one
         // (maps like `racetrack` clamp the terminal), so trust the snapshot.
         game.board_size = BoardSize::new(data.board_width, data.board_height);
+        // The slab floor is derived from the board size, so it is re-laid for
+        // the captured board rather than serialized.
+        game.terrain.seed_board_slab(game.board_size);
         game.running = data.running;
         game.turn_count = data.turn_count;
         // Restore the RNG stream (falls back to the seeded default for older
@@ -604,6 +622,9 @@ impl Game {
         // guards on `place_block`/`place_upgrade`/`place_piece`.
         for &square in &data.blocks {
             game.place_block(square_from_array(square));
+        }
+        for &voxel in &data.voxels {
+            game.place_voxel(WorldVoxel::new(voxel[0], voxel[1], voxel[2]));
         }
         for upgrade in &data.upgrades {
             let upgrade_type = Upgrade::from_str(&upgrade.upgrade_type)
@@ -761,6 +782,8 @@ mod tests {
         game.place_piece(Piece::pawn(), base + STEP_RIGHT);
         game.place_piece(Piece::arrow(STEP_UP.into()), base + STEP_LEFT);
         game.place_block(base + STEP_DOWN);
+        game.place_solid_column(base + STEP_UP * 2, 3);
+        game.place_voxel(WorldVoxel::new(base.x + 4, base.y, 5));
         game.place_upgrade(Upgrade::BlinkRange, base + STEP_DOWN * 2);
         game.place_conveyor_belt(base + STEP_DOWN * 3, STEP_RIGHT);
         game.place_floor_push_arrow(base + STEP_DOWN * 4, STEP_LEFT);
@@ -786,6 +809,36 @@ mod tests {
         let loaded = Game::from_snapshot(data, game.graphics().start_time());
 
         assert_eq!(game_state_json(&loaded, Some("test")), json);
+    }
+
+    #[test]
+    fn legacy_blocks_only_snapshot_loads_as_single_height_columns() {
+        let mut game = set_up_game_with_player();
+        let base = game.player_square();
+        game.place_block(base + STEP_RIGHT);
+        game.place_solid_column(base + STEP_UP, 3);
+        game.world_time = game.world_start_time;
+
+        let json = game_state_json(&game, Some("test"));
+        let mut value: serde_json::Value = serde_json::from_str(&json).expect("parse");
+        // Rewrite to the pre-voxel format: every solid-at-0 square is a legacy
+        // "block"; heights above the block layer are lost.
+        let blocks: Vec<serde_json::Value> = game
+            .block_squares()
+            .into_iter()
+            .map(|square| serde_json::json!([square.x, square.y]))
+            .collect();
+        let object = value.as_object_mut().unwrap();
+        object.remove("voxels");
+        object.insert("blocks".to_string(), serde_json::Value::Array(blocks));
+
+        let data: SnapshotData = serde_json::from_value(value).expect("parse legacy");
+        let loaded = Game::from_snapshot(data, game.graphics().start_time());
+
+        assert!(loaded.is_block_at(base + STEP_RIGHT));
+        assert!(loaded.is_block_at(base + STEP_UP));
+        assert_eq!(loaded.height_at(base + STEP_UP), Some(1), "legacy blocks are one tall");
+        assert_eq!(loaded.height_at(base), Some(crate::game::SLAB_TOP), "board slab is intact");
     }
 
     #[test]

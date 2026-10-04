@@ -25,7 +25,7 @@ struct DiagramPortal {
 impl Game {
     pub fn ascii_diagram(&self) -> String {
         let portals = self.diagram_portals();
-        let blocks = &self.blocks.blocks;
+        let blocks = self.block_squares();
         let cubes = self
             .death_cubes
             .iter()
@@ -131,7 +131,7 @@ impl Game {
         player_square: Option<WorldSquare>,
     ) -> (i32, i32, i32, i32) {
         let mut squares: Vec<WorldSquare> = Vec::new();
-        squares.extend(self.blocks.blocks.iter().copied());
+        squares.extend(self.block_squares());
         squares.extend(self.pieces.keys().copied());
         squares.extend(cubes.iter().copied());
         squares.extend(player_square);

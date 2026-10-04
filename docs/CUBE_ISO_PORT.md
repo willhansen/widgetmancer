@@ -51,7 +51,11 @@ this doc):
 1. **Data model** — `WorldVoxel`/`WorldPoint3` types; `Game.voxels` +
    `column_tops`; `place_voxel` / `place_solid_column` / `height_at` /
    `is_solid_at`; `place_block` as a single-height column; board slab; snapshot
-   voxels (both directions, sorted).
+   voxels (both directions, sorted). **Done 2026-10-04** — terrain lives in
+   `game/terrain.rs`; the board is a materialized slab at voxel `-1`; blocks
+   were folded into the voxel set (`Blocks.blocks` removed) with `block_squares`
+   (= solid at altitude 0) as the gameplay/LOS query; snapshots emit `voxels`
+   (slab regenerated on load) and still read the legacy `blocks` field.
 2. **z projection + forward column pass** — `Screen` z-forward mapping and a
    multi-row write path; replace the board part of
    `load_screen_buffer_from_fov` with a painter-sorted forward column pass
@@ -73,7 +77,7 @@ pass); the flat gate plus golden diffs contain it.
 
 | Feature | Game target | Status |
 |---|---|---|
-| Voxel set + per-column top cache | `Game.voxels` + `column_tops` | pending |
+| Voxel set + per-column top cache | `Game.voxels` + `column_tops` | ported |
 | Exposed-face semantics (top face; camera-facing side face) | forward column pass | pending |
 | `is_cube_top_column` / `nearest_cube_distance` (standoff source) | material helper | pending |
 | Four-cube 2x2 demo layout, `CUBE_SIZE/HEIGHT/GAP`, `GAP >= HEIGHT` invariant | demo-only layout; keep invariant doc | testbed-only |

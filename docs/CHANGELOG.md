@@ -9,6 +9,33 @@ Newest first.
 
 ---
 
+## 2026-10-04 — Port phase 1: terrain/voxel data model (`cube_iso`)
+
+### game: add voxel/altitude terrain model (cube_iso port phase 1)
+
+First step of the `cube_iso` port (`docs/CUBE_ISO_PORT.md`), data model only —
+no rendering change, so the flat gate holds.
+
+- New `utility` types `WorldVoxel`/`WorldPoint3`/`VoxelSet`.
+- New `game/terrain.rs`: a `VoxelSet` + per-column top cache with
+  `place_voxel` / `place_solid_column` / `is_solid_at` / `height_at` and a
+  **materialized board slab** (one voxel per on-board square at index `-1`, top
+  surface altitude 0). The slab is regenerated from the board size, not
+  serialized.
+- Folded blocks into the voxel set: removed `Blocks.blocks`; `place_block` is
+  now a one-voxel column and `Game::block_squares()` (solid at altitude 0) is
+  the gameplay/LOS query. All render/FOV/diagram call sites use it, so flat
+  output is byte-identical.
+- Snapshot: emit sorted `voxels` (`[x,y,z]`, slab excluded); still read the
+  legacy `blocks` field and load each as a single-height column. Loader re-lays
+  the slab for the captured board size.
+- Added `Game::set_up_terrain_demo` and terrain/snapshot round-trip + legacy
+  migration tests.
+
+Verified: workspace tests green; `snapshot_tool diff snapshot/` still matches.
+
+---
+
 ## 2026-10-04 — Record the `cube_iso` porting checklist and plan
 
 ### docs: add `CUBE_ISO_PORT.md` (inventory + phased plan + deletion gate)
