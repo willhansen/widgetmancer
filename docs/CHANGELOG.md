@@ -9,6 +9,33 @@ Newest first.
 
 ---
 
+## 2026-10-04 — Record the `cube_iso` porting checklist and plan
+
+### docs: add `CUBE_ISO_PORT.md` (inventory + phased plan + deletion gate)
+
+The `cube_iso/` prototype has reached the point where its z/altitude rendering
+should move into the main game rather than keep growing its own HUD and debug
+surface. New `docs/CUBE_ISO_PORT.md` is the hub for that:
+
+- **Decisions** captured from planning: rendering z first; extend the native
+  `Glyph`/`Screen` path (not the `Frame`/`DrawableGlyph` stack, which has an
+  `Option`-color bleed in `Frame::raw_string`); FOV/portals stay 2D on the top
+  surface; `q`/`e` reuse `Screen::rotation`; voxel-set terrain with blocks as
+  single-height columns; flat board rendered as a floating slab; static entity
+  altitude; `cube_iso` kept as a testbed until the port completes.
+- **Phased plan:** data model -> z projection + forward column pass (flat-gated)
+  -> materials -> floating-entity altitude -> view rotation -> tooling.
+- **Inventory (A–F):** every demo feature with a status (`native`, `pending`,
+  `ported`, `testbed-only`, `deferred`) and its game target, so progress is
+  visible and the demo can be deleted once no `pending` rows remain.
+- **Deletion gate:** remove `cube_iso/` only when nothing is left to port and
+  the intentionally-dropped/deferred items are acknowledged.
+
+Rule recorded in the doc: flip a status in the same commit that ports it, with
+the usual `CHANGELOG.md` entry.
+
+---
+
 ## 2026-09-29 — Bundle the game's fonts locally and verify coverage
 
 ### game: collect-fonts.sh bundles the fallback chain; cover mode verifies it
