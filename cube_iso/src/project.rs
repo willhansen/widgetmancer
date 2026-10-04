@@ -119,8 +119,15 @@ impl Camera {
         }
     }
 
-    /// Depth in the rotated frame (`|into-screen| + half |horizontal|`), for
-    /// painter ordering and depth fog.
+    /// Signed distance into the screen in the rotated frame (positive = far,
+    /// up-screen). This is the correct painter's-algorithm key: nearer geometry
+    /// has a smaller value and must be drawn last so it overwrites the wall.
+    pub fn forward(&self, x: f32, y: f32) -> f32 {
+        self.rotated_offset(x, y).1
+    }
+
+    /// Absolute depth in the rotated frame (`|into-screen| + half |horizontal|`),
+    /// for depth fog. Not a painter key — it is symmetric in the forward axis.
     pub fn depth(&self, x: f32, y: f32) -> f32 {
         let (rx, ry) = self.rotated_offset(x, y);
         ry.abs() + 0.5 * rx.abs()
@@ -224,6 +231,18 @@ mod tests {
             (0, -1),
             "after one turn, right is south"
         );
+    }
+
+    #[test]
+    fn forward_is_signed_into_screen() {
+        let cam = Camera::with_rotation(0.0, 0.0, 0);
+        assert!(cam.forward(0.0, 3.0) > 0.0, "north is into the screen");
+        assert!(cam.forward(0.0, -3.0) < 0.0, "south is toward the camera");
+        assert_eq!(cam.forward(0.0, 0.0), 0.0);
+        // At a quarter turn, east is into the screen.
+        let turned = Camera::with_rotation(0.0, 0.0, 1);
+        assert!(turned.forward(3.0, 0.0) > 0.0);
+        assert!(turned.forward(-3.0, 0.0) < 0.0);
     }
 
     #[test]

@@ -76,12 +76,14 @@ pub fn render_frame(
     let cam = Camera::with_rotation(player.x.round(), player.y.round(), rotation);
     let cube_columns = world.cube_columns();
 
-    // Far to near in the rotated frame.
+    // Far to near in the rotated frame. Sort by the *signed* forward distance,
+    // not the absolute depth: nearer (southern, at rotation 0) geometry must be
+    // drawn last so it overwrites the wall behind it.
     let mut columns = world.columns();
     columns.sort_by(|a, b| {
-        cam.depth(b.0 as f32, b.1 as f32)
-            .partial_cmp(&cam.depth(a.0 as f32, a.1 as f32))
-            .expect("depth is finite")
+        cam.forward(b.0 as f32, b.1 as f32)
+            .partial_cmp(&cam.forward(a.0 as f32, a.1 as f32))
+            .expect("forward is finite")
     });
     for (x, y) in columns {
         draw_column(&mut frame, world, &cube_columns, &cam, width, height, x, y);
@@ -125,12 +127,8 @@ fn draw_column(
         }
         if !world.is_solid(x + toward.0, y + toward.1, z) {
             let (wl, wr, row) = cam.project_double(width, height, x as f32, y as f32, z as f32);
-            let t = if zmax > 0 {
-                z as f32 / zmax as f32
-            } else {
-                1.0
-            };
-            let color = apply_fog(lerp_rgb(WALL_BOTTOM, WALL_TOP, t), fog);
+            let color = side_face_color(z, zmax, is_cube, standoff);
+            let color = apply_fog(color, fog);
             put(frame, wl, row, solid('▒', color));
             put(frame, wr, row, solid('▒', color));
         }
@@ -182,6 +180,22 @@ fn top_face_color(
         hue
     } else {
         scale_rgb(hue, 0.72)
+    }
+}
+
+/// Color for an exposed camera-facing side face. A cube's wall is the cool
+/// gradient; a ledge's front is a darker shade of its standoff hue, so the
+/// whole ledge reads as one warm object.
+fn side_face_color(z: i32, zmax: i32, is_cube: bool, standoff: i32) -> RGB8 {
+    if is_cube {
+        let t = if zmax > 0 {
+            z as f32 / zmax as f32
+        } else {
+            1.0
+        };
+        lerp_rgb(WALL_BOTTOM, WALL_TOP, t)
+    } else {
+        scale_rgb(standoff_hue(standoff), 0.55)
     }
 }
 
@@ -370,6 +384,36 @@ mod tests {
             .any(|c| c.r > 150 && c.r > c.b + 40 && c.g < c.r);
         assert!(warm, "warm ledges should still render after rotating");
         assert!(turned.glyphs().any(|g| g.bg_color == Some(PLAYER_COLOR)));
+    }
+
+    #[test]
+    fn staircase_ledges_are_not_overwritten_by_the_cube_wall() {
+        // Regression: painter order must use signed forward distance, or the
+        // cube wall (nearer in screen rows but smaller |forward|) is drawn after
+        // the southern staircase and erases it.
+        let world = World::four_cubes();
+        let player = Player::new(PhysicsMode::GridMoveGated);
+        let (w, h) = (110usize, 50usize);
+        let frame = render_frame(&world, &player, 0.0, w, h, 0);
+        let cam = Camera::with_rotation(player.x.round(), player.y.round(), 0);
+        // South staircase step 2 top: world (5, -2), surface altitude 6.
+        let (col, row) = cam.project(w, h, 5.0, -2.0, 6.0);
+        let color = frame.grid[row as usize][col as usize]
+            .bg_color
+            .expect("staircase cell should be painted");
+        assert!(
+            color.r > color.b + 25 && color.g < color.r,
+            "expected a warm staircase ledge at ({col},{row}), got {color:?}"
+        );
+        // Its front face (one row below the top) is warm too, not cool wall.
+        let (fcol, frow) = cam.project(w, h, 5.0, -2.0, 5.0);
+        let front = frame.grid[frow as usize][fcol as usize]
+            .bg_color
+            .expect("staircase front should be painted");
+        assert!(
+            front.r > front.b + 15 && front.g < front.r,
+            "expected a warm staircase front at ({fcol},{frow}), got {front:?}"
+        );
     }
 
     #[test]

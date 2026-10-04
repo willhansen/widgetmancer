@@ -144,6 +144,18 @@ the same concept the engine already uses (`Screen::rotation` /
 ambiguous one; you rotate to inspect the face you care about. It is the only
 option that makes *every* face resolvable without changing the projection.
 
+**Fix — painter key vs. fog key.** The initial rotation change sorted columns
+by `Camera::depth` (`|forward| + 0.5·|right|`), which is an *absolute* distance
+built for fog. As a painter key it is symmetric in the forward axis, so a
+near-south column (`forward` large negative) sorted as "far" and was drawn
+before the cube wall, which then erased the south staircase — visible as a
+broken `█ / ▒` column directly below the player. The sort now uses the signed
+`Camera::forward` (far = positive, drawn first), which is the old `y`-descending
+order generalized to the rotated frame; `depth` remains the fog distance. The
+ledge front faces are also drawn in the warm standoff hue (not the cool wall
+material) so the whole ledge reads as one object. A regression test pins the
+warm staircase top *and* front at world `(5, −2)`.
+
 ## Projection P details
 
 ```
