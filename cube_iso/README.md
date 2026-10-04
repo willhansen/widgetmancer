@@ -18,8 +18,9 @@ cargo run -p cube_iso                 # interactive, alternate screen
 cargo run -p cube_iso -- --dump /tmp/frame.txt   # headless single frame
 ```
 
-Options: `--dump FILE`, `--width N`, `--height N`,
-`--mode smooth|grid|gated`, `--scenario top|stairs|fall|east|west`, `--help`.
+Options: `--dump FILE`, `--width N`, `--height N`, `--rotate 0-3`,
+`--mode smooth|grid|gated`,
+`--scenario top|stairs|stairs-side|fall|east|west`, `--help`.
 
 `--scenario` jumps the player to a starting situation, which is handy for a
 single headless dump:
@@ -30,9 +31,12 @@ cargo run -p cube_iso -- --dump /tmp/frame.txt --scenario stairs --height 48
 
 - `top` — standing on a cube top (default).
 - `stairs` — walked off the south edge onto the side staircase.
+- `stairs-side` — the same, viewed rotated 90° so the staircase is x-facing.
 - `fall` — overshot the staircase and is falling into open space (leaves a
   `│` trail).
 - `east` / `west` — walked off that face onto the protruding x-facing ledges.
+
+`--rotate 0-3` overrides the scenario's view rotation for a dump.
 
 The dump writes the ANSI frame to `FILE` and echoes an uncolored character
 view to stdout, so the shape is readable in a log or test output.
@@ -41,10 +45,11 @@ view to stdout, so the shape is readable in a log or test output.
 
 | Key | Action |
 |-----|--------|
-| arrows / WASD / hjkl | move |
+| arrows / WASD / hjkl | move (relative to the view) |
+| `q` / `e` | rotate the view 90° about the player |
 | `g` | cycle the physics scheme |
 | `r` | respawn |
-| `q` / `Esc` | quit |
+| `Esc` / `Ctrl-C` | quit |
 
 ## Projection P — shared-vertical pseudo-isometric
 
@@ -102,6 +107,24 @@ the projection:
 
 The channels are separate: hue = standoff, checker/shade = grid, brightness
 (with fog) = distance, so they don't fight.
+
+### View rotation (`q` / `e`)
+
+The hue makes a ledge's standoff *readable*, but for a north/south ledge it is
+still painted **over the cube's wall** rather than seen as a separate object:
+its row is `d + (H − z)`, so a near, high ledge (`d < z`) lands inside the wall
+band and there is no visible gap. X-facing ledges don't have this problem
+because their standoff projects along the screen's horizontal axis.
+
+`q`/`e` rotate the view 90° counter-clockwise/clockwise about the player. That
+turns the south staircase into an x-facing one (and back), so **any face can be
+inspected from the orientation where its depth is visible**. Movement keys are
+relative to the view, so "up" always moves up the screen. This mirrors the
+engine's own first-class screen rotation (`Screen::rotation` /
+`QuarterTurnsAnticlockwise`, used for portals), so it is a mechanic rather than
+a special case. The readability channels are world-anchored, so hue, checker,
+and standoff all rotate correctly with the view; only which faces are drawn and
+the painter order follow the rotation.
 
 ## World model
 

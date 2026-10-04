@@ -104,6 +104,46 @@ brightness(with fog) = distance.
 **Honest limit:** checkerboard alone can only report depth modulo its period;
 the hue is what makes standoff exact. If hue is ever dropped, depth goes coarse.
 
+## View rotation: resolving the north/south ambiguity
+
+**Problem.** After the readability pass, east/west ledges read cleanly but
+north/south ones were still ambiguous. A south ledge at `(x, −d, z)` lands on
+row `cam.y + d − z`; the cube wall at `y=0` spans rows `cam.y … cam.y−(H−1)`.
+For a near, high ledge (`d < z`) the ledge's row is *inside* the wall band, so
+it is painted over the wall with no visible gap and no way to read its standoff
+from shape — the hue says "3 out", but the eye sees a stripe on the wall.
+
+**Rejected static cues:** drop/undercut shadow (partial, muddy), void-notch
+cutaway (stylized/broken-looking), support pillars or `d > z` design (changes
+gameplay), local ledge shear (inconsistent with the P grid), and the earlier
+oblique shear / Projection Q (bigger change).
+
+**Decision.** Rotate the view. `q`/`e` apply a 90° quarter turn about the
+player, turning a north/south face into an east/west one and back, so the
+player can always orient to the view where a face's depth is visible. This is
+the same concept the engine already uses (`Screen::rotation` /
+`QuarterTurnsAnticlockwise`), so it is a mechanic, not a hack.
+
+**Landed:**
+
+- `Camera.rotation: u8` (0..=3 CCW); `project`/`project_double` are now methods
+  that rotate `(x−cam, y−cam)` before the P mapping.
+- Direction helpers derived by inverse-rotating screen unit vectors:
+  `forward_step`, `toward_camera_step`, `screen_left_step`,
+  `screen_right_step`, and `world_step_for_screen_dir`.
+- `render.rs` draws the wall/rim toward `toward_camera` and end caps along
+  `screen_left`/`screen_right`, orders columns by `Camera::depth`, and fogs by
+  rotated depth. Hue, checker, and stars stay world-anchored.
+- Input is view-relative (`ScreenDir` → world step); `q`/`e` rotate; quit moved
+  from `q` to `Esc`/`Ctrl-C`; HUD shows facing N/E/S/W.
+- `--rotate 0-3` and a `stairs-side` scenario for headless inspection.
+- Tests: per-turn direction steps, view-relative movement, rotated projection,
+  and a render assertion that a quarter turn rearranges the frame.
+
+**Note.** Rotation is interactive: at any instant one axis is still the
+ambiguous one; you rotate to inspect the face you care about. It is the only
+option that makes *every* face resolvable without changing the projection.
+
 ## Projection P details
 
 ```
