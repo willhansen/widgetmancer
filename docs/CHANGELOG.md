@@ -9,6 +9,93 @@ Newest first.
 
 ---
 
+## 2026-10-06 — Fix one-keypress input lag from the pausable reader
+
+### game: read input unbuffered so `poll` and `read` agree
+
+Follow-up to the Ctrl-P capture work. Holding an arrow and then switching
+direction applied the *previous* direction one step late.
+
+`PausableInput::read` polled the tty fd for readability but read through the
+buffered `std::io::stdin()`. Termion parses a multi-byte key in two reads (2
+bytes, then the tail), and `Stdin`'s `BufReader` had already drained the tail
+into user space, so `poll` saw an empty kernel buffer and the loop never drained
+the buffer. The sequence completed only when the next key made the fd readable —
+delaying every arrow/function/mouse sequence by one keypress.
+
+Read directly from the fd with `libc::read` (retrying `EINTR`, `Ok(0)` on EOF)
+so `poll` and the read observe the same buffer. New regression test writes a
+whole `ESC [ A` "Up" sequence into a pipe and asserts termion yields `Key::Up`
+without a follow-up key; it fails against the buffered read.
+
+Verified: `./run-tests` 613 passed / 9 skipped.
+
+---
+
+## 2026-10-06 — Ctrl-P files live snapshots as numbered issues with a typed note
+
+### game: bind capture to Ctrl-P; auto-create a numbered issue and edit its note
+
+`p` was too easy to fat-finger, and a capture still required exiting the game,
+making an issue directory, copying the snapshot in, and hand-writing a note.
+
+- **Hotkey.** `SNAPSHOT_KEY` is now `Key::Ctrl('p')`.
+- **Issue per capture.** `create_new_issue` scans `issues/` for purely numeric
+  names, takes max+1, and creates `issues/NNNN/snapshot/` plus a templated
+  `issue.md` (number, map, UTC date, Description section). `write_snapshot_to`
+  writes the three snapshot files into a given directory; `next_issue_number`,
+  `civil_from_days`, and the template are unit-tested.
+- **Editor.** On capture the game pauses, drops its raw-mode/alternate-screen
+  writer to restore the terminal, runs `$VISUAL`/`$EDITOR` (fallback `vi`) on
+  the note, then recreates the terminal, forces a full repaint, and resumes.
+  The suspended wall time is added to the logical-time epoch so the world clock
+  and animations stay continuous instead of jumping.
+- **Input reader parking.** Spawning an editor while the background input
+  thread is blocked reading the tty would split keystrokes between them. The
+  reader (`PausableInput`) now polls stdin with `libc::poll` (new `libc`
+  dependency) and parks on a `Condvar` while `InputPause` holds it, with a
+  parked-handshake before the editor starts; `Screen::force_redraw` repaints
+  after the terminal is rebuilt.
+- README snapshot section updated; the repo-root `snapshot/` directory remains
+  for `snapshot_tool` and manual dumps.
+
+Verified: `./run-tests` 611 passed / 9 skipped.
+
+---
+
+## 2026-10-06 — Screen-space UI layer; FOV border stops rotating with the view
+
+### game: add a screen-space `UiLayer` and move the FOV border into it
+
+The FOV border rotated with the player's view because it was authored in
+player-relative world squares and projected through `Screen`'s camera
+(`rotation`). There was no UI layer to put it in — one `Screen` owned both the
+framebuffer and the camera. This adds the missing layer.
+
+- **`terminal_rendering::ui_layer::UiLayer`.** A character-resolution glyph
+  grid in the same frame as `Screen`'s buffer (origin top-left, y down) with no
+  camera attached. Cells start `Glyph::transparent_glyph()`; `composite_onto`
+  skips transparent cells and `drawn_over`s the rest, so opaque UI overwrites
+  and transparent UI leaves the world pass byte-for-byte untouched. Draw
+  helpers (`draw_glyph`, `draw_double_glyph`, `draw_string`) take screen
+  character/square coordinates and clip off-screen.
+- **Frame order.** `Graphics` owns the layer (`clear_ui` / `ui_layer` /
+  `composite_ui`). `update_screen_from_draw_buffer` now fills the world pass,
+  clears and draws UI, composites it over `screen_buffer`, then draws the
+  debug overlays (still topmost) and `display`s.
+- **FOV border.** `graphics/fov_border.rs` paints into the UI layer, positioned
+  by screen offset from the player's screen square, choosing glyphs from screen
+  axes and ignoring `screen.rotation()`. Output is unchanged at rotation 0 and
+  no longer turns under q/e. New `border_is_independent_of_camera_rotation`
+  test compares the layer byte-for-byte across all four rotations.
+- `snapshot/` re-blessed: it was captured at `rotation_quarter_turns: 3`, where
+  the old border had its decorated top edge on a side.
+
+Full suite green: game 300 passed / 6 ignored (26 in the playground bin),
+terminal_rendering 153 passed / 1 ignored; `snapshot_tool diff snapshot/` OK.
+
+---
+
 ## 2026-10-04 — Voxel-grid board, data-defined maps, and the `space-cubes` demo map
 
 ### game: voxel-grid board + JSON map recipes + `space-cubes` map

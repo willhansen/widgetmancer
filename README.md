@@ -14,16 +14,22 @@ https://github.com/willhansen/rust_roguelike/assets/2918280/8e103e14-6331-4321-b
 
 ## Debug snapshots
 
-Press `p` while playing to dump the current game state, rendered screen, and
-input history into the (gitignored) `snapshot/` directory at the repo root.
-This is meant for capturing transient rendering bugs from a live session.
+Press `Ctrl-P` while playing to file a bug from a live session. The game pauses,
+writes the current game state, rendered screen, and input history into a new
+sequentially numbered issue directory (`issues/0001/snapshot/`, `0002/`, ...),
+opens `$VISUAL`/`$EDITOR` (falling back to `vi`) on that issue's `issue.md` for
+a description, and resumes when the editor exits. This is meant for capturing
+transient rendering bugs from a live session.
 
-Load a snapshot back and keep playing with `cargo run --release -- --load snapshot`
-(or `--load <dir>`). The persistent world state (player, pieces, blocks,
-portals, floating entities, turn/world clock) is restored, so the session
-continues where it left off. Transient visuals that are not serialized
-(in-flight animations, selectors) reset. Snapshots can be combined with
-`--map` only when not loading.
+Load a snapshot back and keep playing with
+`cargo run --release -- --load issues/0001/snapshot` (or `--load <dir>`). The
+persistent world state (player, pieces, blocks, portals, floating entities,
+turn/world clock) is restored, so the session continues where it left off.
+Transient visuals that are not serialized (in-flight animations, selectors)
+reset. Snapshots can be combined with `--map` only when not loading.
+
+The repo-root `snapshot/` directory is still used by `snapshot_tool` and manual
+dumps; `Ctrl-P` files captures under `issues/` instead.
 
 ## Font debugging
 

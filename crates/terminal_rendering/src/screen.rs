@@ -46,6 +46,10 @@ pub struct Screen {
     pub screen_buffer: Vec<Vec<Glyph>>,
     // (x,y), left to right, top to bottom
     pub current_screen_state: Vec<Vec<Glyph>>,
+    // Set when the terminal was re-created (e.g. after suspending for an
+    // external editor) so `update_screen` repaints every cell instead of
+    // diffing against a stale `current_screen_state`.
+    force_redraw: bool,
     // (x,y), left to right, top to bottom
     pub terminal_width: u16,
     pub terminal_height: u16,
@@ -64,6 +68,7 @@ impl Screen {
                 vec![Glyph::from_char('x'); terminal_height as usize];
                 terminal_width as usize
             ],
+            force_redraw: false,
             terminal_width,
             terminal_height,
         }
@@ -140,14 +145,22 @@ impl Screen {
             .any(|buffer_square| self.buffer_character_square_is_on_screen(buffer_square))
     }
 
+    /// Repaint every cell on the next `update_screen`, ignoring the diff
+    /// against `current_screen_state`. Used after the terminal is re-created.
+    pub fn force_redraw(&mut self) {
+        self.force_redraw = true;
+    }
+
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
         // Now update the graphics where applicable
+        let force_redraw = std::mem::take(&mut self.force_redraw);
         for buffer_x in 0..self.terminal_width() {
             for buffer_y in 0..self.terminal_height() {
                 let buffer_pos: Point2D<i32, CharacterGridInScreenBufferFrame> =
                     point2(buffer_x, buffer_y);
-                if self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
-                    != self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize]
+                if force_redraw
+                    || self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
+                        != self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize]
                 {
                     let screen_pos_starting_at_1 = buffer_pos + vec2(1, 1);
                     write!(
@@ -507,6 +520,38 @@ mod tests {
 
     fn set_up_nxn_square_screen(n: u16) -> Screen {
         Screen::new(n * 2, n)
+    }
+
+    #[derive(Clone)]
+    struct CountingWriter(std::rc::Rc<std::cell::RefCell<usize>>);
+
+    impl Write for CountingWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            *self.0.borrow_mut() += buf.len();
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn force_redraw_repaints_when_nothing_changed() {
+        let mut screen = set_up_10x10_character_screen();
+        let count = std::rc::Rc::new(std::cell::RefCell::new(0));
+        let mut writer: Box<dyn Write> = Box::new(CountingWriter(count.clone()));
+
+        // The first paint syncs `current_screen_state` to the buffer (as
+        // `Graphics::display` does).
+        screen.update_screen(&mut writer);
+        screen.current_screen_state = screen.screen_buffer.clone();
+        *count.borrow_mut() = 0;
+        screen.update_screen(&mut writer);
+        assert_eq!(*count.borrow(), 0, "matching state should not repaint");
+
+        screen.force_redraw();
+        screen.update_screen(&mut writer);
+        assert!(*count.borrow() > 0, "force_redraw should repaint every cell");
     }
 
     #[test]

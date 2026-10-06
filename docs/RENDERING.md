@@ -62,8 +62,11 @@ and transparency (`bg_transparent`) lets lower layers show through.
    `load_screen_buffer_from_absolute_positions_in_draw_buffer` (direct
    world→screen mapping, no visibility shading — used on the death screen).
 3. `Graphics::draw_starfield` paints the off-board void (see below).
-4. `Graphics::draw_debug_overlays` (no-op unless enabled).
-5. `Graphics::display(writer)` diffs and writes (see below).
+4. `Graphics::clear_ui`, then draw UI content into the screen-space
+   `UiLayer` (the FOV border among it), then `Graphics::composite_ui` blends
+   it over the screen buffer (see [UI layer](#ui-layer-screen-space)).
+5. `Graphics::draw_debug_overlays` (no-op unless enabled).
+6. `Graphics::display(writer)` diffs and writes (see below).
 
 Headless variants (`draw_headless_now`, `display_headless`) run the same
 pipeline with `writer = None`; tests inspect the buffers instead of a
@@ -83,6 +86,24 @@ drifting simply reveals new cells, so nothing is generated or recycled.
 `Starfield::draw` is a pure function of `(screen, board_size, time)`: it
 carries no per-frame state, which is what keeps repeated draws of the same
 moment byte-identical (`test_headless_frames_are_byte_identical`).
+
+## UI layer (screen space)
+
+`terminal_rendering::ui_layer::UiLayer` is a character-resolution glyph grid
+in the same frame as `Screen`'s buffer (origin top-left, y down), but with no
+camera attached. It is composited over the world pass and under the debug
+overlays, and it exists so terminal-space content does not turn with the view.
+
+- Cells start as `Glyph::transparent_glyph()`; `composite_onto` skips
+  transparent cells and `drawn_over`s the rest, so opaque UI overwrites and
+  transparent UI leaves the world pass byte-for-byte untouched.
+- Draw helpers (`draw_glyph`, `draw_double_glyph`, `draw_string`) take
+  `ScreenBufferCharacterSquare` / `ScreenBufferSquare` and clip off-screen.
+- `Graphics` owns the layer (`clear_ui` / `ui_layer` / `composite_ui`). The FOV
+  border (`graphics/fov_border.rs`) is the first client: it used to be authored
+  in player-relative world squares, so the decorated top edge swung round with
+  the camera; it now paints into the UI layer, positioned by screen offset from
+  the player's screen square.
 
 ## FOV-aware compositing (the portal part)
 

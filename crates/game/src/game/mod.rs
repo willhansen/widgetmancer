@@ -740,10 +740,12 @@ impl Game {
         let occupied = self.terrain.occupied_squares();
         self.graphics
             .draw_starfield(&occupied, player_fov.as_ref(), &drawn);
+        self.graphics.clear_ui();
         if self.player_is_alive() {
             self.graphics
                 .draw_fov_border(self.player_square(), self.player_sight_radius);
         }
+        self.graphics.composite_ui();
         self.graphics.draw_debug_overlays();
         self.graphics.display(&mut writer);
     }

@@ -1,6 +1,7 @@
 //! Runtime debug dumps: the full game state, the rendered screen, and the
-//! input history as of a moment during play. Triggered by pressing 'p' so a
-//! transient rendering bug can be captured from a live session.
+//! input history as of a moment during play. Triggered by pressing Ctrl-P so a
+//! transient rendering bug can be captured from a live session. Each capture
+//! becomes a new numbered issue directory with a typed `issue.md` note.
 
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -21,7 +22,7 @@ use utility::coordinate_frame_conversions::{
 };
 use utility::{squares_on_board, KingWorldStep, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir};
 
-pub const SNAPSHOT_KEY: Key = Key::Char('p');
+pub const SNAPSHOT_KEY: Key = Key::Ctrl('p');
 
 pub struct InputRecord {
     pub millis_from_start: u128,
@@ -34,9 +35,90 @@ pub fn snapshot_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../snapshot")
 }
 
+/// The repo root's `issues/` directory, where live captures are filed.
+pub fn issues_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../issues")
+}
+
+/// The smallest unused integer issue number, given the names already present.
+/// Names that are not purely numeric (e.g. `README.md`, descriptive issues) are
+/// ignored. Exposed for testing.
+pub fn next_issue_number(existing_names: impl IntoIterator<Item = String>) -> u32 {
+    existing_names
+        .into_iter()
+        .filter_map(|name| name.parse::<u32>().ok())
+        .max()
+        .map(|max| max + 1)
+        .unwrap_or(1)
+}
+
+/// Create a fresh, sequentially numbered issue directory containing an empty
+/// `snapshot/` subdirectory and a templated `issue.md`. Returns the issue root.
+pub fn create_new_issue(map_name: Option<&str>) -> Result<PathBuf, String> {
+    let issues = issues_dir();
+    let existing = std::fs::read_dir(&issues)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned());
+    let number = next_issue_number(existing);
+    let issue_dir = issues.join(format!("{number:04}"));
+    std::fs::create_dir_all(issue_dir.join("snapshot"))
+        .map_err(|error| format!("Could not create issue dir {}: {error}", issue_dir.display()))?;
+    write_file(&issue_dir.join("issue.md"), &issue_note_template(number, map_name));
+    Ok(issue_dir)
+}
+
+/// The stub written before the editor opens. A short header so the saved note
+/// is self-describing even if left mostly empty.
+fn issue_note_template(number: u32, map_name: Option<&str>) -> String {
+    let map = map_name.unwrap_or("demo");
+    format!(
+        "# Issue {number:04}\n\n\
+         Map: {map}\n\
+         Captured: {}\n\n\
+         ## Description\n\n",
+        today_utc()
+    )
+}
+
+/// Today's date as `YYYY-MM-DD` (UTC), so the template needs no date crate.
+fn today_utc() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or(0);
+    let (year, month, day) = civil_from_days((secs / 86_400) as i64);
+    format!("{year:04}-{month:02}-{day:02}")
+}
+
+/// Howard Hinnant's `civil_from_days`: days since 1970-01-01 to (year, month,
+/// day). Valid across the whole `i64` range.
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let year = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    (if month <= 2 { year + 1 } else { year }, month, day)
+}
+
 pub fn write_snapshot(game: &Game, input_history: &[InputRecord], map_name: Option<&str>) {
-    let dir = snapshot_dir();
-    if let Err(error) = std::fs::create_dir_all(&dir) {
+    write_snapshot_to(&snapshot_dir(), game, input_history, map_name);
+}
+
+/// Write the three snapshot files into `dir`, creating it if needed.
+pub fn write_snapshot_to(
+    dir: &Path,
+    game: &Game,
+    input_history: &[InputRecord],
+    map_name: Option<&str>,
+) {
+    if let Err(error) = std::fs::create_dir_all(dir) {
         eprintln!("Could not create snapshot directory {}: {error}", dir.display());
         return;
     }
@@ -804,6 +886,48 @@ mod tests {
     use crate::utils_for_tests::set_up_game_with_player;
     use euclid::{point2, vec2};
     use utility::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
+
+    #[test]
+    fn next_issue_number_picks_one_past_the_max() {
+        let names = ["README.md", "0002", "0001", "black-diagonal-seam", "0010"].map(String::from);
+        assert_eq!(next_issue_number(names), 11);
+        assert_eq!(next_issue_number(Vec::<String>::new()), 1);
+        assert_eq!(next_issue_number(["not-a-number"].map(String::from)), 1);
+    }
+
+    #[test]
+    fn issue_note_template_is_self_describing() {
+        let note = issue_note_template(7, Some("racetrack"));
+        assert!(note.contains("# Issue 0007"));
+        assert!(note.contains("Map: racetrack"));
+        assert!(note.contains("## Description"));
+    }
+
+    #[test]
+    fn civil_from_days_handles_epoch_and_rollover() {
+        assert_eq!(civil_from_days(0), (1970, 1, 1));
+        assert_eq!(civil_from_days(365), (1971, 1, 1));
+        assert_eq!(civil_from_days(-1), (1969, 12, 31));
+    }
+
+    #[test]
+    fn write_snapshot_to_writes_all_three_files() {
+        let mut game = set_up_game_with_player();
+        game.draw_headless_now();
+        let dir = std::env::temp_dir().join(format!(
+            "widgetmancer_snapshot_dir_{}_{}",
+            std::process::id(),
+            next_issue_number(Vec::<String>::new())
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+
+        write_snapshot_to(&dir, &game, &[], Some("test"));
+
+        assert!(dir.join("screen.txt").is_file());
+        assert!(dir.join("game_state.json").is_file());
+        assert!(dir.join("input_history.json").is_file());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn game_state_json_includes_world_features() {

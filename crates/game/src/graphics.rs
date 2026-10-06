@@ -160,6 +160,9 @@ pub struct Graphics {
     starfield: Starfield,
     /// Static border around the player's FOV. Stateless; see `fov_border`.
     fov_border: FovBorder,
+    /// Screen-space overlay for UI content. Composited over the world pass and
+    /// under the debug overlays; see `terminal_rendering::ui_layer`.
+    ui: UiLayer,
 }
 
 /// Toggles for the live debug overlay.
@@ -191,6 +194,7 @@ impl Graphics {
             debug_overlay: DebugOverlayFlags::default(),
             starfield: Starfield::new(),
             fov_border: FovBorder::new(),
+            ui: UiLayer::new(terminal_width, terminal_height),
         };
         g.screen.fill_screen_buffer(BLACK);
         g
@@ -878,7 +882,24 @@ impl Graphics {
 
     /// Paint the static FOV border, one square outside the sight radius.
     pub fn draw_fov_border(&mut self, player_square: WorldSquare, radius: u32) {
-        self.fov_border.draw(&mut self.screen, player_square, radius);
+        self.fov_border
+            .draw(&mut self.ui, &self.screen, player_square, radius);
+    }
+
+    /// The screen-space UI overlay. Callers draw into it after the world pass;
+    /// `composite_ui` must run before `display`.
+    pub fn ui_layer(&mut self) -> &mut UiLayer {
+        &mut self.ui
+    }
+
+    /// Discard the previous frame's UI content.
+    pub fn clear_ui(&mut self) {
+        self.ui.clear();
+    }
+
+    /// Blend the UI layer over the world pass, under the debug overlays.
+    pub fn composite_ui(&mut self) {
+        self.ui.composite_onto(&mut self.screen);
     }
 
     /// Debug-only overlays applied after the FOV composite (roadmap W.G).
