@@ -9,6 +9,32 @@ Newest first.
 
 ---
 
+## 2026-10-06 — Solved issues are archived; issue numbers are never reused
+
+### game: reserve issue numbers across the `issues/solved/` archive
+
+A capture after deleting a solved issue reused its number: `next_issue_number`
+was one past the highest name *currently* in `issues/`, so removing the
+highest-numbered (or only) issue made the next capture take that number again.
+Issue numbers are references — `docs/CHANGELOG.md`, tests, and notes point at
+them — so reusing one silently repoints those references.
+
+- **Policy.** Solved issues are now moved to `issues/solved/` instead of
+  deleted, so the record of an assigned number survives. `issues/README.md`
+  updated; `issues/solved/README.md` documents the archive.
+- **Numbering.** New `issue_number_names(&issues)` gathers candidate names from
+  both `issues/` and `issues/solved/`; `create_new_issue` feeds them to
+  `next_issue_number`, which stays `max + 1`. `next_issue_number`'s doc now
+  states the caller must include archived numbers, and its old "smallest unused"
+  wording is corrected to "one past the highest".
+- **Tests.** `archived_issue_numbers_are_still_reserved` builds `issues/0001`
+  plus `issues/solved/0002` and asserts the next number is `3`; it fails against
+  the previous top-level-only scan (which returned the reused `2`).
+
+Verified: `cargo test -p game --lib` 309 passed / 6 ignored.
+
+---
+
 ## 2026-10-06 — Re-seed each built-in map's floor to its own board (issues 0001/0002)
 
 ### game: built-in maps re-derive their floor slab; AGENTS debugging discipline

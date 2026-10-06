@@ -40,9 +40,11 @@ pub fn issues_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../issues")
 }
 
-/// The smallest unused integer issue number, given the names already present.
-/// Names that are not purely numeric (e.g. `README.md`, descriptive issues) are
-/// ignored. Exposed for testing.
+/// One past the highest integer issue number among `existing_names`, so numbers
+/// are assigned strictly upward and never reused. Names that are not purely
+/// numeric (e.g. `README.md`, descriptive issues) are ignored. Callers must pass
+/// the archived numbers too (see [`issue_number_names`]), or a solved issue's
+/// number would be handed out again. Exposed for testing.
 pub fn next_issue_number(existing_names: impl IntoIterator<Item = String>) -> u32 {
     existing_names
         .into_iter()
@@ -52,16 +54,24 @@ pub fn next_issue_number(existing_names: impl IntoIterator<Item = String>) -> u3
         .unwrap_or(1)
 }
 
+/// Every candidate issue name, from both the open `issues/` directory and the
+/// `issues/solved/` archive. Solved issues are moved (not deleted) so their
+/// numbers stay reserved and are never handed out again.
+fn issue_number_names(issues: &Path) -> Vec<String> {
+    [issues.to_path_buf(), issues.join("solved")]
+        .iter()
+        .filter_map(|dir| std::fs::read_dir(dir).ok())
+        .flatten()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect()
+}
+
 /// Create a fresh, sequentially numbered issue directory containing an empty
 /// `snapshot/` subdirectory and a templated `issue.md`. Returns the issue root.
 pub fn create_new_issue(map_name: Option<&str>) -> Result<PathBuf, String> {
     let issues = issues_dir();
-    let existing = std::fs::read_dir(&issues)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|entry| entry.file_name().to_string_lossy().into_owned());
-    let number = next_issue_number(existing);
+    let number = next_issue_number(issue_number_names(&issues));
     let issue_dir = issues.join(format!("{number:04}"));
     std::fs::create_dir_all(issue_dir.join("snapshot"))
         .map_err(|error| format!("Could not create issue dir {}: {error}", issue_dir.display()))?;
@@ -893,6 +903,23 @@ mod tests {
         assert_eq!(next_issue_number(names), 11);
         assert_eq!(next_issue_number(Vec::<String>::new()), 1);
         assert_eq!(next_issue_number(["not-a-number"].map(String::from)), 1);
+    }
+
+    #[test]
+    fn archived_issue_numbers_are_still_reserved() {
+        let dir = std::env::temp_dir().join(format!(
+            "widgetmancer_issue_numbers_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("solved/0002")).unwrap();
+        std::fs::create_dir_all(dir.join("0001")).unwrap();
+
+        // 0002 is solved (archived), 0001 is open: the next number must clear
+        // both. A top-level-only scan would return 2 and reuse the solved issue.
+        assert_eq!(next_issue_number(issue_number_names(&dir)), 3);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
