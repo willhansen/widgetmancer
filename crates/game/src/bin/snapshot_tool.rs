@@ -31,7 +31,7 @@ use game::game::snapshot::debug;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "Usage: snapshot_tool <render|diff|bless|cells> <dir> [ref]\n\
+        "Usage: snapshot_tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|invariants|minimize> <dir> [args]\n\
          \n\
          Requires the `debug-tools` feature:\n\
          cargo run -p game --features debug-tools --bin snapshot_tool -- <args>"
@@ -85,6 +85,16 @@ fn main() -> ExitCode {
                 for row in &grid {
                     println!("{}", row.iter().map(|c| c.character).collect::<String>());
                 }
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        "heights" => match debug::height_view(&dir) {
+            Ok(text) => {
+                print!("{text}");
                 ExitCode::SUCCESS
             }
             Err(error) => {

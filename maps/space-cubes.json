@@ -1,0 +1,16 @@
+{
+  "board": [42, 38],
+  "clear_floor": true,
+  "sight_radius": 24,
+  "ops": [
+    { "op": "cuboid", "x": 4, "y": 4, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cube_side_platforms", "x": 4, "y": 4 },
+    { "op": "cuboid", "x": 28, "y": 4, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cube_side_platforms", "x": 28, "y": 4 },
+    { "op": "cuboid", "x": 4, "y": 28, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cube_side_platforms", "x": 4, "y": 28 },
+    { "op": "cuboid", "x": 28, "y": 28, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cube_side_platforms", "x": 28, "y": 28 }
+  ],
+  "player": [9, 9]
+}

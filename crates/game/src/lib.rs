@@ -69,13 +69,21 @@ pub fn set_up_input_thread() -> Receiver<(Instant, Event)> {
 }
 
 pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
+    // A `maps/<name>.json` recipe takes precedence; maps own their board size
+    // and are independent of the terminal.
+    if let Some(name) = map_name {
+        if let Some(map) = game::map_file::load_map_file(name) {
+            game.apply_map_file(&map);
+            return;
+        }
+    }
     match map_name {
         None | Some("demo") => game.set_up_demo_map(),
         Some("racetrack") => game.set_up_portal_cube_racetrack_map(),
         Some("hallways") => game.set_up_portal_pair_hallways_map(),
         Some("numbered-boxes") => game.set_up_numbered_boxes_map(),
         Some(unknown) => {
-            panic!("Unknown map '{unknown}'. Known maps: demo, racetrack, hallways, numbered-boxes.")
+            panic!("Unknown map '{unknown}'. Known maps: demo, racetrack, hallways, numbered-boxes, space-cubes.")
         }
     }
 }
@@ -106,16 +114,6 @@ pub fn do_everything(
     fov_toggles: FovToggles,
 ) {
     let (width, height) = termion::terminal_size().unwrap();
-    //let (width, height) = (40, 20);
-    // The racetrack map's exhibits span ~30x19 squares around the player,
-    // and the board is half the terminal width in squares, so that map
-    // needs at least a 96x26-character terminal. The numbered-boxes map is a
-    // fixed 20x20 board, needing at least 40x20 characters.
-    let (width, height) = match map_name.as_deref() {
-        Some("racetrack") => (width.max(96), height.max(26)),
-        Some("numbered-boxes") => (width.max(40), height.max(20)),
-        _ => (width, height),
-    };
 
     let mut game = match &load_path {
         Some(dir) => match load_snapshot_game(dir) {
@@ -127,6 +125,8 @@ pub fn do_everything(
         },
         None => {
             let mut game = Game::new(width, height, LogicalTime::ZERO);
+            // Maps set their own board size and player start; this provisional
+            // placement only matters for map-less use.
             game.place_player(point2(width as i32 / 4, height as i32 / 2));
             set_up_map_by_name(&mut game, map_name.as_deref());
             game

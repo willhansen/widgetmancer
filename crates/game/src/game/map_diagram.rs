@@ -25,7 +25,6 @@ struct DiagramPortal {
 impl Game {
     pub fn ascii_diagram(&self) -> String {
         let portals = self.diagram_portals();
-        let blocks = self.block_squares();
         let cubes = self
             .death_cubes
             .iter()
@@ -76,10 +75,8 @@ impl Game {
                     '*'
                 } else if exit_squares.contains(&square) {
                     'o'
-                } else if blocks.contains(&square) {
-                    '#'
                 } else {
-                    '.'
+                    terrain_height_glyph(self.height_at(square))
                 };
                 out.push_str(&format!(" {} ", glyph));
             }
@@ -88,6 +85,7 @@ impl Game {
 
         out.push_str("\nLegend\n");
         out.push_str("  @ player   * death cube   # block   o portal exit (enter-only face)\n");
+        out.push_str("  . bare board/void   # one-voxel block   2-9 terrain height (mod 10)\n");
         out.push_str("  portal entrances, by direction of travel through them:\n");
         for portal in &portals {
             out.push_str(&format!(
@@ -149,6 +147,16 @@ impl Game {
     }
 }
 
+/// A glyph for a square's top-surface altitude: `.` for bare board/off-board,
+/// `#` for a single-voxel block, and a digit for taller terrain (mod 10).
+fn terrain_height_glyph(height: Option<i32>) -> char {
+    match height {
+        None | Some(0) => '.',
+        Some(1) => '#',
+        Some(h) => char::from_digit((h as u32) % 10, 10).unwrap_or('#'),
+    }
+}
+
 fn world_point_to_square(point: WorldPoint) -> WorldSquare {
     point2(point.x.round() as i32, point.y.round() as i32)
 }
@@ -166,7 +174,6 @@ fn arrow_for_step(step: WorldStep) -> char {
         '?'
     }
 }
-
 fn dir_name(step: WorldStep) -> &'static str {
     if step == STEP_RIGHT {
         "right"
@@ -178,5 +185,33 @@ fn dir_name(step: WorldStep) -> &'static str {
         "down"
     } else {
         "?"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils_for_tests::set_up_nxn_game;
+    use euclid::point2;
+
+    #[test]
+    fn terrain_height_glyph_distinguishes_board_block_and_tall_columns() {
+        assert_eq!(terrain_height_glyph(None), '.');
+        assert_eq!(terrain_height_glyph(Some(0)), '.', "bare slab");
+        assert_eq!(terrain_height_glyph(Some(1)), '#', "single block");
+        assert_eq!(terrain_height_glyph(Some(3)), '3');
+        assert_eq!(terrain_height_glyph(Some(13)), '3', "wraps mod 10");
+    }
+
+    #[test]
+    fn diagram_prints_raised_terrain_heights() {
+        let mut game = set_up_nxn_game(12);
+        game.place_player(point2(6, 6));
+        let column = point2(7, 6);
+        game.place_solid_column(column, 4);
+        let diagram = game.ascii_diagram();
+        // The raised column is drawn with its top altitude (4), not a block.
+        assert!(diagram.contains(" 4 "), "expected height 4 in diagram:\n{diagram}");
+        assert_eq!(terrain_height_glyph(game.height_at(column)), '4');
     }
 }

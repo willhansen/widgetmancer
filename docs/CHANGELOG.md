@@ -9,6 +9,144 @@ Newest first.
 
 ---
 
+## 2026-10-04 — Voxel-grid board, data-defined maps, and the `space-cubes` demo map
+
+### game: voxel-grid board + JSON map recipes + `space-cubes` map
+
+Turns the board into an explicit voxel grid and recreates the deleted
+`cube_iso` demo as a data-defined map.
+
+- **Voxel-grid board.** `Terrain` gains `fill_floor_rect` / `clear_floor` /
+  `floor_squares` / `occupied_squares` / `slab_voxels`; the `z = -1` floor is a
+  convenience a map opts into. Void renders as starfield and blocks movement.
+  Starfield now paints by occupancy, not the board rectangle.
+- **Walkability by surface altitude.** A move is allowed if the destination has
+  ground and is not *higher* than the player's current surface (derived from the
+  column, so it follows the player down steps). On floor maps a block is a step
+  up → still a wall, so existing gameplay is unchanged. Void is blocked.
+- **Altitude-aware sight.** `Game::fov_blockers` only counts columns whose top
+  rises above the player, so the player can see across a cube top it is on.
+- **Snapshot.** `floor_cells` records the `z = -1` floor only when it differs
+  from the default full rect; legacy snapshots load the full floor.
+- **JSON map recipes.** `game/map_file.rs`: `maps/<name>.json` is a list of
+  `cuboid` / `column` / `voxel` / `cube_side_platforms` / floor ops plus board
+  size, sight radius, and player start; `set_up_map_by_name` prefers a recipe
+  and falls back to the built-ins. Board size is now owned by the map, not the
+  terminal; `do_everything`'s per-map terminal clamp is gone and the built-in
+  maps (`demo`, `racetrack`, `hallways`) set explicit boards.
+- **`space-cubes` map.** `maps/space-cubes.json` + `maps/space-cubes.sh`
+  recreate the demo: four 10×10×10 cubes, their south staircases and east/west
+  ledges, player on the first cube top, real void between.
+- Deferred gravity/falling documented in `ROADMAP.md`.
+- `docs/VOXEL_WORLD_PLAN.md` records the work plan and status so it can be
+  resumed after an interruption.
+
+Verified: workspace tests green (new terrain/walkability/map-file/snapshot/
+space-cubes tests); `snapshot_tool diff snapshot/` still matches.
+
+---
+
+## 2026-10-04 — Finish the `cube_iso` port (phases 4/6, verify) and delete the demo
+
+### game: floating-entity altitude, height tooling, ported tests; remove cube_iso
+
+Completes `docs/CUBE_ISO_PORT.md`:
+
+- **Phase 4 — floating-entity altitude.** `DeathCube`/`FloatingHunterDrone`
+  gain a static `altitude` (voxels, default 0), snapshotted as `altitude`.
+  A non-zero-altitude entity is kept out of the planar draw buffer and
+  composited by `Graphics::overlay_floating_entities_at_altitude` at its
+  shifted screen square (FOV-gated, no ground-level ghost). Altitude 0 is
+  byte-identical to before.
+- **Phase 6 — tooling.** `snapshot_tool heights <dir>` prints a loaded map's
+  per-column top altitude; `map_diagram` already prints heights. Demo HUD/CLI
+  dropped with the crate.
+- **Verification.** Ported tests: `checker_light` 3-square parity,
+  `terrain_fog` monotonicity/floor, painter-order regression (a nearer column
+  overwriting a farther wall), and the projection/altitude tests added earlier.
+- **Deletion gate.** Removed `cube_iso/` from disk and from the workspace
+  `members`; statuses in the port doc are now `ported`/`native`/`deferred`/
+  `testbed-only` with no `pending` left. The doc is marked Done.
+
+Verified: full workspace tests green; `snapshot_tool diff snapshot/` still
+matches.
+
+---
+
+## 2026-10-04 — Port phase 3: terrain materials (`cube_iso`)
+
+### game: per-column terrain materials, checker tops, wall gradient, fog (cube_iso port phase 3)
+
+- `TerrainMaterial { Floor, Tint(RGB8) }` stored per column in `Terrain`
+  (overrides only; defaults derived from whether a column is built up).
+  `place_solid_column_with_material` / `set_terrain_material` choose a tint at
+  creation; `place_block` keeps its legacy look. `set_up_terrain_demo` uses
+  several tints.
+- `Graphics::load_screen_buffer_from_terrain`: fully-visible top faces get the
+  material as their **background** only (block/piece/player glyphs untouched);
+  `Floor` resolves to the existing board pattern (flat boards unchanged), a
+  tint uses the 3-square `(x,y,z)` checker. Walls use a base→tint gradient.
+  Terrain and walls are depth-fogged; `Floor` is not, so the board reads as
+  before. Partially-visible tops keep their existing shadow rendering.
+- Only exactly-one-voxel columns draw the flat block glyph now
+  (`single_height_block_squares`); taller columns render as material, so their
+  tops are no longer hidden by the block fill.
+- Snapshot: `materials` (`[x, y, r, g, b]`, `Floor` encoded as `-1` color),
+  defaults re-derived on load.
+- The demo's warm-ledge/standoff-hue system is intentionally dropped (a tint is
+  chosen at creation); the bright rim is not ported.
+- Tests: default material derivation, override serialization, red-tint top, and
+  the existing raised-terrain/flat-gate/snapshot round-trip tests.
+
+Verified: workspace tests green; `snapshot_tool diff snapshot/` still matches.
+
+---
+
+## 2026-10-04 — Port phase 5: view rotation (`q`/`e`) (`cube_iso`)
+
+### game: bind q/e to view rotation; quit on Esc/Ctrl-C (cube_iso port phase 5)
+
+- `Game::rotate_view(quarter_turns)` rotates `Screen::rotation`; the FOV cache
+  is rotation-independent, so no invalidation needed.
+- `InputMap`: `q`/`e` rotate counter-clockwise/clockwise; quit moved from `q` to
+  `Esc`/`Ctrl-C`. Movement is already screen-relative, so it follows the view.
+- Test: `q` then `e` returns to the starting quarter turn; `Esc` quits.
+- Docs updated: phase 5 + projection/rotation inventory rows marked ported.
+  The optional `DebugOverlayFlags` facing marker is not added.
+
+---
+
+## 2026-10-04 — Port phase 2: z projection + forward terrain column pass (`cube_iso`)
+
+### game: render raised terrain with a z-forward column pass (cube_iso port phase 2)
+
+Second step of the `cube_iso` port (`docs/CUBE_ISO_PORT.md`). Adds the visual
+altitude layer while keeping the flat renderer byte-for-byte:
+
+- `Screen::world_square_and_altitude_to_screen_buffer_square` — altitude shifts
+  a square up one row per voxel, independent of view rotation (projection P's z
+  term). Unit-tested upright and under rotation.
+- `Terrain::columns` / `max_top_altitude` expose the render walk and the gate.
+- `Graphics::load_screen_buffer_from_terrain` — a painter-sorted (far-to-near)
+  forward column pass drawing top faces, camera-facing walls, and the slab edge.
+  Top faces reuse the FOV/draw-buffer lookup, so visibility, partial shadows,
+  and entity overlays still apply; walls use a solid placeholder color until the
+  material phase.
+- `Game::update_screen_from_draw_buffer` picks the pass only when
+  `max_top_altitude() > 1`, so flat/block-only boards keep the legacy inverse-FOV
+  path. On a raised board the legacy inverse composite still runs underneath the
+  pass, preserving portal views of the floor and entities (its per-cell
+  `drawn_over` compositing) and the starfield `drawn` contract; only the raised
+  geometry is not yet re-projected through portals.
+- Tests: raised column draws its top three rows up with a wall below; a
+  single-height block still renders at its flat square.
+- `map_diagram` now prints terrain height: `.` bare board/void, `#`
+  single-voxel block, digits for taller columns (mod 10).
+
+Verified: workspace tests green; `snapshot_tool diff snapshot/` still matches.
+
+---
+
 ## 2026-10-04 — Port phase 1: terrain/voxel data model (`cube_iso`)
 
 ### game: add voxel/altitude terrain model (cube_iso port phase 1)
@@ -31,6 +169,10 @@ no rendering change, so the flat gate holds.
   the slab for the captured board size.
 - Added `Game::set_up_terrain_demo` and terrain/snapshot round-trip + legacy
   migration tests.
+- `CUBE_ISO_PORT.md` gained an "Environment model" section recording what the
+  voxel layer owns (terrain solidity/altitude) versus what it does not (portal
+  topology, 2D FOV, single-surface gameplay), plus the invariants that hold
+  until full 3D occlusion.
 
 Verified: workspace tests green; `snapshot_tool diff snapshot/` still matches.
 

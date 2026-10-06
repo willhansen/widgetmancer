@@ -11,7 +11,8 @@ use glyph::glyph_constants::*;
 
 use crate::fov_stuff::FieldOfViewResult;
 use crate::game::{
-    DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone,
+    DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, Terrain,
+    TerrainMaterial, SLAB_VOXEL_Z,
 };
 use crate::graphics::drawable::{
     ArrowDrawable, BrailleDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum,
@@ -60,6 +61,57 @@ use game_colors::*;
 
 pub type FloorColorFunction = fn(WorldSquare) -> RGB8;
 
+/// Character used for a terrain wall cell.
+const TERRAIN_WALL_CHAR: char = '▒';
+/// Dark base of the wall gradient (bottom of a column).
+const TERRAIN_WALL_BASE: RGB8 = RGB8::new(24, 24, 36);
+/// Checker block size, in world squares — matches the board's own 3-square
+/// pattern.
+const CHECKER_BLOCK: i32 = 3;
+/// Depth (screen squares, forward 1x + side 0.5x) at which fog reaches its
+/// floor, and the darkest it gets.
+const FOG_SPAN: f32 = 18.0;
+const FOG_MIN: f32 = 0.2;
+
+/// The base color a wall gradient runs toward for a column's material. The
+/// floor slab edge uses a neutral slate; a tint uses itself.
+fn terrain_tint(material: TerrainMaterial) -> RGB8 {
+    match material {
+        TerrainMaterial::Tint(color) => color,
+        TerrainMaterial::Floor => RGB8::new(64, 64, 82),
+    }
+}
+
+/// Fraction up the column for a wall voxel, 0 at the slab base and 1 at the top.
+fn wall_gradient_t(z: i32, top_voxel: i32) -> f32 {
+    if top_voxel <= SLAB_VOXEL_Z {
+        return 1.0;
+    }
+    let span = (top_voxel - SLAB_VOXEL_Z) as f32;
+    (((z - SLAB_VOXEL_Z) as f32) / span).clamp(0.0, 1.0)
+}
+
+/// 3-square block checker parity; `true` selects the light shade.
+fn checker_light(x: i32, y: i32, z: i32) -> bool {
+    let block = |v: i32| v.div_euclid(CHECKER_BLOCK);
+    (block(x) + block(y) + block(z)).rem_euclid(2) == 0
+}
+
+fn scale_rgb(color: RGB8, factor: f32) -> RGB8 {
+    let scale = |v: u8| ((v as f32) * factor).round().clamp(0.0, 255.0) as u8;
+    RGB8::new(scale(color.r), scale(color.g), scale(color.b))
+}
+
+fn lerp_rgb(a: RGB8, b: RGB8, t: f32) -> RGB8 {
+    let t = t.clamp(0.0, 1.0);
+    let mix = |x: u8, y: u8| (x as f32 * (1.0 - t) + y as f32 * t).round() as u8;
+    RGB8::new(mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b))
+}
+
+fn terrain_apply_fog(color: RGB8, fog: f32) -> RGB8 {
+    scale_rgb(color, fog)
+}
+
 #[derive(Clone)]
 pub enum FloorColorEnum {
     Function(FloorColorFunction),
@@ -96,6 +148,11 @@ pub struct Graphics {
     /// `display()` are swept, so despawned entities cannot leak.
     floating_entity_family_memory: HashMap<FloatingEntityId, usize>,
     floating_entities_drawn_this_frame: HashSet<FloatingEntityId>,
+    /// Floating entities held to render at a non-zero static altitude. They are
+    /// kept out of the planar `draw_buffer` and composited by the altitude
+    /// overlay pass instead, so they don't also appear at ground level.
+    floating_entity_overlay: HashMap<WorldSquare, DrawableEnum>,
+    floating_entity_altitudes: HashMap<WorldSquare, i32>,
     /// Debug-only render overlays (roadmap W.G). Off by default; harmless when
     /// off, so no feature gate is needed.
     pub debug_overlay: DebugOverlayFlags,
@@ -129,6 +186,8 @@ impl Graphics {
             render_portals_with_line_of_sight: true,
             floating_entity_family_memory: HashMap::new(),
             floating_entities_drawn_this_frame: HashSet::new(),
+            floating_entity_overlay: HashMap::new(),
+            floating_entity_altitudes: HashMap::new(),
             debug_overlay: DebugOverlayFlags::default(),
             starfield: Starfield::new(),
             fov_border: FovBorder::new(),
@@ -167,6 +226,8 @@ impl Graphics {
 
     pub fn clear_draw_buffer(&mut self) {
         self.draw_buffer.clear();
+        self.floating_entity_overlay.clear();
+        self.floating_entity_altitudes.clear();
     }
 
     fn draw_braille_point(&mut self, pos: WorldPoint, color: RGB8) {
@@ -313,6 +374,128 @@ impl Graphics {
         drawn
     }
 
+    /// Forward terrain column pass: paint top faces, camera-facing walls, and
+    /// the board slab edge, far-to-near, instead of the flat inverse FOV map.
+    ///
+    /// Only used when the terrain has more than one level (see
+    /// `Terrain::max_top_altitude`), so flat boards keep the legacy path
+    /// byte-for-byte. Top faces reuse the FOV/draw-buffer lookup, so visibility,
+    /// partial shadows, and entity overlays still apply; the column's material
+    /// recolors the *background* only, leaving the glyph (`#`, piece, player)
+    /// visible. Partially-visible top faces are left as-is (their fg/bg encode
+    /// the shadow). The legacy inverse composite runs underneath for portal
+    /// views, so a square reachable only through a portal keeps its flat draw.
+    pub fn load_screen_buffer_from_terrain(
+        &mut self,
+        field_of_view: &FieldOfViewResult,
+        terrain: &Terrain,
+    ) -> HashSet<ScreenBufferSquare> {
+        let mut drawn: HashSet<ScreenBufferSquare> = HashSet::new();
+        let rotation = self.screen.rotation().quarter_turns();
+        let toward_camera = self.screen.screen_step_to_world_step(SCREEN_STEP_DOWN);
+
+        let mut columns = terrain.columns();
+        // Painter's order: far (small screen row) first, near (large) last, so a
+        // nearer column overwrites the wall it stands in front of.
+        columns.sort_by_key(|&(square, _)| {
+            let base = self.screen.world_square_to_screen_buffer_square(square);
+            (base.y, square.x)
+        });
+
+        for (square, top_voxel) in columns {
+            let material = terrain.material_at(square);
+            for z in (SLAB_VOXEL_Z..=top_voxel).rev() {
+                if !terrain.is_solid_at(square.x, square.y, z) {
+                    continue;
+                }
+                let neighbor = square + toward_camera;
+                if !terrain.is_solid_at(neighbor.x, neighbor.y, z)
+                    && field_of_view
+                        .can_see_relative_square(square - field_of_view.root_square())
+                {
+                    let wall_square = self
+                        .screen
+                        .world_square_and_altitude_to_screen_buffer_square(square, z);
+                    let color = terrain_apply_fog(
+                        lerp_rgb(
+                            TERRAIN_WALL_BASE,
+                            terrain_tint(material),
+                            wall_gradient_t(z, top_voxel),
+                        ),
+                        self.terrain_fog(wall_square),
+                    );
+                    let wall = [
+                        Glyph::new(TERRAIN_WALL_CHAR, color, color),
+                        Glyph::new(TERRAIN_WALL_CHAR, color, color),
+                    ];
+                    self.screen
+                        .draw_glyphs_straight_to_screen_square(wall, wall_square);
+                    drawn.insert(wall_square);
+                }
+
+                if !terrain.is_solid_at(square.x, square.y, z + 1) {
+                    let top_square = self
+                        .screen
+                        .world_square_and_altitude_to_screen_buffer_square(square, z + 1);
+                    let relative = square - field_of_view.root_square();
+                    let maybe_top = field_of_view.drawable_at_relative_square(
+                        relative,
+                        Some(&self.draw_buffer),
+                        self.tint_portals,
+                        self.render_portals_with_line_of_sight,
+                    );
+                    if let Some(top) = maybe_top {
+                        let is_partial = matches!(top, DrawableEnum::PartialVisibility(_));
+                        let rotated: DrawableEnum = top.rotated(-rotation);
+                        let mut glyphs = rotated.to_glyphs();
+                        if !is_partial {
+                            // Material recolors the background only; the glyph
+                            // (block, piece, player) is untouched.
+                            let color = terrain_apply_fog(
+                                self.terrain_top_color(square, z, material),
+                                self.terrain_fog(top_square),
+                            );
+                            glyphs[0].bg_color = color;
+                            glyphs[1].bg_color = color;
+                        }
+                        self.screen
+                            .draw_glyphs_straight_to_screen_square(glyphs, top_square);
+                        drawn.insert(top_square);
+                    }
+                }
+            }
+        }
+        drawn
+    }
+
+    /// The background color of a fully-visible top face: the board's existing
+    /// floor pattern for `Floor`, a 3-square checker for a tint.
+    fn terrain_top_color(
+        &self,
+        square: WorldSquare,
+        voxel_z: i32,
+        material: TerrainMaterial,
+    ) -> RGB8 {
+        match material {
+            TerrainMaterial::Floor => self.floor_color_enum.color_at(square),
+            TerrainMaterial::Tint(color) => {
+                if checker_light(square.x, square.y, voxel_z) {
+                    color
+                } else {
+                    scale_rgb(color, 0.72)
+                }
+            }
+        }
+    }
+
+    /// Depth-fog factor for a screen square, measured from the screen center
+    /// (forward = row offset, side = column offset). Same shape as the demo's.
+    fn terrain_fog(&self, screen_square: ScreenBufferSquare) -> f32 {
+        let offset = (screen_square - self.screen.screen_center_as_screen_buffer_square()).to_f32();
+        let depth = offset.y.abs() + 0.5 * offset.x.abs();
+        (1.0 - depth / FOG_SPAN).clamp(FOG_MIN, 1.0)
+    }
+
     pub fn load_screen_buffer_from_absolute_positions_in_draw_buffer(&mut self) {
         // for character squares on screen
         for buffer_x in 0..self.screen.terminal_width() {
@@ -446,7 +629,13 @@ impl Graphics {
         time: LogicalTime,
     ) {
         let color = self.technicolor_at_time(time);
-        self.draw_floating_square(death_cube.id, death_cube.position(), color, portals);
+        self.draw_floating_square(
+            death_cube.id,
+            death_cube.position(),
+            color,
+            portals,
+            death_cube.altitude(),
+        );
     }
     pub fn draw_floating_hunter_drone(
         &mut self,
@@ -457,7 +646,13 @@ impl Graphics {
         for line in sight_line_segments {
             self.draw_naive_braille_line(line.p1, line.p2, SIGHT_LINE_SEEKING_COLOR);
         }
-        self.draw_floating_square(drone.id, drone.position(), HUNTER_DRONE_COLOR, portals);
+        self.draw_floating_square(
+            drone.id,
+            drone.position(),
+            HUNTER_DRONE_COLOR,
+            portals,
+            drone.altitude(),
+        );
     }
 
     fn draw_floating_square(
@@ -466,6 +661,7 @@ impl Graphics {
         pos: WorldPoint,
         color: RGB8,
         portals: &PortalGeometry,
+        altitude: i32,
     ) {
         let (mut drawables, picked_family) =
             OffsetSquareDrawable::drawables_for_floating_square_at_point_biased(
@@ -476,9 +672,60 @@ impl Graphics {
         remap_floating_square_drawables_through_portals(pos, &mut drawables, portals);
         self.floating_entity_family_memory.insert(id, picked_family);
         self.floating_entities_drawn_this_frame.insert(id);
-        drawables
+        if altitude == 0 {
+            drawables.iter().for_each(|(&square, drawable)| {
+                self.draw_drawable_to_draw_buffer(square, drawable)
+            });
+        } else {
+            // Held for the altitude overlay pass, so it doesn't also render at
+            // ground level.
+            drawables.into_iter().for_each(|(square, drawable)| {
+                self.floating_entity_overlay.insert(square, drawable.to_enum());
+                self.floating_entity_altitudes.insert(square, altitude);
+            });
+        }
+    }
+
+    /// Composite floating entities held at a non-zero altitude, shifted up by
+    /// their altitude. Only squares the player's FOV can see are drawn, and the
+    /// entity is composited over whatever the board already put at the
+    /// destination cell. Returns the screen squares painted (for the starfield).
+    pub fn overlay_floating_entities_at_altitude(
+        &mut self,
+        field_of_view: &FieldOfViewResult,
+    ) -> HashSet<ScreenBufferSquare> {
+        let mut drawn = HashSet::new();
+        let mut squares: Vec<(WorldSquare, i32)> = self
+            .floating_entity_altitudes
             .iter()
-            .for_each(|(&square, drawable)| self.draw_drawable_to_draw_buffer(square, drawable));
+            .map(|(&square, &z)| (square, z))
+            .collect();
+        // Far-to-near, matching the terrain painter order.
+        squares.sort_by_key(|&(square, _)| {
+            let base = self.screen.world_square_to_screen_buffer_square(square);
+            (base.y, square.x)
+        });
+        for (square, altitude) in squares {
+            let relative = square - field_of_view.root_square();
+            if field_of_view.visibilities_of_relative_square(relative).is_empty() {
+                continue;
+            }
+            let Some(drawable) = self.floating_entity_overlay.get(&square).cloned() else {
+                continue;
+            };
+            let screen_square = self
+                .screen
+                .world_square_and_altitude_to_screen_buffer_square(square, altitude);
+            let above = drawable.to_glyphs();
+            let below = self.screen.get_glyphs_at_screen_square(screen_square);
+            let mut composited: DoubleGlyph = above;
+            composited[0].bg_color = below[0].bg_color;
+            composited[1].bg_color = below[1].bg_color;
+            self.screen
+                .draw_glyphs_straight_to_screen_square(composited, screen_square);
+            drawn.insert(screen_square);
+        }
+        drawn
     }
 
     pub fn technicolor_at_time(&self, time: LogicalTime) -> RGB8 {
@@ -621,12 +868,12 @@ impl Graphics {
     /// which are left alone. Uses the frame's `current_time`.
     pub fn draw_starfield(
         &mut self,
-        board_size: BoardSize,
+        occupied: &SquareSet,
         fov: Option<&FieldOfViewResult>,
         drawn: &HashSet<ScreenBufferSquare>,
     ) {
         self.starfield
-            .draw(&mut self.screen, board_size, self.current_time, fov, drawn);
+            .draw(&mut self.screen, occupied, self.current_time, fov, drawn);
     }
 
     /// Paint the static FOV border, one square outside the sight radius.
@@ -650,8 +897,10 @@ impl Graphics {
         }
     }
 
-    pub fn draw_static_board(&mut self, board_size: BoardSize) {
-        squares_on_board(board_size).into_iter().for_each(|square| {
+    /// Draw the board floor pattern under the given squares. Squares without a
+    /// floor voxel are void and get no drawable.
+    pub fn draw_static_board(&mut self, floor_squares: &SquareSet) {
+        floor_squares.iter().for_each(|&square| {
             let color = self.floor_color_enum.color_at(square);
             let drawable = SolidColorDrawable::new(color);
             self.draw_above_square(&drawable, square)
@@ -783,6 +1032,29 @@ mod tests {
     }
 
     #[test]
+    fn checker_light_advances_every_three_squares() {
+        assert_eq!(checker_light(0, 0, 0), checker_light(2, 0, 0));
+        assert_ne!(checker_light(0, 0, 0), checker_light(3, 0, 0));
+        assert_ne!(checker_light(0, 0, 0), checker_light(0, 3, 0));
+        assert_ne!(checker_light(0, 0, 0), checker_light(0, 0, 3));
+    }
+
+    #[test]
+    fn terrain_fog_shrinks_with_depth_and_floors() {
+        let g = set_up_graphics();
+        let center = g.screen.screen_center_as_screen_buffer_square();
+        assert_eq!(g.terrain_fog(center), 1.0, "no fog at the screen center");
+        assert!(
+            g.terrain_fog(center) > g.terrain_fog(center + vec2(0, 10)),
+            "fog increases with depth"
+        );
+        assert!(
+            (g.terrain_fog(center + vec2(0, 10_000)) - FOG_MIN).abs() < 1e-6,
+            "fog floors at FOG_MIN"
+        );
+    }
+
+    #[test]
     fn test_debug_overlay_marks_screen_center() {
         let mut g = set_up_graphics();
         g.debug_overlay.screen_center = true;
@@ -903,7 +1175,7 @@ mod tests {
         let mut g = set_up_graphics_with_nxn_world_squares(1);
         let the_square = WorldSquare::new(0, 0);
         g.set_empty_board_animation();
-        g.draw_static_board(BoardSize::new(1, 1));
+        g.draw_static_board(&squares_on_board(BoardSize::new(1, 1)));
         //g.print_output_buffer();
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
         //g.print_output_buffer();

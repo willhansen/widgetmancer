@@ -28,6 +28,7 @@ mod ai;
 mod blocks;
 mod combat;
 mod floating_entities;
+pub mod map_file;
 mod map_diagram;
 mod realtime;
 pub mod snapshot;
@@ -37,7 +38,7 @@ mod turns;
 pub use spawning::IncubatingPawn;
 pub use floating_entities::{DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
 pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
-pub use terrain::{Terrain, SLAB_TOP, SLAB_VOXEL_Z};
+pub use terrain::{Terrain, TerrainMaterial, DEFAULT_TERRAIN_TINT, SLAB_TOP, SLAB_VOXEL_Z};
 
 pub const PLAYER_SIGHT_RADIUS: u32 = 16;
 
@@ -214,6 +215,16 @@ impl Game {
             faced_direction: KingWorldStep::new(direction),
             blink_range: 5,
         });
+    }
+
+    /// The player's current walking altitude: the top surface of the column it
+    /// stands on. Derived from the terrain, so it follows the player down
+    /// steps (no vertical physics yet).
+    fn player_altitude(&self) -> i32 {
+        self.player_optional
+            .as_ref()
+            .and_then(|player| self.height_at(player.position))
+            .unwrap_or(SLAB_TOP)
     }
 
     pub fn mid_square(&self) -> WorldSquare {
@@ -503,7 +514,8 @@ impl Game {
             self.capture_piece_at(square);
         }
 
-        if !self.square_is_on_board(square) || self.is_block_at(square) {
+        let altitude = self.player_altitude();
+        if !self.square_is_on_board(square) || !self.player_can_stand_at(square, altitude) {
             return Err(());
         }
 
@@ -515,6 +527,19 @@ impl Game {
         self.raw_set_player_position(square);
 
         return Ok(());
+    }
+
+    /// A voxel-world standability rule: the destination must have ground, and
+    /// (with no gravity yet) it must not be higher than where the player
+    /// already stands. Level moves and stepping *down* are allowed; a step up
+    /// is a wall, which is what keeps single-voxel blocks blocking exactly as
+    /// before on floor maps. At the default floor altitude this reduces to the
+    /// old `!is_block_at`.
+    fn player_can_stand_at(&self, square: WorldSquare, current_altitude: i32) -> bool {
+        match self.height_at(square) {
+            Some(surface) => surface <= current_altitude,
+            None => false,
+        }
     }
 
     fn raw_set_player_position(&mut self, square: WorldSquare) {
@@ -557,6 +582,16 @@ impl Game {
     pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
         return &mut self.graphics;
     }
+
+    /// Rotate the view by quarter turns counter-clockwise (negative = clockwise).
+    /// Movement is already screen-relative, and the FOV cache is rotation-
+    /// independent (the inverse composite rotates per cell), so no cache reset
+    /// is needed.
+    pub fn rotate_view(&mut self, quarter_turns: i32) {
+        self.graphics
+            .screen
+            .rotate(QuarterTurnsAnticlockwise::new(quarter_turns));
+    }
     pub fn graphics(&self) -> &Graphics {
         return &self.graphics;
     }
@@ -589,7 +624,11 @@ impl Game {
 
     pub fn populate_draw_buffer(&mut self, time: LogicalTime) {
         self.graphics.clear_draw_buffer();
-        self.graphics.draw_static_board(self.board_size);
+        // The floor pattern is the base drawable under every occupied column
+        // (the forward pass recolors raised tops); real void gets nothing, so
+        // the FOV composite skips it and the starfield paints it.
+        let occupied = self.terrain.occupied_squares();
+        self.graphics.draw_static_board(&occupied);
         self.graphics.draw_board_animation(time);
 
         // TODO: fix redundant calculation
@@ -614,7 +653,7 @@ impl Game {
             self.squares_threatened_by_any_piece(true),
         );
 
-        let block_squares = self.block_squares();
+        let block_squares = self.terrain.single_height_block_squares();
         self.graphics.draw_blocks(&block_squares);
         for (&square, &piece) in &self.pieces {
             if piece.piece_type == Arrow {
@@ -672,7 +711,25 @@ impl Game {
                 .screen
                 .set_screen_center_by_world_square(self.player_square());
             let fov = self.player_fov_for_draw();
-            let drawn = self.graphics.load_screen_buffer_from_fov(&fov);
+            let mut drawn = if self.terrain.max_top_altitude() > 1 {
+                // On a raised board the forward column pass draws the whole
+                // scene. The legacy inverse composite is only needed underneath
+                // to reproduce portal views (its per-cell `drawn_over`
+                // compositing); a portal-free raised map skips it, which also
+                // avoids drawing entity/floor duplicates at ground level.
+                let mut drawn = std::collections::HashSet::new();
+                if self.portal_geometry.iter_portals().next().is_some() {
+                    drawn = self.graphics.load_screen_buffer_from_fov(&fov);
+                }
+                drawn.extend(
+                    self.graphics
+                        .load_screen_buffer_from_terrain(&fov, &self.terrain),
+                );
+                drawn
+            } else {
+                self.graphics.load_screen_buffer_from_fov(&fov)
+            };
+            drawn.extend(self.graphics.overlay_floating_entities_at_altitude(&fov));
             (Some(fov), drawn)
         } else {
             self.graphics
@@ -680,8 +737,9 @@ impl Game {
             (None, std::collections::HashSet::new())
         };
 
+        let occupied = self.terrain.occupied_squares();
         self.graphics
-            .draw_starfield(self.board_size, player_fov.as_ref(), &drawn);
+            .draw_starfield(&occupied, player_fov.as_ref(), &drawn);
         if self.player_is_alive() {
             self.graphics
                 .draw_fov_border(self.player_square(), self.player_sight_radius);
@@ -950,6 +1008,9 @@ impl Game {
     /// trivial case of placed terrain.
     pub fn place_block(&mut self, square: WorldSquare) {
         self.terrain.place_solid_column(square, 1);
+        // Blocks keep their legacy look (the block glyph's own background).
+        self.terrain
+            .set_material(square, TerrainMaterial::Tint(glyph_constants::BLOCK_BG));
         self.invalidate_fov_cache();
     }
     pub fn place_voxel(&mut self, voxel: WorldVoxel) {
@@ -962,6 +1023,23 @@ impl Game {
     pub fn place_solid_column(&mut self, square: WorldSquare, top_height: u32) {
         self.terrain.place_solid_column(square, top_height);
         self.invalidate_fov_cache();
+    }
+    /// Fill a solid column with an explicit material tint.
+    pub fn place_solid_column_with_material(
+        &mut self,
+        square: WorldSquare,
+        top_height: u32,
+        material: TerrainMaterial,
+    ) {
+        self.terrain
+            .place_solid_column_with_material(square, top_height, material);
+        self.invalidate_fov_cache();
+    }
+    pub fn set_terrain_material(&mut self, square: WorldSquare, material: TerrainMaterial) {
+        self.terrain.set_material(square, material);
+    }
+    pub fn terrain_material_at(&self, square: WorldSquare) -> TerrainMaterial {
+        self.terrain.material_at(square)
     }
     pub fn is_solid_at(&self, x: i32, y: i32, z: i32) -> bool {
         self.terrain.is_solid_at(x, y, z)
@@ -1050,12 +1128,22 @@ impl Game {
         (0..n).for_each(|i| self.place_block(self.player_square() + STEP_RIGHT * (i as i32 + 4)));
     }
 
-    /// A few solid columns of differing heights, to exercise the terrain API
-    /// and snapshot round-trip before the z renderer lands.
+    /// A few solid columns of differing heights and tints, to exercise the
+    /// terrain and material APIs and the snapshot round-trip.
     pub fn set_up_terrain_demo(&mut self) {
         let base = self.player_square() + STEP_UP * 3;
-        for (i, height) in [1u32, 3, 2, 4].into_iter().enumerate() {
-            self.place_solid_column(base + STEP_RIGHT * i as i32, height);
+        let tints = [
+            RGB8::new(96, 104, 128),
+            RGB8::new(208, 120, 56),
+            RGB8::new(72, 128, 120),
+            RGB8::new(176, 82, 96),
+        ];
+        for (i, (height, tint)) in [1u32, 3, 2, 4].into_iter().zip(tints).enumerate() {
+            self.place_solid_column_with_material(
+                base + STEP_RIGHT * i as i32,
+                height,
+                TerrainMaterial::Tint(tint),
+            );
         }
     }
     pub fn set_up_simple_portal_map(&mut self) {
@@ -1173,6 +1261,8 @@ impl Game {
     }
 
     pub fn set_up_demo_map(&mut self) {
+        self.board_size = BoardSize::new(40, 24);
+        self.place_player(point2(20, 12));
         let base_square: WorldSquare = self.player_square();
 
         let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
@@ -1233,6 +1323,8 @@ impl Game {
     /// The exhibits span ~30x19 squares around the player, so the game
     /// clamps the terminal to at least 96x26 characters for this map.
     pub fn set_up_portal_cube_racetrack_map(&mut self) {
+        self.board_size = BoardSize::new(48, 26);
+        self.place_player(point2(24, 13));
         let base = self.player_square();
 
         let left_edge_x = base.x + 4;
@@ -1362,6 +1454,8 @@ impl Game {
     /// - bottom: two-way, double-sided — also registers the backs of both
     ///   windows, giving the guard more faces to skip at each emergence.
     pub fn set_up_portal_pair_hallways_map(&mut self) {
+        self.board_size = BoardSize::new(48, 26);
+        self.place_player(point2(24, 13));
         let base = self.player_square();
 
         let left_x = base.x + 2;
@@ -1560,13 +1654,25 @@ impl Game {
     }
     fn player_field_of_view(&self) -> FieldOfViewResult {
         let start_square = self.player_square();
-        let block_squares = self.block_squares();
+        let block_squares = self.fov_blockers();
         portal_aware_field_of_view_from_square(
             start_square,
             self.player_sight_radius,
             &block_squares,
             &self.portal_geometry,
         )
+    }
+
+    /// Columns that block the player's sight: the gameplay blockers (solid at
+    /// the block altitude) whose top surface rises *above* where the player
+    /// stands. On the flat board this is every block/pillar (the old behavior);
+    /// on a cube top the cube is underfoot, so the player sees across it.
+    fn fov_blockers(&self) -> SquareSet {
+        let altitude = self.player_altitude();
+        self.block_squares()
+            .into_iter()
+            .filter(|&square| self.height_at(square).is_some_and(|top| top > altitude))
+            .collect()
     }
 
     /// Enable/disable the per-player-square FOV cache.
@@ -1610,7 +1716,7 @@ impl Game {
         &self,
     ) -> (FieldOfViewResult, crate::fov_stuff::FovTrace) {
         let start_square = self.player_square();
-        let block_squares = self.block_squares();
+        let block_squares = self.fov_blockers();
         crate::fov_stuff::portal_aware_field_of_view_from_square_traced(
             start_square,
             self.player_sight_radius,

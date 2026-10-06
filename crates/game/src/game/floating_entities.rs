@@ -32,6 +32,8 @@ pub struct DeathCube {
     pub(crate) id: FloatingEntityId,
     pub(crate) position: WorldPoint,
     pub(crate) velocity: WorldMove,
+    /// Static rendering altitude, in voxels. No vertical physics yet.
+    pub(crate) altitude: i32,
 }
 impl DeathCube {
     pub fn new(id: FloatingEntityId, position: WorldPoint, velocity: WorldMove) -> Self {
@@ -39,7 +41,16 @@ impl DeathCube {
             id,
             position,
             velocity,
+            altitude: 0,
         }
+    }
+
+    pub fn altitude(&self) -> i32 {
+        self.altitude
+    }
+
+    pub fn set_altitude(&mut self, altitude: i32) {
+        self.altitude = altitude;
     }
 }
 
@@ -67,6 +78,8 @@ pub struct FloatingHunterDrone {
     pub(crate) velocity: WorldMove,
     #[getset(get_copy = "pub", set = "pub")]
     pub(crate) sight_direction: Angle<f32>,
+    /// Static rendering altitude, in voxels. No vertical physics yet.
+    pub(crate) altitude: i32,
 }
 
 impl FloatingEntityTrait for FloatingHunterDrone {
@@ -96,6 +109,15 @@ impl FloatingHunterDrone {
             position,
             velocity,
             sight_direction,
+            altitude: 0,
         }
+    }
+
+    pub fn altitude(&self) -> i32 {
+        self.altitude
+    }
+
+    pub fn set_altitude(&mut self, altitude: i32) {
+        self.altitude = altitude;
     }
 }

@@ -57,7 +57,9 @@ impl InputMap {
     pub fn handle_event(&mut self, game: &mut Game, evt: Event) {
         match evt {
             Event::Key(ke) => match ke {
-                Key::Char('q') => game.quit(),
+                Key::Esc | Key::Ctrl('c') => game.quit(),
+                Key::Char('q') => game.rotate_view(1),
+                Key::Char('e') => game.rotate_view(-1),
                 Key::Char(' ') => game.do_player_radial_attack(),
                 Key::Char('f') => game.smite_selected_square(),
                 Key::Char('g') => game.do_player_spear_attack(),
@@ -143,6 +145,21 @@ mod tests {
         let world_pos = input_map.screen_to_world(&terminal_pos);
         let correct_world_pos = WorldSquare::new(49, 49);
         assert_eq!(correct_world_pos, world_pos);
+    }
+
+    #[test]
+    fn test_q_and_e_rotate_the_view_and_esc_quits() {
+        let mut game = crate::utils_for_tests::set_up_game_with_player();
+        let mut input = InputMap::new(40, 20);
+        let start = game.graphics().screen.rotation().quarter_turns();
+        input.handle_event(&mut game, Event::Key(Key::Char('q')));
+        let after_q = game.graphics().screen.rotation().quarter_turns();
+        assert_eq!(after_q.rem_euclid(4), (start + 1).rem_euclid(4));
+        input.handle_event(&mut game, Event::Key(Key::Char('e')));
+        let after_e = game.graphics().screen.rotation().quarter_turns();
+        assert_eq!(after_e.rem_euclid(4), start.rem_euclid(4));
+        input.handle_event(&mut game, Event::Key(Key::Esc));
+        assert!(!game.running());
     }
 
     #[test]

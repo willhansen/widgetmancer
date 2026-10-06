@@ -108,7 +108,7 @@ impl Starfield {
     pub fn draw(
         &self,
         screen: &mut Screen,
-        board_size: BoardSize,
+        occupied: &SquareSet,
         time: LogicalTime,
         fov: Option<&FieldOfViewResult>,
         drawn: &HashSet<ScreenBufferSquare>,
@@ -160,7 +160,7 @@ impl Starfield {
                     let world_square = screen.screen_buffer_character_square_to_world_square(
                         ScreenBufferCharacterSquare::new(pos_x, pos_y),
                     );
-                    if is_on_board(world_square, board_size) {
+                    if occupied.contains(&world_square) {
                         continue;
                     }
                     if let Some(fov) = fov {
@@ -237,6 +237,7 @@ fn char_offset_to_world_offset(screen: &Screen, char_offset: Vec2) -> Vec2 {
     screen.rotation().rotate_vector(flipped)
 }
 
+#[cfg(test)]
 fn is_on_board(square: WorldSquare, board_size: BoardSize) -> bool {
     square.x >= 0
         && square.x < board_size.width as i32
@@ -307,7 +308,7 @@ mod tests {
         screen.set_screen_center_by_world_square(point2(5, 5));
         let before = screen.screen_buffer.clone();
 
-        Starfield::new().draw(&mut screen, BoardSize::new(20, 20), LogicalTime::ZERO, None, &HashSet::new());
+        Starfield::new().draw(&mut screen, &squares_on_board(BoardSize::new(20, 20)), LogicalTime::ZERO, None, &HashSet::new());
 
         assert_eq!(screen.screen_buffer, before);
     }
@@ -318,7 +319,7 @@ mod tests {
         screen.set_screen_center_by_world_square(point2(5, 5));
         let board_size = board_with_visible_void();
 
-        Starfield::new().draw(&mut screen, board_size, LogicalTime::ZERO, None, &HashSet::new());
+        Starfield::new().draw(&mut screen, &squares_on_board(board_size), LogicalTime::ZERO, None, &HashSet::new());
 
         assert!(count_star_cells(&screen) > 0, "expected some stars");
         for x in 0..screen.terminal_width() {
@@ -354,7 +355,7 @@ mod tests {
 
         Starfield::new().draw(
             &mut screen,
-            board_size,
+            &squares_on_board(board_size),
             LogicalTime::ZERO,
             Some(&fov),
             &HashSet::new(),
@@ -403,7 +404,7 @@ mod tests {
         let before = screen.screen_buffer.clone();
         Starfield::new().draw(
             &mut screen,
-            board_size,
+            &squares_on_board(board_size),
             LogicalTime::ZERO,
             Some(&fov),
             &everything_drawn,
@@ -418,7 +419,7 @@ mod tests {
         let render = || {
             let mut screen = test_screen();
             screen.set_screen_center_by_world_square(point2(5, 5));
-            Starfield::new().draw(&mut screen, board_size, LogicalTime::from_secs_f32(3.0), None, &HashSet::new());
+            Starfield::new().draw(&mut screen, &squares_on_board(board_size), LogicalTime::from_secs_f32(3.0), None, &HashSet::new());
             screen.screen_buffer
         };
 
@@ -432,7 +433,7 @@ mod tests {
         let render = |time| {
             let mut screen = test_screen();
             screen.set_screen_center_by_world_square(point2(5, 5));
-            Starfield::new().draw(&mut screen, board_size, LogicalTime::from_secs_f32(time), None, &HashSet::new());
+            Starfield::new().draw(&mut screen, &squares_on_board(board_size), LogicalTime::from_secs_f32(time), None, &HashSet::new());
             screen.screen_buffer
         };
 

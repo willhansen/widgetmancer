@@ -8,6 +8,32 @@ with each item so the context doesn't have to be re-discovered later.
 
 ---
 
+## Deferred: voxel-world vertical gameplay (from the `cube_iso` port)
+
+The z/altitude rendering port (`docs/CUBE_ISO_PORT.md`) made terrain a voxel
+grid and let the player walk its top surfaces, but deliberately stopped short of
+vertical physics. Open follow-ups:
+
+- **Gravity / falling.** Walking off an edge currently does nothing: void and
+  step-ups are blocked, and the player's altitude is derived from the column it
+  stands on (`Game::player_altitude`), so it can only move level or *down*.
+  The demo (`cube_iso/src/physics.rs`, deleted) dropped `z` one step at a time
+  to the support below, marked `lost` past `FALL_LIMIT`, and respawned.
+- **Fall trail.** The demo drew the path of the fall; the game has no such
+  overlay (its `Fall trail` inventory row is `deferred`).
+- **Step-down animation.** Descents (e.g. the `space-cubes` staircase) jump the
+  player glyph down instantly rather than sliding.
+- **Smooth / grid-realtime / move-gated modes.** The demo's three physics
+  schemes are not ported.
+- **Player altitude as state.** Today it is derived from position; real falling
+  needs a stored `z`, `vz`, and tick integration.
+
+Sight and blocking are already altitude-aware (`Game::fov_blockers`): a column
+blocks only when its top rises above the player, which is what lets the player
+see across a cube top it is standing on.
+
+---
+
 ## Debug tooling wishlist — rendering & FOV
 
 Captured while designing tooling for the portal-depth partial-visibility

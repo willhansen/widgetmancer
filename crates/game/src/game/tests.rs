@@ -3025,6 +3025,12 @@
         game
     }
 
+    fn set_up_space_cubes_game() -> Game {
+        let mut game = Game::new(84, 38, LogicalTime::ZERO);
+        crate::set_up_map_by_name(&mut game, Some("space-cubes"));
+        game
+    }
+
     // Lane centers relative to the player at (24,13): one-way at y=19,
     // two-way single-sided at y=13, two-way double-sided at y=7. Every cube
     // spawns on its lane's left portal square (x=26).
@@ -3109,10 +3115,11 @@
         // to break ties only by portal depth. Equal-depth visibilities then
         // picked glyphs in HashMap order, so frames flashed. The draw order
         // must be a total order.
-        for map in ["racetrack", "hallways"] {
+        for map in ["racetrack", "hallways", "space-cubes"] {
             let mut game = match map {
                 "racetrack" => set_up_racetrack_game(),
-                _ => set_up_hallways_game(),
+                "hallways" => set_up_hallways_game(),
+                _ => set_up_space_cubes_game(),
             };
             for tick in 0..4 {
                 game.tick_realtime_effects(Duration::from_secs_f32(0.021));
@@ -3125,4 +3132,177 @@
                 );
             }
         }
+    }
+
+    #[test]
+    fn raised_terrain_shifts_the_top_face_and_draws_a_wall() {
+        let mut game = set_up_nxn_game(14);
+        let column = point2(7, 7);
+        game.place_player(point2(5, 7));
+        game.place_solid_column(column, 3);
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let top = screen.world_square_and_altitude_to_screen_buffer_square(column, 3);
+        let top_glyphs = screen.get_glyphs_at_screen_square(top);
+        assert_eq!(
+            top_glyphs[0].character, ' ',
+            "a terrain top uses the floor glyph carrying the material color"
+        );
+        assert_ne!(top_glyphs[0].bg_color, BLACK, "top should be material-colored");
+        assert_eq!(top_glyphs[0].bg_color, top_glyphs[1].bg_color);
+
+        let wall = screen.world_square_and_altitude_to_screen_buffer_square(column, 2);
+        let wall_glyphs = screen.get_glyphs_at_screen_square(wall);
+        assert_eq!(wall_glyphs[0].character, '▒', "wall character");
+        assert_ne!(wall_glyphs[0].bg_color, BLACK, "wall should be tinted");
+        assert_eq!(wall_glyphs[0].bg_color, wall_glyphs[1].bg_color);
+    }
+
+    #[test]
+    fn single_height_blocks_keep_the_flat_projection() {
+        use terminal_rendering::glyph::Glyph;
+
+        // The forward pass is gated to boards taller than one voxel, so a plain
+        // block map is byte-identical to the legacy renderer.
+        let mut game = set_up_nxn_game(14);
+        let column = point2(7, 7);
+        game.place_player(point2(5, 7));
+        game.place_block(column);
+        assert_eq!(game.terrain.max_top_altitude(), 1, "one-voxel block");
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let flat = screen.world_square_to_screen_buffer_square(column);
+        assert_eq!(
+            screen.get_glyphs_at_screen_square(flat),
+            Glyph::block_glyphs(),
+            "a single-height block stays at its flat screen square"
+        );
+        let raised = screen.world_square_and_altitude_to_screen_buffer_square(column, 1);
+        assert_ne!(
+            screen.get_glyphs_at_screen_square(raised),
+            Glyph::block_glyphs(),
+            "no elevated copy above a flat block"
+        );
+    }
+
+    #[test]
+    fn terrain_tint_colors_the_top_background() {
+        use rgb::RGB8;
+        let mut game = set_up_nxn_game(14);
+        game.place_player(point2(5, 7));
+        let column = point2(7, 7);
+        game.place_solid_column_with_material(
+            column,
+            3,
+            TerrainMaterial::Tint(RGB8::new(200, 40, 40)),
+        );
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let top = screen.world_square_and_altitude_to_screen_buffer_square(column, 3);
+        let glyphs = screen.get_glyphs_at_screen_square(top);
+        let bg = glyphs[0].bg_color;
+        assert!(
+            bg.r > bg.b + 40,
+            "expected a red-tinted top, got {bg:?}"
+        );
+    }
+
+    #[test]
+    fn floating_entity_altitude_lifts_its_glyph() {
+        use euclid::vec2;
+        let mut game = set_up_nxn_game(14);
+        game.place_player(point2(5, 7));
+        let square = point2(7, 7);
+        game.place_floating_hunter_drone(
+            square.to_f32(),
+            vec2(0.0, 0.0),
+            euclid::Angle::radians(0.0),
+        );
+        game.floating_hunter_drones
+            .last_mut()
+            .unwrap()
+            .set_altitude(2);
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let raised = screen.world_square_and_altitude_to_screen_buffer_square(square, 2);
+        let glyphs = screen.get_glyphs_at_screen_square(raised);
+        assert_eq!(
+            glyphs[0].fg_color, HUNTER_DRONE_COLOR,
+            "the drone should render at its altitude"
+        );
+        let ground = screen.world_square_to_screen_buffer_square(square);
+        assert_ne!(
+            screen.get_glyphs_at_screen_square(ground)[0].fg_color,
+            HUNTER_DRONE_COLOR,
+            "no ground-level ghost copy"
+        );
+    }
+
+    #[test]
+    fn nearer_column_overwrites_the_farther_columns_wall() {
+        // Regression for the demo's painter bug: a far column's camera-facing
+        // wall must not erase a nearer column's top. North column (y=9) and
+        // south (y=7, height 2) share a screen row one above the south base.
+        let mut game = set_up_nxn_game(14);
+        game.place_player(point2(5, 7));
+        game.place_solid_column(point2(7, 9), 4);
+        game.place_solid_column(point2(7, 7), 2);
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let south_top = screen.world_square_and_altitude_to_screen_buffer_square(point2(7, 7), 2);
+        let glyphs = screen.get_glyphs_at_screen_square(south_top);
+        assert_ne!(
+            glyphs[0].character, '▒',
+            "the nearer column top must overwrite the farther wall"
+        );
+    }
+
+    #[test]
+    fn player_walks_down_terrain_but_not_up_or_into_void() {
+        let mut game = set_up_nxn_game(12);
+        game.terrain.clear_floor();
+        game.place_solid_column(point2(5, 5), 3);
+        game.place_solid_column(point2(5, 6), 2);
+        game.place_player(point2(5, 5));
+
+        assert!(
+            game.try_set_player_position(point2(5, 6)).is_ok(),
+            "stepping down onto a lower column is allowed"
+        );
+        assert_eq!(game.player_square(), point2(5, 6));
+        assert!(
+            game.try_set_player_position(point2(5, 5)).is_err(),
+            "a step up is a wall"
+        );
+        assert!(
+            game.try_set_player_position(point2(6, 5)).is_err(),
+            "void has no support and is blocked"
+        );
+    }
+
+    #[test]
+    fn space_cubes_map_matches_the_demo_layout() {
+        let mut game = Game::new(84, 38, LogicalTime::ZERO);
+        crate::set_up_map_by_name(&mut game, Some("space-cubes"));
+
+        assert_eq!(game.board_size(), BoardSize::new(42, 38));
+        // Four 10x10x10 cubes at (4,4), (28,4), (4,28), (28,28).
+        for (cx, cy) in [(4, 4), (28, 4), (4, 28), (28, 28)] {
+            assert_eq!(game.height_at(point2(cx, cy)), Some(10));
+            assert_eq!(game.height_at(point2(cx + 9, cy + 9)), Some(10));
+        }
+        assert_eq!(game.height_at(point2(14, 14)), None, "gap is real void");
+        // South staircase first step: thin slab at z=7 (surface 8).
+        assert_eq!(game.height_at(point2(7, 3)), Some(8));
+        assert!(game.is_solid_at(7, 3, 7) && !game.is_solid_at(7, 3, 6), "thin");
+        // East ledge at z=6 (surface 7).
+        assert_eq!(game.height_at(point2(14, 6)), Some(7));
+        // Player starts on the first cube top.
+        assert_eq!(game.player_square(), point2(9, 9));
+        game.draw_headless_now();
     }

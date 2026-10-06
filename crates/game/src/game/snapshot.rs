@@ -12,13 +12,14 @@ use euclid::Angle;
 use serde::Deserialize;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
-use crate::game::{DeathCube, FloatingEntityId, FloatingHunterDrone, Game, IncubatingPawn, Player, Widget};
+use crate::game::{DeathCube, FloatingEntityId, FloatingHunterDrone, Game, IncubatingPawn, Player, TerrainMaterial, Widget, SLAB_VOXEL_Z};
 use crate::piece::{Faction, Piece, PieceType, Upgrade};
+use rgb::RGB8;
 use terminal_rendering::glyph::Glyph;
 use utility::coordinate_frame_conversions::{
     BoardSize, WorldMove, WorldPoint, WorldSquare, WorldStep, WorldVoxel,
 };
-use utility::{KingWorldStep, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir};
+use utility::{squares_on_board, KingWorldStep, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir};
 
 pub const SNAPSHOT_KEY: Key = Key::Char('p');
 
@@ -98,6 +99,14 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
             ),
         ),
         (
+            "materials",
+            json_sorted_array(
+                game.terrain
+                    .materials()
+                    .map(|(square, material)| material_json(square, material)),
+            ),
+        ),
+        (
             "upgrades",
             json_sorted_array(game.blocks.upgrades.iter().map(|(&square, &upgrade)| {
                 json_object([
@@ -149,10 +158,37 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
         ("screen", screen_state_json(game)),
     ];
 
+    // The floor is a full board rect by default; only record it when a map has
+    // real voids (or a partial floor), so ordinary snapshots stay compact.
+    if let Some(floor_cells) = non_default_floor_cells(game) {
+        fields.push((
+            "floor_cells",
+            json_sorted_array(floor_cells.iter().map(|&[x, y]| square_json(square_from_array([x, y])))),
+        ));
+    }
+
     // Stable output makes snapshots diffable across runs.
     fields.sort_by_key(|(name, _)| *name);
 
     json_object(fields)
+}
+
+/// The `z = -1` slab cells, as `[x, y]`, when they differ from the full board
+/// rect; `None` means "the default full floor".
+fn non_default_floor_cells(game: &Game) -> Option<Vec<[i32; 2]>> {
+    let slab: Vec<[i32; 2]> = game
+        .terrain
+        .slab_voxels()
+        .into_iter()
+        .map(|voxel| [voxel.x, voxel.y])
+        .collect();
+    let full = squares_on_board(game.board_size);
+    if slab.len() == full.len()
+        && slab.iter().all(|&[x, y]| full.contains(&square_from_array([x, y])))
+    {
+        return None;
+    }
+    Some(slab)
 }
 
 fn player_json(game: &Game) -> String {
@@ -186,6 +222,7 @@ fn death_cubes_json(game: &Game) -> String {
             ("id", cube.id.0.to_string()),
             ("position", point_json(cube.position)),
             ("velocity", move_json(cube.velocity)),
+            ("altitude", cube.altitude().to_string()),
         ])
     }))
 }
@@ -200,6 +237,7 @@ fn hunter_drones_json(game: &Game) -> String {
                 "sight_direction_degrees",
                 drone.sight_direction.radians.to_degrees().to_string(),
             ),
+            ("altitude", drone.altitude().to_string()),
         ])
     }))
 }
@@ -337,6 +375,17 @@ fn voxel_json(voxel: WorldVoxel) -> String {
     format!("[{}, {}, {}]", voxel.x, voxel.y, voxel.z)
 }
 
+/// Material overrides encode `Floor` as `-1` in the color slots.
+fn material_json(square: WorldSquare, material: TerrainMaterial) -> String {
+    match material {
+        TerrainMaterial::Tint(color) => format!(
+            "[{}, {}, {}, {}, {}]",
+            square.x, square.y, color.r, color.g, color.b
+        ),
+        TerrainMaterial::Floor => format!("[{}, {}, -1, -1, -1]", square.x, square.y),
+    }
+}
+
 fn point_json(point: WorldPoint) -> String {
     format!("[{}, {}]", point.x, point.y)
 }
@@ -417,6 +466,13 @@ struct SnapshotData {
     #[serde(default)]
     voxels: Vec<[i32; 3]>,
     #[serde(default)]
+    materials: Vec<[i32; 5]>,
+    /// Explicit `z = -1` floor cells, present only when the floor is not the
+    /// default full board rect (e.g. a map with real voids). Absent means the
+    /// full `board_width x board_height` rect.
+    #[serde(default)]
+    floor_cells: Option<Vec<[i32; 2]>>,
+    #[serde(default)]
     upgrades: Vec<UpgradeDto>,
     #[serde(default)]
     conveyor_belts: Vec<DirectedDto>,
@@ -486,6 +542,8 @@ struct CubeDto {
     id: u64,
     position: [f32; 2],
     velocity: [f32; 2],
+    #[serde(default)]
+    altitude: i32,
 }
 
 #[derive(Deserialize)]
@@ -494,6 +552,8 @@ struct DroneDto {
     position: [f32; 2],
     velocity: [f32; 2],
     sight_direction_degrees: f32,
+    #[serde(default)]
+    altitude: i32,
 }
 
 #[derive(Deserialize)]
@@ -594,6 +654,12 @@ impl Game {
         // The slab floor is derived from the board size, so it is re-laid for
         // the captured board rather than serialized.
         game.terrain.seed_board_slab(game.board_size);
+        if let Some(floor_cells) = &data.floor_cells {
+            game.terrain.clear_floor();
+            for &[x, y] in floor_cells {
+                game.place_voxel(WorldVoxel::new(x, y, SLAB_VOXEL_Z));
+            }
+        }
         game.running = data.running;
         game.turn_count = data.turn_count;
         // Restore the RNG stream (falls back to the seeded default for older
@@ -625,6 +691,19 @@ impl Game {
         }
         for &voxel in &data.voxels {
             game.place_voxel(WorldVoxel::new(voxel[0], voxel[1], voxel[2]));
+        }
+        for material in &data.materials {
+            let square = square_from_array([material[0], material[1]]);
+            let value = if material[2] < 0 {
+                TerrainMaterial::Floor
+            } else {
+                TerrainMaterial::Tint(RGB8::new(
+                    material[2] as u8,
+                    material[3] as u8,
+                    material[4] as u8,
+                ))
+            };
+            game.set_terrain_material(square, value);
         }
         for upgrade in &data.upgrades {
             let upgrade_type = Upgrade::from_str(&upgrade.upgrade_type)
@@ -665,19 +744,23 @@ impl Game {
             );
         }
         for cube in &data.death_cubes {
-            game.death_cubes.push(DeathCube::new(
+            let mut death_cube = DeathCube::new(
                 FloatingEntityId(cube.id),
                 point_from_array(cube.position),
                 move_from_array(cube.velocity),
-            ));
+            );
+            death_cube.set_altitude(cube.altitude);
+            game.death_cubes.push(death_cube);
         }
         for drone in &data.floating_hunter_drones {
-            game.floating_hunter_drones.push(FloatingHunterDrone::new(
+            let mut hunter_drone = FloatingHunterDrone::new(
                 FloatingEntityId(drone.id),
                 point_from_array(drone.position),
                 move_from_array(drone.velocity),
                 Angle::degrees(drone.sight_direction_degrees),
-            ));
+            );
+            hunter_drone.set_altitude(drone.altitude);
+            game.floating_hunter_drones.push(hunter_drone);
         }
         // Every registered portal face is dumped, so replaying each as an
         // entrance reconstructs the exact entrance->exit map.
@@ -783,17 +866,27 @@ mod tests {
         game.place_piece(Piece::arrow(STEP_UP.into()), base + STEP_LEFT);
         game.place_block(base + STEP_DOWN);
         game.place_solid_column(base + STEP_UP * 2, 3);
+        game.place_solid_column_with_material(
+            base + STEP_UP * 3,
+            2,
+            TerrainMaterial::Tint(RGB8::new(200, 80, 40)),
+        );
         game.place_voxel(WorldVoxel::new(base.x + 4, base.y, 5));
         game.place_upgrade(Upgrade::BlinkRange, base + STEP_DOWN * 2);
         game.place_conveyor_belt(base + STEP_DOWN * 3, STEP_RIGHT);
         game.place_floor_push_arrow(base + STEP_DOWN * 4, STEP_LEFT);
         game.place_widget(Widget::new(3), base + STEP_DOWN * 5);
         game.place_linear_death_cube(base.to_f32() + vec2(0.5, 0.5), vec2(1.0, 0.0));
+        game.death_cubes.last_mut().unwrap().set_altitude(2);
         game.place_floating_hunter_drone(
             base.to_f32() + vec2(1.5, 1.5),
             vec2(0.0, 1.0),
             Angle::radians(0.5),
         );
+        game.floating_hunter_drones
+            .last_mut()
+            .unwrap()
+            .set_altitude(3);
         game.incubating_pawns.insert(
             base + STEP_RIGHT * 2,
             IncubatingPawn {
@@ -839,6 +932,27 @@ mod tests {
         assert!(loaded.is_block_at(base + STEP_UP));
         assert_eq!(loaded.height_at(base + STEP_UP), Some(1), "legacy blocks are one tall");
         assert_eq!(loaded.height_at(base), Some(crate::game::SLAB_TOP), "board slab is intact");
+    }
+
+    #[test]
+    fn snapshot_round_trips_a_void_floor() {
+        let mut game = set_up_game_with_player();
+        game.terrain.clear_floor();
+        game.place_solid_column(point2(5, 5), 3);
+        game.place_player(point2(5, 5));
+        game.world_time = game.world_start_time;
+
+        let json = game_state_json(&game, Some("test"));
+        assert!(
+            json.contains("\"floor_cells\""),
+            "a non-default floor must be recorded"
+        );
+        let data: SnapshotData = serde_json::from_str(&json).expect("parse snapshot");
+        let loaded = Game::from_snapshot(data, game.graphics().start_time());
+
+        assert_eq!(game_state_json(&loaded, Some("test")), json);
+        assert_eq!(loaded.height_at(point2(5, 5)), Some(3));
+        assert_eq!(loaded.height_at(point2(0, 1)), None, "void stayed void");
     }
 
     #[test]
@@ -946,6 +1060,30 @@ pub mod debug {
     /// Load a snapshot directory into a live `Game` (resumes realtime effects).
     pub fn load_snapshot_dir(dir: &Path) -> Result<Game, String> {
         load_snapshot_game(dir)
+    }
+
+    /// A colorless per-column top-altitude view of a loaded snapshot: `.` for
+    /// bare board/void and a digit for a built-up column (mod 10), rows printed
+    /// north-to-south. Complements the rendered view when asking "did the
+    /// terrain load right?".
+    pub fn height_view(dir: &Path) -> Result<String, String> {
+        let game = load_snapshot_game(dir)?;
+        let board = game.board_size();
+        let mut out = String::from(
+            "Terrain top altitude per column: '.' = bare board/void, digit = height\n",
+        );
+        for y in (0..board.height as i32).rev() {
+            for x in 0..board.width as i32 {
+                let glyph = match game.height_at(WorldSquare::new(x, y)) {
+                    Some(h) if h > 0 => char::from_digit((h as u32) % 10, 10).unwrap_or('#'),
+                    _ => '.',
+                };
+                out.push(glyph);
+                out.push(' ');
+            }
+            out.push('\n');
+        }
+        Ok(out)
     }
 
     /// Portal-recursion trace for the loaded snapshot's player (roadmap W.C).

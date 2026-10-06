@@ -11,6 +11,7 @@
 
 use std::collections::HashMap;
 
+use rgb::RGB8;
 use utility::coordinate_frame_conversions::{
     BoardSize, SquareSet, VoxelSet, WorldSquare, WorldVoxel,
 };
@@ -20,11 +21,28 @@ pub const SLAB_TOP: i32 = 0;
 /// Voxel index of the one-voxel-thick board slab; its top is [`SLAB_TOP`].
 pub const SLAB_VOXEL_Z: i32 = SLAB_TOP - 1;
 
+/// Default tint for placed terrain that is not given an explicit material. A
+/// neutral cool slate; the renderer derives the checker's light/dark shades and
+/// the wall gradient from it.
+pub const DEFAULT_TERRAIN_TINT: RGB8 = RGB8::new(96, 104, 128);
+
+/// How a column's exposed faces are colored. `Floor` resolves to the board's
+/// existing floor pattern at render time; `Tint` is a base color the renderer
+/// shades into a checker of tops and a wall gradient.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TerrainMaterial {
+    Floor,
+    Tint(RGB8),
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Terrain {
     voxels: VoxelSet,
     /// Highest occupied voxel index per column, for O(1) support queries.
     column_tops: HashMap<WorldSquare, i32>,
+    /// Explicit material overrides. Columns without an entry derive their
+    /// material from whether they are built up (`material_at`).
+    materials: HashMap<WorldSquare, TerrainMaterial>,
 }
 
 impl Terrain {
@@ -36,20 +54,54 @@ impl Terrain {
 
     /// Replace any slab layer with one voxel per on-board square. Placed voxels
     /// (`z >= 0`) are untouched, so this is safe to call after a board resize.
+    /// The convenience "make this a flat board" floor; a map with real gaps can
+    /// instead [`Terrain::clear_floor`] and draw its own voxels.
     pub fn seed_board_slab(&mut self, board_size: BoardSize) {
+        self.clear_floor();
+        self.fill_floor_rect(board_size.width as i32, board_size.height as i32);
+    }
+
+    /// Place a floor voxel (`z = -1`) under every square of a `width x height`
+    /// rect whose lower-left corner is the origin.
+    pub fn fill_floor_rect(&mut self, width: i32, height: i32) {
+        for y in 0..height {
+            for x in 0..width {
+                self.place_voxel(WorldVoxel::new(x, y, SLAB_VOXEL_Z));
+            }
+        }
+    }
+
+    /// Remove every floor voxel, leaving placed geometry. Columns left without
+    /// any voxel become real void.
+    pub fn clear_floor(&mut self) {
         self.voxels.retain(|voxel| voxel.z != SLAB_VOXEL_Z);
         self.column_tops
             .retain(|_, &mut top| top != SLAB_VOXEL_Z);
-        for y in 0..board_size.height as i32 {
-            for x in 0..board_size.width as i32 {
-                let square = WorldSquare::new(x, y);
-                self.voxels.insert(WorldVoxel::new(x, y, SLAB_VOXEL_Z));
-                let entry = self.column_tops.entry(square).or_insert(SLAB_VOXEL_Z);
-                if SLAB_VOXEL_Z > *entry {
-                    *entry = SLAB_VOXEL_Z;
-                }
-            }
-        }
+    }
+
+    /// Columns whose top surface is the bare floor (no placed voxel above it).
+    /// These are what render with the board's floor pattern.
+    pub fn floor_squares(&self) -> SquareSet {
+        self.column_tops
+            .iter()
+            .filter(|(_, &top)| top == SLAB_VOXEL_Z)
+            .map(|(&square, _)| square)
+            .collect()
+    }
+
+    /// Every column that contains any voxel. Anything else is void.
+    pub fn occupied_squares(&self) -> SquareSet {
+        self.column_tops.keys().copied().collect()
+    }
+
+    /// Every floor voxel (`z = -1`); what a snapshot records to reproduce a
+    /// board that isn't the default full rect.
+    pub fn slab_voxels(&self) -> Vec<WorldVoxel> {
+        self.voxels
+            .iter()
+            .copied()
+            .filter(|voxel| voxel.z == SLAB_VOXEL_Z)
+            .collect()
     }
 
     pub fn place_voxel(&mut self, voxel: WorldVoxel) {
@@ -68,6 +120,17 @@ impl Terrain {
         for z in 0..top_height as i32 {
             self.place_voxel(WorldVoxel::new(square.x, square.y, z));
         }
+    }
+
+    /// Like [`Terrain::place_solid_column`], but with an explicit material tint.
+    pub fn place_solid_column_with_material(
+        &mut self,
+        square: WorldSquare,
+        top_height: u32,
+        material: TerrainMaterial,
+    ) {
+        self.place_solid_column(square, top_height);
+        self.set_material(square, material);
     }
 
     pub fn is_solid_at(&self, x: i32, y: i32, z: i32) -> bool {
@@ -103,6 +166,59 @@ impl Terrain {
             .iter()
             .copied()
             .filter(|voxel| voxel.z >= SLAB_TOP)
+    }
+
+    /// Every column that is exactly one voxel tall. These are the squares that
+    /// render as flat gameplay "blocks"; taller columns render as material.
+    pub fn single_height_block_squares(&self) -> SquareSet {
+        self.column_tops
+            .iter()
+            .filter(|(_, &top)| top == SLAB_TOP)
+            .map(|(&square, _)| square)
+            .collect()
+    }
+
+    /// Every column that owns at least one voxel, with its highest voxel index.
+    /// On-board squares always appear (their slab voxel), so this is also the
+    /// set the render pass walks.
+    pub fn columns(&self) -> Vec<(WorldSquare, i32)> {
+        self.column_tops
+            .iter()
+            .map(|(&square, &top)| (square, top))
+            .collect()
+    }
+
+    /// Highest top-surface altitude anywhere, or `0` for an empty/slab-only
+    /// world. Drives the render gate: a board no taller than one voxel renders
+    /// through the legacy flat path.
+    pub fn max_top_altitude(&self) -> i32 {
+        self.column_tops
+            .values()
+            .map(|&top| top + 1)
+            .max()
+            .unwrap_or(SLAB_TOP)
+    }
+
+    /// The column's material: an explicit override if set, otherwise `Floor` for
+    /// the slab and the default terrain tint for any built-up column.
+    pub fn material_at(&self, square: WorldSquare) -> TerrainMaterial {
+        if let Some(&material) = self.materials.get(&square) {
+            return material;
+        }
+        match self.top_voxel(square) {
+            Some(top) if top >= SLAB_TOP => TerrainMaterial::Tint(DEFAULT_TERRAIN_TINT),
+            _ => TerrainMaterial::Floor,
+        }
+    }
+
+    pub fn set_material(&mut self, square: WorldSquare, material: TerrainMaterial) {
+        self.materials.insert(square, material);
+    }
+
+    /// Explicit material overrides only (defaults are derived on read). What
+    /// gets serialized.
+    pub fn materials(&self) -> impl Iterator<Item = (WorldSquare, TerrainMaterial)> + '_ {
+        self.materials.iter().map(|(&square, &material)| (square, material))
     }
 
     pub fn is_empty(&self) -> bool {
@@ -188,6 +304,24 @@ mod tests {
     }
 
     #[test]
+    fn max_top_altitude_tracks_the_tallest_column() {
+        let mut terrain = board();
+        assert_eq!(terrain.max_top_altitude(), SLAB_TOP, "bare slab is altitude 0");
+        terrain.place_solid_column(point2(1, 1), 4);
+        assert_eq!(terrain.max_top_altitude(), 4);
+    }
+
+    #[test]
+    fn columns_include_bare_board_and_placed_columns() {
+        let mut terrain = board();
+        terrain.place_solid_column(point2(1, 1), 3);
+        let columns = terrain.columns();
+        assert_eq!(columns.len(), 4 * 3, "one per on-board square");
+        assert!(columns.contains(&(point2(1, 1), 2)));
+        assert!(columns.contains(&(point2(0, 0), SLAB_VOXEL_Z)));
+    }
+
+    #[test]
     fn reseeding_replaces_only_the_slab_layer() {
         let mut terrain = board();
         terrain.place_solid_column(point2(1, 1), 3);
@@ -195,5 +329,46 @@ mod tests {
         assert_eq!(terrain.height_at(point2(1, 1)), Some(3), "placed voxels stay");
         assert_eq!(terrain.height_at(point2(3, 2)), None, "shrunk board loses its slab");
         assert!(terrain.is_solid_at(0, 0, SLAB_VOXEL_Z), "slab re-laid");
+    }
+
+    #[test]
+    fn material_defaults_follow_whether_a_column_is_built_up() {
+        let mut terrain = board();
+        assert_eq!(terrain.material_at(point2(0, 0)), TerrainMaterial::Floor);
+        terrain.place_solid_column(point2(1, 1), 3);
+        assert_eq!(
+            terrain.material_at(point2(1, 1)),
+            TerrainMaterial::Tint(DEFAULT_TERRAIN_TINT)
+        );
+    }
+
+    #[test]
+    fn explicit_material_overrides_and_serializes() {
+        let mut terrain = board();
+        let tint = RGB8::new(200, 80, 40);
+        terrain.place_solid_column_with_material(point2(1, 1), 2, TerrainMaterial::Tint(tint));
+        assert_eq!(terrain.material_at(point2(1, 1)), TerrainMaterial::Tint(tint));
+        let overrides: Vec<_> = terrain.materials().collect();
+        assert_eq!(overrides, vec![(point2(1, 1), TerrainMaterial::Tint(tint))]);
+    }
+
+    #[test]
+    fn clear_floor_makes_real_void_and_floor_squares_shrink() {
+        let mut terrain = board();
+        assert_eq!(terrain.floor_squares().len(), 4 * 3);
+        assert_eq!(terrain.occupied_squares().len(), 4 * 3);
+        terrain.clear_floor();
+        assert!(terrain.floor_squares().is_empty());
+        assert!(terrain.occupied_squares().is_empty());
+        assert_eq!(terrain.height_at(point2(0, 0)), None, "now void");
+    }
+
+    #[test]
+    fn fill_floor_rect_restores_a_partial_floor() {
+        let mut terrain = Terrain::new();
+        terrain.fill_floor_rect(3, 2);
+        assert_eq!(terrain.floor_squares().len(), 6);
+        assert_eq!(terrain.height_at(point2(2, 1)), Some(SLAB_TOP));
+        assert_eq!(terrain.height_at(point2(3, 0)), None, "outside the rect");
     }
 }

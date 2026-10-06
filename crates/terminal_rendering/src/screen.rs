@@ -130,7 +130,7 @@ impl Screen {
             .to_point()
     }
 
-    fn screen_center_as_screen_buffer_square(&self) -> ScreenBufferSquare {
+    pub fn screen_center_as_screen_buffer_square(&self) -> ScreenBufferSquare {
         self.screen_buffer_step_from_origin_to_center().to_point()
     }
 
@@ -311,6 +311,17 @@ impl Screen {
         let world_step_from_screen_center = self.screen_step_to_world_step(screen_step_from_center);
 
         self.screen_center_as_world_square() + world_step_from_screen_center
+    }
+
+    /// The screen square a world square projects to at `altitude`. Altitude
+    /// shifts strictly up the screen (one row per voxel) regardless of view
+    /// rotation, matching `cube_iso`'s projection P.
+    pub fn world_square_and_altitude_to_screen_buffer_square(
+        &self,
+        world_square: WorldSquare,
+        altitude: i32,
+    ) -> ScreenBufferSquare {
+        self.world_square_to_screen_buffer_square(world_square) + vec2(0, -altitude)
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -692,6 +703,30 @@ mod tests {
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(340, 22)));
         assert!(s.world_square_is_at_least_partially_on_screen(point2(302, -20)));
         assert!(s.world_square_is_at_least_partially_on_screen(point2(300, 26)));
+    }
+
+    #[test]
+    fn altitude_shifts_projection_up_one_row_per_voxel() {
+        let s = Screen::new(20, 20);
+        let square = point2(3, 4);
+        let ground = s.world_square_to_screen_buffer_square(square);
+        for altitude in [0, 1, 5] {
+            let projected = s.world_square_and_altitude_to_screen_buffer_square(square, altitude);
+            assert_eq!(projected.x, ground.x);
+            assert_eq!(projected.y, ground.y - altitude);
+        }
+    }
+
+    #[test]
+    fn altitude_shift_is_upright_under_rotation() {
+        let mut s = Screen::new_by_square_dimensions(20, 20);
+        s.set_screen_center_by_world_square(point2(5, 5));
+        s.set_rotation(QuarterTurnsAnticlockwise::new(1));
+        let square = point2(6, 5);
+        let ground = s.world_square_to_screen_buffer_square(square);
+        let raised = s.world_square_and_altitude_to_screen_buffer_square(square, 2);
+        assert_eq!(raised.x, ground.x, "altitude does not move sideways");
+        assert_eq!(raised.y, ground.y - 2, "altitude always moves up the screen");
     }
 
     #[test]
