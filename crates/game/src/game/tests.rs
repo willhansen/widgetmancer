@@ -3306,3 +3306,61 @@
         assert_eq!(game.player_square(), point2(9, 9));
         game.draw_headless_now();
     }
+
+    #[test]
+    fn built_in_maps_seed_the_floor_to_their_board() {
+        // Built-in maps fix their own board regardless of the terminal, so the
+        // floor slab must be re-derived from that board. Regression for issues
+        // 0001/0002: a wide terminal left a terminal-sized slab that rendered
+        // as walkable floor past the board edge, which movement then refused.
+        let cases: [(&str, fn(&mut Game), BoardSize); 4] = [
+            ("demo", Game::set_up_demo_map, BoardSize::new(40, 24)),
+            (
+                "racetrack",
+                Game::set_up_portal_cube_racetrack_map,
+                BoardSize::new(48, 26),
+            ),
+            (
+                "hallways",
+                Game::set_up_portal_pair_hallways_map,
+                BoardSize::new(48, 26),
+            ),
+            (
+                "numbered-boxes",
+                Game::set_up_numbered_boxes_map,
+                BoardSize::new(20, 20),
+            ),
+        ];
+        for (name, set_up, board) in cases {
+            // A terminal-derived board that does not match the map's board.
+            let mut game = Game::new(400, 120, LogicalTime::ZERO);
+            assert_ne!(game.board_size(), board, "{name}: terminal board must differ");
+            set_up(&mut game);
+            assert_eq!(game.board_size(), board, "{name}: board");
+            let occupied = game.terrain.occupied_squares();
+            assert_eq!(
+                occupied.len(),
+                (board.width * board.height) as usize,
+                "{name}: floor covers exactly the board"
+            );
+            for &square in &occupied {
+                assert!(
+                    game.square_is_on_board(square),
+                    "{name}: floor off the board at {square:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn demo_map_has_no_floor_past_its_edges() {
+        let mut game = Game::new(400, 120, LogicalTime::ZERO);
+        game.set_up_demo_map();
+        // Issue 0001: floor used to be drawn above the top edge at (19, 24).
+        assert_eq!(game.height_at(point2(19, 24)), None, "void above the top edge");
+        // Issue 0002: ...and right of the right edge at (40, 13).
+        assert_eq!(game.height_at(point2(40, 13)), None, "void right of the right edge");
+        // The board itself is still bare floor.
+        assert_eq!(game.height_at(point2(19, 23)), Some(SLAB_TOP));
+        assert_eq!(game.height_at(point2(39, 13)), Some(SLAB_TOP));
+    }

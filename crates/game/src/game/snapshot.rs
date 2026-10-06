@@ -1080,6 +1080,21 @@ mod tests {
     }
 
     #[test]
+    fn flat_built_in_map_is_the_default_floor() {
+        // A built-in map must leave the slab equal to its board, so a snapshot
+        // of a bare map omits the (redundant) `floor_cells` override. Regression
+        // for issues 0001/0002, where a wide terminal left a larger slab.
+        let mut game = Game::new(400, 120, LogicalTime::ZERO);
+        game.set_up_demo_map();
+
+        let json = game_state_json(&game, Some("demo"));
+        assert!(
+            !json.contains("\"floor_cells\""),
+            "a full-board floor is the default and must not be serialized"
+        );
+    }
+
+    #[test]
     fn loaded_snapshot_reproduces_rendered_screen() {
         let mut game = set_up_game_with_player();
         game.set_up_simple_portal_map();

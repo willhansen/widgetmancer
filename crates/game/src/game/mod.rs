@@ -194,6 +194,14 @@ impl Game {
         self.board_size
     }
 
+    /// Re-derive the floor slab for the current `board_size`. Built-in maps set
+    /// a fixed board independent of the terminal, so they must call this after
+    /// changing it; otherwise the slab keeps the terminal-sized rect from
+    /// `Game::new` and renders as walkable floor (or void) past the board edge.
+    fn seed_board_floor_for_current_board(&mut self) {
+        self.terrain.seed_board_slab(self.board_size);
+    }
+
     pub fn player_is_alive(&self) -> bool {
         self.player_optional.is_some()
     }
@@ -1264,6 +1272,7 @@ impl Game {
 
     pub fn set_up_demo_map(&mut self) {
         self.board_size = BoardSize::new(40, 24);
+        self.seed_board_floor_for_current_board();
         self.place_player(point2(20, 12));
         let base_square: WorldSquare = self.player_square();
 
@@ -1326,6 +1335,7 @@ impl Game {
     /// clamps the terminal to at least 96x26 characters for this map.
     pub fn set_up_portal_cube_racetrack_map(&mut self) {
         self.board_size = BoardSize::new(48, 26);
+        self.seed_board_floor_for_current_board();
         self.place_player(point2(24, 13));
         let base = self.player_square();
 
@@ -1457,6 +1467,7 @@ impl Game {
     ///   windows, giving the guard more faces to skip at each emergence.
     pub fn set_up_portal_pair_hallways_map(&mut self) {
         self.board_size = BoardSize::new(48, 26);
+        self.seed_board_floor_for_current_board();
         self.place_player(point2(24, 13));
         let base = self.player_square();
 
@@ -1493,6 +1504,7 @@ impl Game {
     /// pushed off the board, where they fall with a shrinking-square animation.
     pub fn set_up_numbered_boxes_map(&mut self) {
         self.board_size = BoardSize::new(20, 20);
+        self.seed_board_floor_for_current_board();
         self.place_player(point2(10, 10));
 
         let box_positions = [

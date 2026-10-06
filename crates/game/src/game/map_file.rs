@@ -84,6 +84,9 @@ impl Game {
     pub fn apply_map_file(&mut self, map: &MapFile) {
         if let Some([width, height]) = map.board {
             self.board_size = BoardSize::new(width, height);
+            // Recipes own their board; derive the default floor from it rather
+            // than inheriting the terminal-sized slab from `Game::new`.
+            self.seed_board_floor_for_current_board();
         }
         if map.clear_floor {
             self.terrain.clear_floor();

@@ -9,6 +9,46 @@ Newest first.
 
 ---
 
+## 2026-10-06 — Re-seed each built-in map's floor to its own board (issues 0001/0002)
+
+### game: built-in maps re-derive their floor slab; AGENTS debugging discipline
+
+Issues 0001 and 0002 were the same bug at different edges: the player walked to
+the demo board's top edge (`(19, 23)`) and couldn't move up, and to the right
+edge (`(39, 13)`) and couldn't move right, with no visible reason.
+
+`Game::new` seeds the floor slab for the *terminal-derived* board
+(`terminal_width / 2 × terminal_height`). Built-in maps then override
+`board_size` (demo 40×24, racetrack/hallways 48×26, numbered-boxes 20×20)
+without re-deriving the slab, so on a wide terminal (the captures were
+353×62) the floor stayed 176×62. The renderer paints the floor for every
+occupied terrain column, while movement is gated by `square_is_on_board(board_size)`
+— so walkable-looking floor was drawn past the edge and then silently refused.
+On a narrow terminal the mismatch inverts: part of the board is void.
+
+- **Re-seed on map setup.** Added `Game::seed_board_floor_for_current_board`
+  and call it right after each built-in map sets its `board_size`, so the slab
+  always matches the board. `seed_board_slab` only rebuilds the `z = -1` layer,
+  so placed geometry is untouched.
+- **Harden recipes.** `apply_map_file` now seeds the default floor for a
+  recipe's board before honoring `clear_floor`, so a recipe that shrinks the
+  board can't inherit the terminal slab either.
+- **Snapshot.** A bare map's slab is now the full board rect, so snapshots omit
+  the (previously always-present) `floor_cells` override.
+- **Tests.** `built_in_maps_seed_the_floor_to_their_board` checks every
+  built-in across a mismatched terminal; `demo_map_has_no_floor_past_its_edges`
+  pins the two reported coordinates; `flat_built_in_map_is_the_default_floor`
+  asserts the compact serialization.
+- **AGENTS.md.** Added a repo "Debugging discipline" section: data before
+  code, reconnoiter `git diff`/CHANGELOG and fixtures first, state one
+  falsifiable invariant, and group numbered reports.
+- Deleted the solved `issues/0001` and `issues/0002`; re-blessed the local
+  (gitignored) `snapshot/` fixture now that its floor is board-sized.
+
+Verified: `cargo test -p game` green; `snapshot_tool diff snapshot/` OK.
+
+---
+
 ## 2026-10-06 — Fix one-keypress input lag from the pausable reader
 
 ### game: read input unbuffered so `poll` and `read` agree
