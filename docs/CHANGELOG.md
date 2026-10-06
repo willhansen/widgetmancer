@@ -9,6 +9,26 @@ Newest first.
 
 ---
 
+## 2026-10-06 — Archive the solved 0001/0002 record; renumber the reused capture to 0003
+
+### issues: restore solved 0001/0002, move the reused issue to 0003
+
+The two issues solved by the built-in-map floor fix were deleted rather than
+archived, so the next capture reused number 0001. Now that numbers are never
+reused, restore the record and fix the collision:
+
+- `issues/solved/0001/` and `issues/solved/0002/` recreated from the
+  `docs/CHANGELOG.md` descriptions (demo top-edge `(19, 23)` could not move up;
+  right-edge `(39, 13)` could not move right). Their snapshots were lost with
+  the deletion, so only the notes are restored — the numbers are what matter for
+  non-reuse.
+- The reused capture is renumbered `issues/0001` → `issues/0003` (its `issue.md`
+  header updated), the next number once 0001/0002 are reserved.
+
+Verified: `issue_number_names` now scans to next = 4.
+
+---
+
 ## 2026-10-06 — Solved issues are archived; issue numbers are never reused
 
 ### game: reserve issue numbers across the `issues/solved/` archive
