@@ -1,0 +1,18 @@
+{
+  "board": [40, 24],
+  "ops": [
+    { "op": "double_sided_two_way_portal", "entrance": [23, 15], "entrance_dir": "right", "exit": [25, 17], "exit_dir": "up" },
+    { "op": "double_sided_two_way_portal", "entrance": [23, 14], "entrance_dir": "right", "exit": [26, 17], "exit_dir": "up" },
+    { "op": "double_sided_two_way_portal", "entrance": [23, 13], "entrance_dir": "right", "exit": [27, 17], "exit_dir": "up" },
+    { "op": "double_sided_two_way_portal", "entrance": [23, 12], "entrance_dir": "right", "exit": [28, 17], "exit_dir": "up" },
+    { "op": "double_sided_two_way_portal", "entrance": [23, 11], "entrance_dir": "right", "exit": [29, 17], "exit_dir": "up" },
+    { "op": "double_sided_two_way_portal", "entrance": [23, 10], "entrance_dir": "right", "exit": [30, 17], "exit_dir": "up" },
+    { "op": "double_sided_two_way_portal", "entrance": [17, 7], "entrance_dir": "down", "exit": [18, 3], "exit_dir": "down" },
+    { "op": "double_sided_two_way_portal", "entrance": [18, 7], "entrance_dir": "down", "exit": [19, 3], "exit_dir": "down" },
+    { "op": "double_sided_two_way_portal", "entrance": [19, 7], "entrance_dir": "down", "exit": [20, 3], "exit_dir": "down" },
+    { "op": "double_sided_two_way_portal", "entrance": [20, 7], "entrance_dir": "down", "exit": [21, 3], "exit_dir": "down" },
+    { "op": "double_sided_two_way_portal", "entrance": [21, 7], "entrance_dir": "down", "exit": [22, 3], "exit_dir": "down" },
+    { "op": "death_turret", "x": 6, "y": 12 }
+  ],
+  "player": [20, 12]
+}

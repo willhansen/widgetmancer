@@ -1,0 +1,17 @@
+{
+  "board": [38, 38],
+  "clear_floor": true,
+  "sight_radius": 24,
+  "ops": [
+    { "op": "cuboid", "x": 2, "y": 2, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cuboid", "x": 14, "y": 2, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cuboid", "x": 26, "y": 2, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cuboid", "x": 2, "y": 14, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cuboid", "x": 14, "y": 14, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cuboid", "x": 26, "y": 14, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cuboid", "x": 2, "y": 26, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cuboid", "x": 14, "y": 26, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] },
+    { "op": "cuboid", "x": 26, "y": 26, "z": 0, "width": 10, "depth": 10, "height": 10, "tint": [96, 104, 128] }
+  ],
+  "player": [19, 19]
+}

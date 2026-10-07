@@ -12,7 +12,8 @@ use euclid::point2;
 use rgb::RGB8;
 use serde::Deserialize;
 
-use utility::coordinate_frame_conversions::{BoardSize, WorldSquare, WorldVoxel};
+use utility::coordinate_frame_conversions::{BoardSize, WorldSquare, WorldStep, WorldVoxel};
+use utility::{SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
 
 use super::{Game, TerrainMaterial, SLAB_VOXEL_Z};
 
@@ -72,6 +73,39 @@ pub enum MapOp {
     /// The demo's cube side platforms (south staircase + east/west ledges),
     /// anchored at the cube's lower-left `(x, y)`.
     CubeSidePlatforms { x: i32, y: i32 },
+    /// A two-way, double-sided portal: entering `entrance` moving
+    /// `entrance_dir` emerges at `exit` moving `exit_dir`, and the reverse
+    /// faces exist too (see `Game::place_double_sided_two_way_portal`).
+    DoubleSidedTwoWayPortal {
+        entrance: [i32; 2],
+        entrance_dir: MapDir,
+        exit: [i32; 2],
+        exit_dir: MapDir,
+    },
+    /// A stationary death-cube turret.
+    DeathTurret { x: i32, y: i32 },
+}
+
+/// A world-space orthogonal direction, named as it reads on screen. `up` is
+/// `+y` in world squares.
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum MapDir {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl MapDir {
+    fn to_step(self) -> WorldStep {
+        match self {
+            MapDir::Up => STEP_UP,
+            MapDir::Down => STEP_DOWN,
+            MapDir::Left => STEP_LEFT,
+            MapDir::Right => STEP_RIGHT,
+        }
+    }
 }
 
 fn tint_of(tint: Option<[u8; 3]>) -> Option<RGB8> {
@@ -149,6 +183,22 @@ impl Game {
                 }
             }
             MapOp::CubeSidePlatforms { x, y } => self.place_cube_side_platforms(point2(x, y)),
+            MapOp::DoubleSidedTwoWayPortal {
+                entrance,
+                entrance_dir,
+                exit,
+                exit_dir,
+            } => self.place_double_sided_two_way_portal(
+                SquareWithOrthogonalDir::from_square_and_worldstep(
+                    point2(entrance[0], entrance[1]),
+                    entrance_dir.to_step(),
+                ),
+                SquareWithOrthogonalDir::from_square_and_worldstep(
+                    point2(exit[0], exit[1]),
+                    exit_dir.to_step(),
+                ),
+            ),
+            MapOp::DeathTurret { x, y } => self.place_death_turret(point2(x, y)),
         }
     }
 

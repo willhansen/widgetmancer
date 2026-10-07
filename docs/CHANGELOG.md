@@ -9,7 +9,44 @@ Newest first.
 
 ---
 
-## 2026-10-06 — Archive the solved 0001/0002 record; renumber the reused capture to 0003
+## 2026-10-07 — Default map becomes a data-defined `cubes` recipe; the old demo moves to `portals-and-death-cubes-demo`
+
+### game: `maps/cubes.json` default; port the demo to a recipe and add portal/turret ops
+
+The no-`--map` default used to be `Game::set_up_demo_map` in Rust. The default
+is now the data-defined `maps/cubes.json` (a 3×3 grid of 10×10×10 cubes over
+void, one voxel apart), and the old demo scene moved to the recipe
+`maps/portals-and-death-cubes-demo.json`.
+
+- **New recipe ops.** `MapOp` gains `double_sided_two_way_portal`
+  (`entrance`/`entrance_dir` + `exit`/`exit_dir`, with a serde `MapDir`) and
+  `death_turret` (`x`/`y`), so recipes can express portal geometry and turrets
+  that previously required Rust.
+- **Demo ported.** `set_up_demo_map` is deleted; its 40×24 floor, 11
+  double-sided two-way portals, and death turret at `(6,12)` are transcribed
+  into `maps/portals-and-death-cubes-demo.json`. A golden test pins the exact
+  44 portal-entrance `sort_key`s and the turret square, so the recipe stays
+  byte-faithful to the deleted built-in.
+- **Default.** `set_up_map_by_name` resolves `None` to `DEFAULT_MAP_NAME`
+  (`"cubes"`), which loads like any other recipe; the built-in `demo` arm is
+  gone. `--map demo` is replaced by
+  `--map portals-and-death-cubes-demo`.
+- **Tests.** `built_in_maps_seed_the_floor_to_their_board` drops the now-recipe
+  demo; `demo_map_has_no_floor_past_its_edges` →
+  `demo_recipe_has_no_floor_past_its_edges`;
+  `flat_built_in_map_is_the_default_floor` → `flat_recipe_map_is_the_default_floor`;
+  new `default_map_is_the_cubes_recipe` and
+  `portals_and_death_cubes_demo_recipe_matches_the_golden_layout`.
+- **CLI/docs/scripts.** Usage strings in `main.rs`/`map_diagram.rs` and the
+  snapshot issue label list the new names; `maps/cubes.sh` and
+  `maps/portals-and-death-cubes-demo.sh` launch the two new maps.
+
+Verified: `cargo test` workspace green (311 lib tests among them);
+`map_diagram cubes` and `map_diagram portals-and-death-cubes-demo` render.
+
+---
+
+
 
 ### issues: restore solved 0001/0002, move the reused issue to 0003
 

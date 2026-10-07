@@ -235,22 +235,23 @@ fn edit_issue_note(
     input_pause.resume();
 }
 
+pub const DEFAULT_MAP_NAME: &str = "cubes";
+
 pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
     // A `maps/<name>.json` recipe takes precedence; maps own their board size
-    // and are independent of the terminal.
-    if let Some(name) = map_name {
-        if let Some(map) = game::map_file::load_map_file(name) {
-            game.apply_map_file(&map);
-            return;
-        }
+    // and are independent of the terminal. With no `--map`, the default is a
+    // recipe too.
+    let name = map_name.unwrap_or(DEFAULT_MAP_NAME);
+    if let Some(map) = game::map_file::load_map_file(name) {
+        game.apply_map_file(&map);
+        return;
     }
-    match map_name {
-        None | Some("demo") => game.set_up_demo_map(),
-        Some("racetrack") => game.set_up_portal_cube_racetrack_map(),
-        Some("hallways") => game.set_up_portal_pair_hallways_map(),
-        Some("numbered-boxes") => game.set_up_numbered_boxes_map(),
-        Some(unknown) => {
-            panic!("Unknown map '{unknown}'. Known maps: demo, racetrack, hallways, numbered-boxes, space-cubes.")
+    match name {
+        "racetrack" => game.set_up_portal_cube_racetrack_map(),
+        "hallways" => game.set_up_portal_pair_hallways_map(),
+        "numbered-boxes" => game.set_up_numbered_boxes_map(),
+        unknown => {
+            panic!("Unknown map '{unknown}'. Known maps: cubes, space-cubes, racetrack, hallways, numbered-boxes, portals-and-death-cubes-demo.")
         }
     }
 }

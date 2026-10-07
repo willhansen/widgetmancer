@@ -5,7 +5,7 @@ use game::{do_everything, FovToggles};
 
 fn usage() {
     eprintln!(
-        "Usage: game [--map <demo|racetrack|hallways|numbered-boxes|space-cubes>] [--load <snapshot-dir>]\n\
+        "Usage: game [--map <cubes|space-cubes|racetrack|hallways|numbered-boxes|portals-and-death-cubes-demo>] [--load <snapshot-dir>]\n\
          \x20      [--no-fov-cache] [--fov-radius <squares>]\n\
          \n\
          FOV performance options (see docs/PERFORMANCE.md):\n\

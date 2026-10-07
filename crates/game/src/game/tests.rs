@@ -3313,8 +3313,7 @@
         // floor slab must be re-derived from that board. Regression for issues
         // 0001/0002: a wide terminal left a terminal-sized slab that rendered
         // as walkable floor past the board edge, which movement then refused.
-        let cases: [(&str, fn(&mut Game), BoardSize); 4] = [
-            ("demo", Game::set_up_demo_map, BoardSize::new(40, 24)),
+        let cases: [(&str, fn(&mut Game), BoardSize); 3] = [
             (
                 "racetrack",
                 Game::set_up_portal_cube_racetrack_map,
@@ -3353,9 +3352,9 @@
     }
 
     #[test]
-    fn demo_map_has_no_floor_past_its_edges() {
+    fn demo_recipe_has_no_floor_past_its_edges() {
         let mut game = Game::new(400, 120, LogicalTime::ZERO);
-        game.set_up_demo_map();
+        crate::set_up_map_by_name(&mut game, Some("portals-and-death-cubes-demo"));
         // Issue 0001: floor used to be drawn above the top edge at (19, 24).
         assert_eq!(game.height_at(point2(19, 24)), None, "void above the top edge");
         // Issue 0002: ...and right of the right edge at (40, 13).
@@ -3363,4 +3362,88 @@
         // The board itself is still bare floor.
         assert_eq!(game.height_at(point2(19, 23)), Some(SLAB_TOP));
         assert_eq!(game.height_at(point2(39, 13)), Some(SLAB_TOP));
+    }
+
+    #[test]
+    fn portals_and_death_cubes_demo_recipe_matches_the_golden_layout() {
+        // This scene used to be `Game::set_up_demo_map` in Rust; it now lives
+        // in `maps/portals-and-death-cubes-demo.json`. The golden below is the
+        // exact set of portal entrance `sort_key`s the built-in registered
+        // (44 entries: 11 double-sided two-way portals, 4 faces each), plus
+        // its death turret.
+        let mut game = Game::new(400, 120, LogicalTime::ZERO);
+        crate::set_up_map_by_name(&mut game, Some("portals-and-death-cubes-demo"));
+        assert_eq!(game.board_size(), BoardSize::new(40, 24));
+        let mut keys: Vec<_> = game
+            .portal_geometry
+            .iter_portals()
+            .map(|p| p.entrance().sort_key())
+            .collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            vec![
+                (17, 6, 0, 1),
+                (17, 7, 0, -1),
+                (18, 3, 0, 1),
+                (18, 4, 0, -1),
+                (18, 6, 0, 1),
+                (18, 7, 0, -1),
+                (19, 3, 0, 1),
+                (19, 4, 0, -1),
+                (19, 6, 0, 1),
+                (19, 7, 0, -1),
+                (20, 3, 0, 1),
+                (20, 4, 0, -1),
+                (20, 6, 0, 1),
+                (20, 7, 0, -1),
+                (21, 3, 0, 1),
+                (21, 4, 0, -1),
+                (21, 6, 0, 1),
+                (21, 7, 0, -1),
+                (22, 3, 0, 1),
+                (22, 4, 0, -1),
+                (23, 10, 1, 0),
+                (23, 11, 1, 0),
+                (23, 12, 1, 0),
+                (23, 13, 1, 0),
+                (23, 14, 1, 0),
+                (23, 15, 1, 0),
+                (24, 10, -1, 0),
+                (24, 11, -1, 0),
+                (24, 12, -1, 0),
+                (24, 13, -1, 0),
+                (24, 14, -1, 0),
+                (24, 15, -1, 0),
+                (25, 16, 0, 1),
+                (25, 17, 0, -1),
+                (26, 16, 0, 1),
+                (26, 17, 0, -1),
+                (27, 16, 0, 1),
+                (27, 17, 0, -1),
+                (28, 16, 0, 1),
+                (28, 17, 0, -1),
+                (29, 16, 0, 1),
+                (29, 17, 0, -1),
+                (30, 16, 0, 1),
+                (30, 17, 0, -1),
+            ]
+        );
+        assert_eq!(
+            game.pieces.keys().cloned().collect::<Vec<_>>(),
+            vec![point2(6, 12)]
+        );
+    }
+
+    #[test]
+    fn default_map_is_the_cubes_recipe() {
+        let mut game = Game::new(400, 120, LogicalTime::ZERO);
+        crate::set_up_map_by_name(&mut game, None);
+        assert_eq!(game.board_size(), BoardSize::new(38, 38));
+        // The player stands on the middle cube's top face (10 voxels tall).
+        assert_eq!(game.player_square(), point2(19, 19));
+        assert_eq!(game.height_at(point2(19, 19)), Some(10));
+        // Void between cubes; only the nine 10x10 footprints are solid.
+        assert_eq!(game.height_at(point2(12, 12)), None, "gap is void");
+        assert_eq!(game.terrain.occupied_squares().len(), 9 * 100);
     }

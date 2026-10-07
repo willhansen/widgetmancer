@@ -1270,40 +1270,6 @@ impl Game {
         self.place_dotted_thin_walls(bars_top_right_root_square);
     }
 
-    pub fn set_up_demo_map(&mut self) {
-        self.board_size = BoardSize::new(40, 24);
-        self.seed_board_floor_for_current_board();
-        self.place_player(point2(20, 12));
-        let base_square: WorldSquare = self.player_square();
-
-        let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
-            base_square + STEP_RIGHT * 3 + STEP_UP * 3,
-            STEP_RIGHT.into(),
-        );
-        let left_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
-            left_entrance.square() + STEP_UP * 2 + STEP_RIGHT * 2,
-            STEP_UP.into(),
-        );
-        (0..6).for_each(|i| {
-            let entrance = left_entrance.strafed_right_n(i);
-            let exit = left_exit.strafed_right_n(i);
-            self.place_double_sided_two_way_portal(entrance, exit);
-        });
-
-        (0..5).for_each(|dx| {
-            let top_left: WorldSquare = base_square + WorldStep::new(-3, -5);
-            let dy = 4;
-            let left_entrance: SquareWithOrthogonalDir = (top_left, STEP_DOWN).into();
-            let left_exit = left_entrance.stepped_n(dy).strafed_left();
-            self.place_double_sided_two_way_portal(
-                left_entrance.strafed_left_n(dx),
-                left_exit.strafed_left_n(dx),
-            );
-        });
-
-        self.place_death_turret(base_square + STEP_LEFT * 14);
-    }
-
     /// Verification map for floating entities through portals (ROADMAP
     /// item 11). Three exhibits; the lap and shuttle cubes loop forever,
     /// so their crossings repeat indefinitely and nothing despawns:

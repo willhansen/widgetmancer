@@ -82,7 +82,7 @@ pub fn create_new_issue(map_name: Option<&str>) -> Result<PathBuf, String> {
 /// The stub written before the editor opens. A short header so the saved note
 /// is self-describing even if left mostly empty.
 fn issue_note_template(number: u32, map_name: Option<&str>) -> String {
-    let map = map_name.unwrap_or("demo");
+    let map = map_name.unwrap_or(crate::DEFAULT_MAP_NAME);
     format!(
         "# Issue {number:04}\n\n\
          Map: {map}\n\
@@ -1107,14 +1107,15 @@ mod tests {
     }
 
     #[test]
-    fn flat_built_in_map_is_the_default_floor() {
-        // A built-in map must leave the slab equal to its board, so a snapshot
-        // of a bare map omits the (redundant) `floor_cells` override. Regression
-        // for issues 0001/0002, where a wide terminal left a larger slab.
+    fn flat_recipe_map_is_the_default_floor() {
+        // A recipe that keeps the default full-board floor must leave the slab
+        // equal to its board, so a snapshot of a bare map omits the (redundant)
+        // `floor_cells` override. Regression for issues 0001/0002, where a wide
+        // terminal left a larger slab.
         let mut game = Game::new(400, 120, LogicalTime::ZERO);
-        game.set_up_demo_map();
+        crate::set_up_map_by_name(&mut game, Some("portals-and-death-cubes-demo"));
 
-        let json = game_state_json(&game, Some("demo"));
+        let json = game_state_json(&game, Some("portals-and-death-cubes-demo"));
         assert!(
             !json.contains("\"floor_cells\""),
             "a full-board floor is the default and must not be serialized"
