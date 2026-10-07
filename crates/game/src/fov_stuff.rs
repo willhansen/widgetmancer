@@ -629,6 +629,19 @@ impl FieldOfViewResult {
         !self.visibilities_of_relative_square(step).is_empty()
     }
 
+    /// The absolute square actually seen at `relative_square`, chosen in the
+    /// same draw order the renderer uses (topmost visibility last). A portal
+    /// can map an apparent on-board square to off-board void and vice versa,
+    /// so callers that ask "is this cell board or void?" must use this rather
+    /// than the portal-unaware `root + relative_square` projection.
+    ///
+    /// Returns `None` when the relative square is not visible at all.
+    pub fn resolved_absolute_square(&self, relative_square: WorldStep) -> Option<WorldSquare> {
+        Self::sorted_by_draw_order(self.visibilities_of_relative_square(relative_square))
+            .last()
+            .map(|visibility| visibility.absolute_square())
+    }
+
     pub fn visibilities_of_absolute_square(
         &self,
         world_square: WorldSquare,
@@ -2461,7 +2474,7 @@ mod tests {
         // (37,23)) with the viewer standing on the lower one. Their openings
         // meet at a 45-degree corner, so a square on that seam used to get only
         // one slice's half-plane and render as an OUT_OF_SIGHT black diagonal
-        // (issues/black-diagonal-portal-seam). Merging the slices' arcs must
+        // (issues/solved/black-diagonal-portal-seam). Merging the slices' arcs must
         // make the seam square fully visible.
         let mut portal_geometry = PortalGeometry::default();
         let player = point2(37, 23);

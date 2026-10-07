@@ -181,6 +181,7 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
             game.world_time_since_start().as_secs_f32().to_string(),
         ),
         ("player", player_json(game)),
+        ("sight_radius", game.player_sight_radius.to_string()),
         ("pieces", json_sorted_array(game.pieces.iter().map(|(&square, &piece)| piece_json(square, &piece)))),
         (
             "voxels",
@@ -549,6 +550,10 @@ struct SnapshotData {
     turn_count: u32,
     world_time_seconds: f32,
     player: Option<PlayerDto>,
+    /// Player sight radius at capture. Absent in older snapshots, which fall
+    /// back to `PLAYER_SIGHT_RADIUS`. Maps can override it (e.g. `cubes`).
+    #[serde(default)]
+    sight_radius: Option<u32>,
     #[serde(default)]
     pieces: Vec<PieceDto>,
     /// Legacy single-height block squares, from snapshots before terrain
@@ -767,6 +772,9 @@ impl Game {
         game.graphics
             .screen
             .set_rotation(QuarterTurnsAnticlockwise::new(data.screen.rotation_quarter_turns));
+        if let Some(radius) = data.sight_radius {
+            game.set_player_sight_radius(radius);
+        }
 
         if let Some(player) = data.player {
             game.player_optional = Some(Player {
@@ -1056,6 +1064,23 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_round_trips_sight_radius() {
+        // Maps can override the sight radius (e.g. `cubes`: 24). It must
+        // survive a snapshot so a headless render matches the capture instead
+        // of falling back to `PLAYER_SIGHT_RADIUS`.
+        let mut game = set_up_game_with_player();
+        game.set_player_sight_radius(24);
+        game.world_time = game.world_start_time;
+
+        let json = game_state_json(&game, Some("test"));
+        let data: SnapshotData = serde_json::from_str(&json).expect("parse snapshot");
+        let loaded = Game::from_snapshot(data, game.graphics().start_time());
+
+        assert_eq!(loaded.player_sight_radius, 24);
+        assert_eq!(game_state_json(&loaded, Some("test")), json);
+    }
+
+    #[test]
     fn legacy_blocks_only_snapshot_loads_as_single_height_columns() {
         let mut game = set_up_game_with_player();
         let base = game.player_square();
@@ -1143,7 +1168,7 @@ mod tests {
 
     #[test]
     fn stacked_portal_seam_has_no_out_of_sight_partial() {
-        // Reproduces issues/black-diagonal-portal-seam: standing on a portal in
+        // Reproduces issues/solved/black-diagonal-portal-seam: standing on a portal in
         // a stacked pair used to render a diagonal of OUT_OF_SIGHT black
         // partials along the 45-degree seam between their openings.
         let mut game = crate::utils_for_tests::set_up_nxm_game(44, 63);
@@ -1175,6 +1200,62 @@ mod tests {
                 cell.y
             );
         }
+    }
+
+    #[test]
+    fn stars_are_drawn_through_a_portal_over_off_board_void() {
+        // Issue 0004: looking north through a portal at the board's north edge,
+        // the void beyond should show stars. The starfield used to decide
+        // board-vs-void from the portal-unaware `screen -> world` projection, so
+        // cells whose *apparent* square is on-board but whose *resolved* square
+        // is off-board (reached through the portal) were culled.
+        let mut game = crate::utils_for_tests::set_up_nxm_game(24, 40);
+        game.board_size = BoardSize::new(20, 12);
+        game.seed_board_floor_for_current_board();
+        game.place_player(point2(10, 6));
+        game.place_double_sided_two_way_portal(
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(10, 2), STEP_DOWN),
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(9, 4), STEP_DOWN),
+        );
+        game.draw_headless_now();
+
+        let fov = game.player_field_of_view();
+        let root = fov.root_square();
+        let board = game.board_size();
+        let on_board = |square: WorldSquare| {
+            square.x >= 0
+                && square.x < board.width as i32
+                && square.y >= 0
+                && square.y < board.height as i32
+        };
+        let screen = &game.graphics.screen;
+
+        let mut portal_void_stars = 0;
+        for square in screen.all_screen_squares() {
+            let naive = screen.screen_buffer_square_to_world_square(square);
+            let relative = naive - root;
+            if !fov.can_see_relative_square(relative) {
+                continue;
+            }
+            let Some(seen) = fov.resolved_absolute_square(relative) else {
+                continue;
+            };
+            if !on_board(naive) || on_board(seen) {
+                continue;
+            }
+            let glyphs = screen.get_glyphs_at_screen_square(square);
+            if glyphs
+                .iter()
+                .any(|glyph| matches!(glyph.character, '·' | '.' | '+' | '*' | '✦'))
+            {
+                portal_void_stars += 1;
+            }
+        }
+
+        assert!(
+            portal_void_stars > 0,
+            "no stars rendered in cells that are off-board only through the portal"
+        );
     }
 }
 

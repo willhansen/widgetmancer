@@ -9,6 +9,176 @@ Newest first.
 
 ---
 
+## 2026-10-07 — Re-bless the 0004 and touching captures to their fixed renders
+
+### issues: bless resolved captures; keep the pre-fix render beside them
+
+The `0004` (stars through a portal) and `touching-floating-square-background`
+(shape-preserving composite) fixes changed their headless renders, so their
+`solved/` captures were blessed to match. The originals are preserved as
+`screen.pre-fix.txt` (missing stars; flooded left half). `0003` was blessed the
+same way when it was fixed.
+
+The `black-*` and `player-border-rotation` captures predate the current renderer
+and are kept as design records rather than re-blessed.
+
+---
+
+## 2026-10-07 — Retire the leftover-portal artifact and archive the resolved captures
+
+### issues: archive 0003/0004/touching, retire leftover-portal
+
+All four captures now in `issues/` are resolved, so they move to
+`issues/solved/` (numbers stay reserved per `issues/README.md`):
+
+- `0003` — cubes framing + edges fixed by the camera-altitude/rim change and
+  the `sight_radius` round-trip.
+- `0004` — stars through a portal fixed by the FOV-resolved occupancy test.
+- `touching-floating-square-background` — fixed by the shape-preserving
+  compositing.
+- `leftover-portal-rendering-artifact-after-jump` — retired as
+  non-reproducible: no headless code path produces the red-tinted floor, the
+  starfield cannot flicker (pure function of screen/board/time), and the two
+  deterministic paths that could have were already fixed. Documented in its
+  note; a live pty capture would be needed to chase the terminal-side case.
+
+`issue_number_names` still scans both directories; the next number stays 5.
+
+---
+
+## 2026-10-07 — Camera follows the player's surface altitude; cube tops get a drop-off rim
+
+### game: player-relative camera altitude and a terrain rim (issue 0003)
+
+The `cubes` map's big cubes projected out of the top of the frame because the
+camera ignored the player's altitude. The player stands on a 10-tall cube, but
+`update_screen_from_draw_buffer` centred the camera on the player's *ground*
+square while terrain is projected upward by `-altitude`: the player glyph sat 10
+rows above the frame centre and the north cubes left the top of the border.
+
+- **Camera altitude.** `Screen` gains `camera_altitude`;
+  `world_square_and_altitude_to_screen_buffer_square` subtracts
+  `altitude - camera_altitude`. It is set to `player_altitude()` each draw, so
+  the player's surface lands at the frame centre. Flat boards (altitude 0) are
+  byte-for-byte unchanged (`snapshot/` diff still OK).
+- **Rim.** Exposed top faces get a bright `UPPER_HALF_BLOCK` rim on their far
+  (screen-up) drop-off edge (`terrain_rim_color`), so a raised cube reads as a
+  cube rather than a flat dark patch. Only plain tops (no glyph of their own)
+  are rimmed.
+- Tests: `player_renders_at_the_frame_center_on_a_raised_column`; the
+  raised-terrain top-face test now expects the rim half-block.
+
+The `issues/0003` capture was re-blessed to the fixed render (original kept at
+`screen.pre-fix.txt`).
+
+---
+
+## 2026-10-07 — Snapshots round-trip the player sight radius
+
+### game: serialize/restore `sight_radius` so map overrides survive a capture
+
+Issue 0003 (map `cubes`) re-rendered 1488 cells wrong because the headless
+loader fell back to `PLAYER_SIGHT_RADIUS = 16` while the map overrides the
+radius to 24 (`maps/cubes.json`). The snapshot had no field for it, so the FOV
+border and starfield were eight squares too small on every side.
+
+- `game_state_json` emits `sight_radius`; `SnapshotData` reads it as an
+  `Option<u32>` (absent in older captures → default), and `from_snapshot`
+  calls `set_player_sight_radius`.
+- Backfilled `issues/0003/snapshot/game_state.json` with `"sight_radius": 24`
+  (the value the live run used, confirmed by the captured border at radius 25);
+  `snapshot_tool diff issues/0003/snapshot` is now `OK`.
+- Regression test `snapshot_round_trips_sight_radius`.
+
+The committed `snapshot/` fixture predates the field and still loads on the
+default-16 fallback, so it doubles as the backward-compat case.
+
+---
+
+## 2026-10-07 — Opaque glyphs no longer flood a partial below shape with its ink color
+
+### game/terminal_rendering: preserve a content drawable's background under an opaque glyph
+
+Issue `touching-floating-square-background`: the player arrow over a remapped
+death cube rendered its left half entirely in the death color and let a lower
+block through on the right. In `Glyph::drawn_over`
+(`crates/terminal_rendering/src/glyph.rs`), when the top glyph had ink and a
+transparent background but could not be combined with the below character, the
+background was filled with the below glyph's **ink** color, discarding the
+below shape. For the player over the death cube that flooded the half.
+
+- `Glyph::drawn_over_preserving_below_shape` (and the `DoubleGlyphFunctions`
+  counterpart) keep the below shape's *background* when the top is transparent,
+  falling back to the ink color only when the below glyph is itself
+  background-transparent.
+- `TextDrawable::drawn_over` routes through it only when the below drawable is
+  content — `OffsetSquareDrawable` or `PartialVisibilityDrawable`. UI markers
+  (danger/move squares) keep the old recolor-the-cell compositing, so
+  `test_protected_piece_has_fully_colored_background` and
+  `test_portal_drawn_in_correct_order_over_partially_visible_block` still hold.
+- Regression test `test_text_over_partial_shape_keeps_below_background` pins the
+  failing direction (it fails against the old `bottom.fg_color` fallback).
+
+The right half still shows the death cube's actual lower-block coverage; only
+the spurious whole-half fill is gone.
+
+---
+
+## 2026-10-07 — Stars through portals: resolve board-vs-void at the square actually seen
+
+### game: starfield decides void from the FOV-resolved square, not the naive projection
+
+Issue 0004: looking north through the demo's portal bank, the void beyond the
+board edge showed no stars. `Starfield::draw` tested occupancy with
+`screen_buffer_character_square_to_world_square`, which knows nothing about
+portals. For a cell whose content comes through a portal, that naive square is
+on-board and occupied, so `occupied.contains(&world_square)` culled the star
+even though the FOV resolved the cell to an off-board square
+(`graphics/starfield.rs:163`).
+
+- **Model.** Added `FieldOfViewResult::resolved_absolute_square(relative)`,
+  returning the absolute square of the topmost visibility in draw order (the
+  same order the renderer uses), or `None` when the relative square is unseen.
+- **Starfield.** The occupancy gate now runs on the resolved square (falling
+  back to the naive square when there is no visibility), while the FOV-visibility
+  and `drawn` gates are unchanged, so board floor is still never overwritten.
+- **Tests.** `stars_are_drawn_through_a_portal_over_off_board_void` builds a
+  small board with a double-sided north portal and asserts a star renders in a
+  cell that is off-board only through the portal. All existing starfield tests
+  and the blessed `snapshot/` diff stay green.
+
+`snapshot_tool diff issues/0004/snapshot` grows by the previously-missing stars;
+the remaining delta is transient animation/selector state the loader does not
+restore.
+
+---
+
+## 2026-10-07 — Archive the three fixed issues; retire the rotated-border lost-look note
+
+### issues: move black-block, black-diagonal-seam, player-border-rotation to solved/
+
+`issues/` is meant to hold only open captures (`issues/README.md`), but three
+entries there were already fixed:
+
+- `black-block-deep-in-portal` and `black-diagonal-portal-seam` carry
+  "Status: fixed" and their regression tests
+  (`test_portal_slice_arcs_union_to_full_visibility`,
+  `test_stacked_portal_slices_union_to_full_visibility`,
+  `stacked_portal_seam_has_no_out_of_sight_partial`).
+- `player-border-rotation` was fixed by the screen-space `UiLayer`
+  (`border_is_independent_of_camera_rotation`) but its note was never updated.
+
+Moved all three under `issues/solved/` (numbers stay reserved per
+`issues/README.md`). Updated the stale `player-border-rotation` note with its
+resolution, recorded its "save the rotated frame as reference" wish in
+`docs/vision/ideas.md`, and repointed the `docs/ROADMAP.md` Done-section links
+and two code comments at the new `issues/solved/…` paths.
+
+Verified: `issue_number_names` still scans both directories (next number
+stays 5); full suite green.
+
+---
+
 ## 2026-10-07 — Default map becomes a data-defined `cubes` recipe; the old demo moves to `portals-and-death-cubes-demo`
 
 ### game: `maps/cubes.json` default; port the demo to a recipe and add portal/turret ops

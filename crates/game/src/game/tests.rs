@@ -19,7 +19,7 @@
     use crate::utils_for_tests::*;
     use terminal_rendering::glyph::glyph_constants::{
         BLACK, BLOCK_FG, BLUE, FULL_BLOCK, GREY, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, PLAYER_COLOR,
-        RED, RIGHT_HALF_BLOCK, THICK_ARROWS,
+        RED, RIGHT_HALF_BLOCK, THICK_ARROWS, UPPER_HALF_BLOCK,
     };
 
     use super::*;
@@ -3146,8 +3146,8 @@
         let top = screen.world_square_and_altitude_to_screen_buffer_square(column, 3);
         let top_glyphs = screen.get_glyphs_at_screen_square(top);
         assert_eq!(
-            top_glyphs[0].character, ' ',
-            "a terrain top uses the floor glyph carrying the material color"
+            top_glyphs[0].character, UPPER_HALF_BLOCK,
+            "the top face's far drop-off edge carries the rim half-block"
         );
         assert_ne!(top_glyphs[0].bg_color, BLACK, "top should be material-colored");
         assert_eq!(top_glyphs[0].bg_color, top_glyphs[1].bg_color);
@@ -3157,6 +3157,28 @@
         assert_eq!(wall_glyphs[0].character, '▒', "wall character");
         assert_ne!(wall_glyphs[0].bg_color, BLACK, "wall should be tinted");
         assert_eq!(wall_glyphs[0].bg_color, wall_glyphs[1].bg_color);
+    }
+
+    #[test]
+    fn player_renders_at_the_frame_center_on_a_raised_column() {
+        // Issue 0003: the camera follows the player's surface altitude, so the
+        // player glyph lands at the frame centre instead of `altitude` rows
+        // above it (which pushed tall cubes out of the top of the frame).
+        let mut game = set_up_nxn_game(14);
+        let column = point2(7, 7);
+        game.place_solid_column(column, 3);
+        game.place_player(column);
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let center = screen.screen_center_as_screen_buffer_square();
+        let glyphs = screen.get_glyphs_at_screen_square(center);
+        assert!(
+            THICK_ARROWS.contains(glyphs[0].character),
+            "expected the player arrow at the frame centre, got {:?}",
+            glyphs[0].character
+        );
+        assert_eq!(glyphs[0].fg_color, PLAYER_COLOR);
     }
 
     #[test]

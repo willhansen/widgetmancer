@@ -103,8 +103,10 @@ impl Starfield {
     /// the FOV composite did **not** draw anything there (`drawn` is the set of
     /// screen squares the FOV filled). So the unseen void outside the sight
     /// radius stays black, and a portal view's floor — which maps to off-board
-    /// screen cells — is not overwritten. With `fov == None` (dead player) the
-    /// whole off-board void is decorated.
+    /// screen cells — is not overwritten. Board-vs-void is decided at the square
+    /// the FOV actually resolves the cell to, so void seen through a portal
+    /// shows stars even though its apparent square is on-board. With
+    /// `fov == None` (dead player) the whole off-board void is decorated.
     pub fn draw(
         &self,
         screen: &mut Screen,
@@ -160,12 +162,10 @@ impl Starfield {
                     let world_square = screen.screen_buffer_character_square_to_world_square(
                         ScreenBufferCharacterSquare::new(pos_x, pos_y),
                     );
-                    if occupied.contains(&world_square) {
-                        continue;
-                    }
                     if let Some(fov) = fov {
                         // Only paint void the player can see...
-                        if !fov.can_see_relative_square(world_square - fov.root_square()) {
+                        let relative = world_square - fov.root_square();
+                        if !fov.can_see_relative_square(relative) {
                             continue;
                         }
                         // ...and only where the FOV composite drew nothing.
@@ -175,6 +175,18 @@ impl Starfield {
                         if drawn.contains(&screen_square) {
                             continue;
                         }
+                        // Board-vs-void must be decided at the square actually
+                        // seen: a portal can map this apparent board cell to
+                        // off-board void (and the reverse), so the naive
+                        // projection would wrongly cull stars through portals.
+                        let seen = fov
+                            .resolved_absolute_square(relative)
+                            .unwrap_or(world_square);
+                        if occupied.contains(&seen) {
+                            continue;
+                        }
+                    } else if occupied.contains(&world_square) {
+                        continue;
                     }
 
                     let palette_index = ((rand01(h ^ HASH_GLYPH) * layer.palette.len() as f32)

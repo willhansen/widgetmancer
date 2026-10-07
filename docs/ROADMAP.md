@@ -37,7 +37,7 @@ see across a cube top it is standing on.
 ## Debug tooling wishlist — rendering & FOV
 
 Captured while designing tooling for the portal-depth partial-visibility
-artifact (`issues/black-block-deep-in-portal/PORTAL_FOV_DEPTH_ARTIFACT.md`),
+artifact (`issues/solved/black-block-deep-in-portal/PORTAL_FOV_DEPTH_ARTIFACT.md`),
 whose write-up names its own blocker: "no supported way to dump FOV internals
 for a loaded snapshot." Ordered by leverage, not implementation order. This is
 a wishlist; promote entries into numbered `Open` items (or fold into item 6)
@@ -481,7 +481,7 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
 ## Done
 
 ### 13. Fix black diagonal partial-square seam through adjacent portals — 2026-09
-- **Evidence:** `issues/black-diagonal-portal-seam/` — standing on one of a
+- **Evidence:** `issues/solved/black-diagonal-portal-seam/` — standing on one of a
   stacked pair of east-facing portals rendered a diagonal of
   `OUT_OF_SIGHT`-background partials on the 45-degree seam between their
   openings (`rel(k,-k)`, `k=1..5` in the capture; longer in the minimized repro).
@@ -505,7 +505,7 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   green (536 passed / 9 skipped; 275 with `debug-tools`).
 
 ### 12. Fix portal-depth partial-visibility artifact — 2026-09
-- **Evidence:** `issues/black-block-deep-in-portal/` — a black
+- **Evidence:** `issues/solved/black-block-deep-in-portal/` — a black
   `OUT_OF_SIGHT`-background partial at buffer `(49,37)` (rel `(15,1)`, depth 3)
   where depths 0–2 see the same absolute square `(37,45)` fully.
 - **Root cause:** sub-FOVs reaching the same transformed root through adjacent
@@ -518,7 +518,7 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   cones and recomputes affected squares under the union. Top-level octant folds
   and blocker splits keep their arcs. Regression test
   `test_portal_slice_arcs_union_to_full_visibility`; full workspace suite green.
-  Debug outputs regenerated under `issues/black-block-deep-in-portal/debug/`
+  Debug outputs regenerated under `issues/solved/black-block-deep-in-portal/debug/`
   (pre-fix minimization kept in `debug/pre-fix/`).
 
 ### 11. Floating squares travel through portals — 2026-09-23

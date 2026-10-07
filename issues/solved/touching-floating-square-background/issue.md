@@ -38,3 +38,27 @@ compositing (`crates/game/src/graphics/drawable.rs` /
 `DoubleGlyph::drawn_over`): the below drawable's per-half shape is not preserved
 under an opaque glyph.
 
+## Resolution (2026-10-07)
+
+The flattening is in `Glyph::drawn_over` (`crates/terminal_rendering/src/glyph.rs`):
+when the top glyph has ink and a transparent background but cannot be combined
+with the below character, it filled the whole half's background with the below
+glyph's *ink* color, discarding the below shape. For the player arrow over the
+remapped death cube that flooded the left half with the death color.
+
+Fix: `TextDrawable::drawn_over` now detects content drawables
+(`OffsetSquareDrawable`, `PartialVisibilityDrawable`) and composites through
+`Glyph::drawn_over_preserving_below_shape`, which keeps the below shape's
+background where the top is transparent instead of flooding it. UI overlays
+(danger/move markers) keep the old recolor-the-cell compositing, so
+`test_protected_piece_has_fully_colored_background` still holds.
+
+Regression test: `test_text_over_partial_shape_keeps_below_background`.
+After the fix, `explain minimized 4 4` reports the player's left half as
+arrow-on-floor (`bg(191,191,191)`) rather than death-flooded; the right half
+keeps the death cube's actual lower-block coverage.
+
+`snapshot/screen.txt` and `minimized/screen.txt` were re-blessed to the fixed
+render; the `screen.pre-fix.txt` files are the originals (flooded left half).
+
+

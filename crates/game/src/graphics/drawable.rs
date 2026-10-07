@@ -66,7 +66,21 @@ impl Drawable for TextDrawable {
     }
 
     fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
-        let glyphs = self.to_glyphs().drawn_over(other.to_glyphs());
+        // Content drawables (floating offset squares, partially-visible
+        // squares) carry a per-half shape that an opaque top glyph should sit
+        // on without flooding the half with the content's ink color. UI
+        // markers (danger squares, etc.) are meant to recolor the cell, so
+        // they keep the default compositing.
+        let preserve_below_shape = matches!(
+            other.to_enum(),
+            DrawableEnum::OffsetSquare(_) | DrawableEnum::PartialVisibility(_)
+        );
+        let glyphs = if preserve_below_shape {
+            self.to_glyphs()
+                .drawn_over_preserving_below_shape(other.to_glyphs())
+        } else {
+            self.to_glyphs().drawn_over(other.to_glyphs())
+        };
         Self::from_glyphs(glyphs).into()
     }
 
@@ -650,6 +664,33 @@ mod tests {
         assert_ne!(
             stacked.to_glyphs()[0].fg_color,
             stacked.to_glyphs()[0].bg_color
+        );
+    }
+
+    #[test]
+    fn test_text_over_partial_shape_keeps_below_background() {
+        // The reverse of `test_shadow_over_text`: text (or the player arrow)
+        // drawn *over* a partially-visible/offset shape must not flood the
+        // half with the below drawable's ink color. Issue
+        // `touching-floating-square-background`.
+        let below = PartialVisibilityDrawable::from_partially_visible_drawable(
+            &SolidColorDrawable::new(GREEN),
+            SquareVisibility::bottom_half_visible(),
+        );
+        let text = TextDrawable::new("a ", RED, BLACK, true);
+
+        let combo = text.drawn_over(&below);
+        let glyphs = combo.to_glyphs();
+
+        assert_eq!(glyphs[0].character, 'a');
+        assert_eq!(
+            glyphs[0].bg_color,
+            below.to_glyphs()[0].bg_color,
+            "background should be the below shape's background"
+        );
+        assert_ne!(
+            glyphs[0].bg_color, GREEN,
+            "the below ink color must not flood the half"
         );
     }
 

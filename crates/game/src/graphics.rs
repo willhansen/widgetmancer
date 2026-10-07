@@ -102,6 +102,14 @@ fn scale_rgb(color: RGB8, factor: f32) -> RGB8 {
     RGB8::new(scale(color.r), scale(color.g), scale(color.b))
 }
 
+/// A brightened top-face color for the drop-off rim. The rim marks a top
+/// face's far (screen-up) edge where the terrain falls away, so a raised cube
+/// reads as a cube against the dark void instead of a flat dark patch
+/// (issue 0003: "difficult to see the edges of the cube").
+fn terrain_rim_color(top_color: RGB8) -> RGB8 {
+    lerp_rgb(top_color, RGB8::new(225, 232, 255), 0.5)
+}
+
 fn lerp_rgb(a: RGB8, b: RGB8, t: f32) -> RGB8 {
     let t = t.clamp(0.0, 1.0);
     let mix = |x: u8, y: u8| (x as f32 * (1.0 - t) + y as f32 * t).round() as u8;
@@ -461,6 +469,22 @@ impl Graphics {
                             );
                             glyphs[0].bg_color = color;
                             glyphs[1].bg_color = color;
+                            // Rim the top face's far (screen-up) drop-off edge
+                            // so the cube silhouette reads. Only plain tops
+                            // (no glyph of their own) get the rim.
+                            if !glyphs[0].has_fg() && !glyphs[1].has_fg() {
+                                let far_neighbor = square - toward_camera;
+                                let far_is_lower = terrain
+                                    .height_at(far_neighbor)
+                                    .map_or(true, |height| height < z + 1);
+                                if far_is_lower {
+                                    let rim = terrain_rim_color(color);
+                                    for glyph in glyphs.iter_mut() {
+                                        glyph.character = UPPER_HALF_BLOCK;
+                                        glyph.fg_color = rim;
+                                    }
+                                }
+                            }
                         }
                         self.screen
                             .draw_glyphs_straight_to_screen_square(glyphs, top_square);

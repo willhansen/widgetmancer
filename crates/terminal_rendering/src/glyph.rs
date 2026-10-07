@@ -407,6 +407,30 @@ impl Glyph {
         }
     }
 
+    /// Like [`Glyph::drawn_over`], but when `bottom` is a partial shape (not a
+    /// solid fill and not itself background-transparent), keep its background
+    /// instead of filling the half with its ink color. Use this when the below
+    /// drawable is content the top glyph covers — an offset floating square or
+    /// a partially-visible square — rather than a UI marker meant to recolor
+    /// the cell (see issue `touching-floating-square-background`).
+    pub fn drawn_over_preserving_below_shape(&self, bottom: Glyph) -> Glyph {
+        let top = *self;
+        if !top.has_fg() || !top.bg_transparent {
+            return top.drawn_over(bottom);
+        }
+        if let Some(combined_character) = combine_characters(top.character, bottom.character) {
+            return Glyph::new(combined_character, top.fg_color, bottom.bg_color);
+        }
+        let bg = if bottom.bg_transparent {
+            bottom.fg_color
+        } else if let Some(below_solid_color) = bottom.get_solid_color() {
+            below_solid_color
+        } else {
+            bottom.bg_color
+        };
+        Glyph::new(top.character, top.fg_color, bg)
+    }
+
     pub fn char_map_to_fg_only_glyph_map<T: Hash + Eq + Copy>(
         char_map: HashMap<T, char>,
         color: RGB8,
@@ -491,6 +515,7 @@ impl Display for Glyph {
 pub trait DoubleGlyphFunctions {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2];
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
+    fn drawn_over_preserving_below_shape(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
     fn to_string(&self) -> String;
     fn to_clean_string(&self) -> String;
     fn chars(&self) -> DoubleChar;
@@ -561,6 +586,16 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         };
 
         return output;
+    }
+    fn drawn_over_preserving_below_shape(
+        &self,
+        background_glyphs: DoubleGlyph,
+    ) -> DoubleGlyph {
+        [0, 1].map(|i| {
+            let top = self[i];
+            let bottom = background_glyphs[i];
+            top.drawn_over_preserving_below_shape(bottom)
+        })
     }
     fn to_string(&self) -> String {
         self[0].to_string() + &self[1].to_string()

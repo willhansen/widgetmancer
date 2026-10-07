@@ -718,6 +718,12 @@ impl Game {
             self.graphics
                 .screen
                 .set_screen_center_by_world_square(self.player_square());
+            // Follow the player's surface so its glyph sits at the frame
+            // centre even on a raised column (issue 0003: tall cubes drifted
+            // out of the top of the frame).
+            self.graphics
+                .screen
+                .set_camera_altitude(self.player_altitude());
             let fov = self.player_fov_for_draw();
             let mut drawn = if self.terrain.max_top_altitude() > 1 {
                 // On a raised board the forward column pass draws the whole

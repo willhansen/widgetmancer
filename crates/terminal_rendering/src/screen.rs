@@ -42,6 +42,11 @@ pub const SCREEN_STEP_DOWN_RIGHT: ScreenBufferStep = vec2(1, 1);
 pub struct Screen {
     screen_origin: WorldSquare,
     rotation: QuarterTurnsAnticlockwise,
+    /// The camera follows the player's surface altitude: terrain/entity
+    /// projections subtract `(altitude - camera_altitude)`, so the player's
+    /// glyph lands at the frame centre even when standing on a raised column.
+    /// Always 0 on flat boards, which keeps the legacy projection byte-for-byte.
+    camera_altitude: i32,
     // TODO: replace with Frame
     pub screen_buffer: Vec<Vec<Glyph>>,
     // (x,y), left to right, top to bottom
@@ -60,6 +65,7 @@ impl Screen {
         Screen {
             screen_origin: point2(0, terminal_height as i32 - 1),
             rotation: QuarterTurnsAnticlockwise::default(),
+            camera_altitude: 0,
             screen_buffer: vec![
                 vec![Glyph::from_char(' '); terminal_height as usize];
                 terminal_width as usize
@@ -91,6 +97,16 @@ impl Screen {
 
     pub fn set_screen_center_by_world_square(&mut self, world_square: WorldSquare) {
         self.screen_origin = world_square - self.world_step_from_origin_to_center();
+    }
+
+    pub fn camera_altitude(&self) -> i32 {
+        self.camera_altitude
+    }
+
+    /// See [`Screen::camera_altitude`]. Callers should set this to the player's
+    /// surface altitude before a draw so the player renders at the centre.
+    pub fn set_camera_altitude(&mut self, altitude: i32) {
+        self.camera_altitude = altitude;
     }
 
     #[cfg(test)]
@@ -328,13 +344,15 @@ impl Screen {
 
     /// The screen square a world square projects to at `altitude`. Altitude
     /// shifts strictly up the screen (one row per voxel) regardless of view
-    /// rotation, matching `cube_iso`'s projection P.
+    /// rotation, matching `cube_iso`'s projection P. The `camera_altitude`
+    /// offset makes the player's own surface land at the frame centre.
     pub fn world_square_and_altitude_to_screen_buffer_square(
         &self,
         world_square: WorldSquare,
         altitude: i32,
     ) -> ScreenBufferSquare {
-        self.world_square_to_screen_buffer_square(world_square) + vec2(0, -altitude)
+        self.world_square_to_screen_buffer_square(world_square)
+            + vec2(0, -(altitude - self.camera_altitude))
     }
 
     ////////////////////////////////////////////////////////////////////////////////
