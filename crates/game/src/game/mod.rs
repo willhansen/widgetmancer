@@ -312,7 +312,7 @@ impl Game {
     fn get_grid_entity_at_square(&self, square: WorldSquare) -> Option<GridEntity> {
         if self.try_get_player_square() == Some(square) {
             Some(GridEntity::Player)
-        } else if self.is_block_at(square) {
+        } else if self.square_blocks_player(square) {
             Some(GridEntity::Block)
         } else if let Some(&widget) = self.widgets.get(&square) {
             Some(GridEntity::Widget(widget))
@@ -550,6 +550,15 @@ impl Game {
         }
     }
 
+    /// The player-relative form of `is_block_at`: a column blocks the player
+    /// when its top rises above the player's current surface (void included).
+    /// On a raised board the column underfoot is not a wall, so entity/empty
+    /// checks must use this rather than `is_block_at`'s flat `z = SLAB_TOP`
+    /// solidity, which is true for every cube column.
+    fn square_blocks_player(&self, square: WorldSquare) -> bool {
+        !self.player_can_stand_at(square, self.player_altitude())
+    }
+
     fn raw_set_player_position(&mut self, square: WorldSquare) {
         if let Some(player) = &mut self.player_optional {
             player.position = square
@@ -776,7 +785,7 @@ impl Game {
     fn square_is_empty(&self, square: WorldSquare) -> bool {
         !self.is_player_at(square)
             && !self.is_non_player_piece_at(square)
-            && !self.is_block_at(square)
+            && !self.square_blocks_player(square)
             && !self.is_upgrade_at(square)
     }
 

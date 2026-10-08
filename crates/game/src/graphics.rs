@@ -68,10 +68,6 @@ const TERRAIN_WALL_BASE: RGB8 = RGB8::new(24, 24, 36);
 /// Checker block size, in world squares — matches the board's own 3-square
 /// pattern.
 const CHECKER_BLOCK: i32 = 3;
-/// Depth (screen squares, forward 1x + side 0.5x) at which fog reaches its
-/// floor, and the darkest it gets.
-const FOG_SPAN: f32 = 18.0;
-const FOG_MIN: f32 = 0.2;
 
 /// The base color a wall gradient runs toward for a column's material. The
 /// floor slab edge uses a neutral slate; a tint uses itself.
@@ -114,10 +110,6 @@ fn lerp_rgb(a: RGB8, b: RGB8, t: f32) -> RGB8 {
     let t = t.clamp(0.0, 1.0);
     let mix = |x: u8, y: u8| (x as f32 * (1.0 - t) + y as f32 * t).round() as u8;
     RGB8::new(mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b))
-}
-
-fn terrain_apply_fog(color: RGB8, fog: f32) -> RGB8 {
-    scale_rgb(color, fog)
 }
 
 #[derive(Clone)]
@@ -428,13 +420,10 @@ impl Graphics {
                     let wall_square = self
                         .screen
                         .world_square_and_altitude_to_screen_buffer_square(square, z);
-                    let color = terrain_apply_fog(
-                        lerp_rgb(
-                            TERRAIN_WALL_BASE,
-                            terrain_tint(material),
-                            wall_gradient_t(z, top_voxel),
-                        ),
-                        self.terrain_fog(wall_square),
+                    let color = lerp_rgb(
+                        TERRAIN_WALL_BASE,
+                        terrain_tint(material),
+                        wall_gradient_t(z, top_voxel),
                     );
                     let wall = [
                         Glyph::new(TERRAIN_WALL_CHAR, color, color),
@@ -463,10 +452,7 @@ impl Graphics {
                         if !is_partial {
                             // Material recolors the background only; the glyph
                             // (block, piece, player) is untouched.
-                            let color = terrain_apply_fog(
-                                self.terrain_top_color(square, z, material),
-                                self.terrain_fog(top_square),
-                            );
+                            let color = self.terrain_top_color(square, z, material);
                             glyphs[0].bg_color = color;
                             glyphs[1].bg_color = color;
                             // Rim the top face's far (screen-up) drop-off edge
@@ -514,14 +500,6 @@ impl Graphics {
                 }
             }
         }
-    }
-
-    /// Depth-fog factor for a screen square, measured from the screen center
-    /// (forward = row offset, side = column offset). Same shape as the demo's.
-    fn terrain_fog(&self, screen_square: ScreenBufferSquare) -> f32 {
-        let offset = (screen_square - self.screen.screen_center_as_screen_buffer_square()).to_f32();
-        let depth = offset.y.abs() + 0.5 * offset.x.abs();
-        (1.0 - depth / FOG_SPAN).clamp(FOG_MIN, 1.0)
     }
 
     pub fn load_screen_buffer_from_absolute_positions_in_draw_buffer(&mut self) {
@@ -1082,21 +1060,6 @@ mod tests {
         assert_ne!(checker_light(0, 0, 0), checker_light(3, 0, 0));
         assert_ne!(checker_light(0, 0, 0), checker_light(0, 3, 0));
         assert_ne!(checker_light(0, 0, 0), checker_light(0, 0, 3));
-    }
-
-    #[test]
-    fn terrain_fog_shrinks_with_depth_and_floors() {
-        let g = set_up_graphics();
-        let center = g.screen.screen_center_as_screen_buffer_square();
-        assert_eq!(g.terrain_fog(center), 1.0, "no fog at the screen center");
-        assert!(
-            g.terrain_fog(center) > g.terrain_fog(center + vec2(0, 10)),
-            "fog increases with depth"
-        );
-        assert!(
-            (g.terrain_fog(center + vec2(0, 10_000)) - FOG_MIN).abs() < 1e-6,
-            "fog floors at FOG_MIN"
-        );
     }
 
     #[test]

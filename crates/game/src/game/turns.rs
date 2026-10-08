@@ -60,9 +60,16 @@ impl Game {
                         push_direction.into(),
                     ));
                     if let Ok((end_square, _)) = push_end_pose.map(|x| x.tuple()) {
-                        self.try_push_grid_entity(start_square, push_direction.into())
-                            .ok();
-                        push_end_squares.insert(end_square);
+                        // Only claim the destination when something actually
+                        // moved there: an empty belt must not reserve the next
+                        // square, or (iteration-order dependent) it would skip
+                        // the belt carrying the entity that is about to arrive.
+                        if self
+                            .try_push_grid_entity(start_square, push_direction.into())
+                            .is_ok()
+                        {
+                            push_end_squares.insert(end_square);
+                        }
                     }
                 }
             });

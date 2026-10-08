@@ -148,7 +148,7 @@ All phases are complete; `cube_iso/` is deleted. Remaining statuses are
 | Camera follows x,y but not z | game camera | native |
 | 90-degree view rotation (0..=3 CCW) | `Screen::rotation` + `q`/`e` | ported |
 | Direction helpers (`forward`/`toward_camera`/`screen_left`/`screen_right`, `ScreenDir`) | input/camera helpers | native |
-| Signed `forward` (painter key) vs absolute `depth` (fog) | column pass + fog | ported |
+| Signed `forward` (painter key) vs absolute `depth` (fog) | column pass (fog removed) | ported |
 
 ## C. Rendering (`cube_iso/src/render.rs`)
 
@@ -159,7 +159,7 @@ All phases are complete; `cube_iso/` is deleted. Remaining statuses are
 | Cool cube material: block-checkered top, smooth wall gradient, bright rim | material helper | ported (no rim) |
 | Warm ledge material: standoff hue ramp, darker front, end caps | material helper | testbed-only (per-column tint instead) |
 | 3-square block checker (x,y,z parity) | material helper | ported |
-| Depth fog (`FOG_SPAN`, `FOG_MIN`) | material helper | ported |
+| Depth fog (`FOG_SPAN`, `FOG_MIN`) | material helper | removed (read as a spotlight on the cubes map) |
 | Board-as-floating-slab edge wall | forward column pass | ported |
 | Player marker (width by mode) | existing `ArrowDrawable` | deferred (with physics modes) |
 | Fall trail | deferred with gravity | deferred |

@@ -15,7 +15,7 @@ use serde::Deserialize;
 use utility::coordinate_frame_conversions::{BoardSize, WorldSquare, WorldStep, WorldVoxel};
 use utility::{SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
 
-use super::{Game, TerrainMaterial, SLAB_VOXEL_Z};
+use super::{Game, TerrainMaterial, Widget, SLAB_VOXEL_Z};
 
 /// Side length of a `space-cubes` cube, in world squares (the demo's constant).
 const CUBE_SIZE: i32 = 10;
@@ -84,6 +84,11 @@ pub enum MapOp {
     },
     /// A stationary death-cube turret.
     DeathTurret { x: i32, y: i32 },
+    /// A pushable numbered widget. Values 1-10 are preferred (see `Widget::new`).
+    Widget { x: i32, y: i32, value: u32 },
+    /// A conveyor belt that carries whatever is on the square in `dir` each
+    /// movement period.
+    ConveyorBelt { x: i32, y: i32, dir: MapDir },
 }
 
 /// A world-space orthogonal direction, named as it reads on screen. `up` is
@@ -199,6 +204,12 @@ impl Game {
                 ),
             ),
             MapOp::DeathTurret { x, y } => self.place_death_turret(point2(x, y)),
+            MapOp::Widget { x, y, value } => {
+                self.place_widget(Widget::new(value), point2(x, y))
+            }
+            MapOp::ConveyorBelt { x, y, dir } => {
+                self.place_conveyor_belt(point2(x, y), dir.to_step())
+            }
         }
     }
 
@@ -237,6 +248,7 @@ impl Game {
 mod tests {
     use super::*;
     use euclid::point2;
+    use utility::OrthogonalWorldStep;
 
     #[test]
     fn map_file_parses_and_applies_ops() {
@@ -245,7 +257,9 @@ mod tests {
             "clear_floor": true,
             "ops": [
                 { "op": "column", "x": 2, "y": 2, "height": 3 },
-                { "op": "voxel", "x": 4, "y": 4, "z": 6 }
+                { "op": "voxel", "x": 4, "y": 4, "z": 6 },
+                { "op": "widget", "x": 5, "y": 5, "value": 4 },
+                { "op": "conveyor_belt", "x": 6, "y": 5, "dir": "right" }
             ],
             "player": [2, 2]
         }"#;
@@ -258,6 +272,12 @@ mod tests {
         assert_eq!(game.height_at(point2(4, 4)), Some(7), "floating voxel");
         assert_eq!(game.height_at(point2(0, 0)), None, "floor cleared");
         assert_eq!(game.player_square(), point2(2, 2));
+        assert!(game.widgets.contains_key(&point2(5, 5)), "widget placed");
+        assert_eq!(
+            game.blocks.conveyor_belts.get(&point2(6, 5)),
+            Some(&OrthogonalWorldStep::from(STEP_RIGHT)),
+            "belt placed"
+        );
     }
 
     #[test]

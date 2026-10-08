@@ -9,6 +9,106 @@ Newest first.
 
 ---
 
+## 2026-10-08 — Portals and a belt-through-portal on the default cubes map
+
+### game: three portal pairs on `cubes`; belt transport through a portal
+
+The default scene gains three `double_sided_two_way_portal` ops (data only —
+no new ops needed) plus a conveyor that rides through one:
+
+- **P1 (belt-through, rotates right→up).** The east belt run (x20–27) ends on
+  its entrance `(27,18)`; the widget emerges at `(33,30)` facing up onto a new
+  `(33,30)…(33,34)` belt run. A rider widget (value 6) starts at `(20,18)` and
+  visibly travels east, through the portal, then up.
+- **P2** links the center cube `(19,21)` to the bottom-left top `(6,8)`.
+- **P3** links the top-middle `(18,32)` to the middle-left `(6,18)`.
+- Every one of the 12 faces (and its ±1 neighbors) lands on a solid cube top, so
+  no reverse face emerges over void.
+
+**Belt-push fix (`turns.rs`).** `simultaneously_push_several_grid_entities`
+inserted a belt's end square into `push_end_squares` even when nothing moved
+there. An *empty* belt processed before a following belt would reserve that
+following square and skip it, stalling a rider depending on `HashMap` iteration
+order (observed as intermittent stalls on the new belt run). The reservation now
+happens only when `try_push_grid_entity` actually returns `Ok`.
+
+- Tests: `default_cubes_map_belt_carries_a_widget_through_a_portal` ticks the
+  east run to the entrance (7 ticks), crosses on the 8th, and continues up on
+  the 9th; `default_map_is_the_cubes_recipe` now expects 6 widgets and asserts a
+  belt sits on both the portal entrance and its exit.
+- Verified with `map_diagram cubes` (all 12 faces listed) and
+  `cargo test --workspace` green.
+
+---
+
+## 2026-10-08 — Widgets push and the player can blink on the cubes map
+
+### game: classify grid blockers relative to the player's altitude
+
+On the raised `cubes` map the player could not push widgets or blink. Both
+symptoms had one cause: the grid-entity and empty-square checks used
+`is_block_at`, the *flat* solidity test (`solid at z = SLAB_TOP`). Every cube
+column is solid at z=0, so once the player stood on a cube top:
+
+- `get_grid_entity_at_square` returned `Block` for the widget's square, so
+  `try_push_grid_entity` refused it (`mod.rs:315`).
+- `square_is_empty` returned false for every cube-top square, so `player_blink`
+  never advanced past the start (`mod.rs:785`).
+
+`player_can_stand_at` already encodes the right rule for the player (a
+destination is standable when its surface is not above the player's). New
+`square_blocks_player` is its negation (void included), i.e. the player-relative
+form of `is_block_at`; `get_grid_entity_at_square` and `square_is_empty` now use
+it. On flat maps (player altitude 0) this reduces to the old `is_block_at`, so
+existing gameplay is unchanged.
+
+- Demo tweak: the center-cube widget moved from `(17,18)` (on a belt) to
+  `(17,17)` so it stays put until the player pushes it onto the belt line.
+- Tests: `default_cubes_map_widget_can_be_pushed` walks the player beside the
+  center cube's widget and asserts it slides one square; 
+  `default_cubes_map_player_can_blink_on_a_cube_top` blinks the full range across
+  the top. Both fail against the `is_block_at` check.
+
+Verified: `cargo test --workspace` green (319 game lib tests).
+
+---
+
+## 2026-10-08 — Default cubes map gets bridges, widgets, and belts; depth fog removed
+
+### game: bridge/widget/belt map ops; drop terrain fog
+
+Three requested changes to the default `cubes` scene:
+
+- **Bridges.** `maps/cubes.json` now places twelve 3-wide, 1-voxel-thick bridge
+  decks (`z=9`, so their tops sit at altitude 10, level with the cube tops)
+  across the 2-square void gaps, joining all nine cubes into a walkable grid.
+  No code was needed — the existing `cuboid` op expresses them.
+- **Widgets & belts on the recipe.** `MapOp` gains `Widget { x, y, value }` and
+  `ConveyorBelt { x, y, dir }` (`map_file.rs`), delegating to
+  `place_widget` / `place_conveyor_belt`. The default map now seeds five
+  pushable widgets across five cube tops and three conveyor runs (center cube
+  east/west toward the bridges, and a bottom-left→middle-left run) so the
+  machines are reachable without any Rust-authoring. Snapshot serialization
+  already covered both, so no snapshot change.
+- **Fog removed.** The raised-terrain pass tinted walls and tops by distance
+  from the screen center (`terrain_fog`, `FOG_SPAN`, `FOG_MIN`,
+  `terrain_apply_fog`), which on a void map read as a spotlight centered on the
+  player. `load_screen_buffer_from_terrain` now uses the raw wall gradient and
+  material top color; the helpers and their test are gone. `wall_gradient_t`
+  and `scale_rgb` (checker shade) remain.
+- **Tests.** `map_file_parses_and_applies_ops` also parses a widget and a belt;
+  `default_map_is_the_cubes_recipe` checks bridge heights, that a gap corner
+  stays void, the occupied-column count (`9*100 + 12*6`), and the widget/belt
+  counts.
+- `issues/solved/0003/snapshot/screen.txt` re-blessed to the fog-free render
+  (the cubes map is the raised-board capture); `docs/CUBE_ISO_PORT.md` fog rows
+  marked removed.
+
+Verified: `cargo test --workspace` green (317 game lib tests); `snapshot_tool
+diff` OK for `snapshot/`, `issues/solved/0003`, `0005`, and `0006`.
+
+---
+
 ## 2026-10-07 — Starfield parallax turns with the portal frame (0005 follow-up)
 
 ### game: apply the view frame's rotation to the starfield (issue 0005)

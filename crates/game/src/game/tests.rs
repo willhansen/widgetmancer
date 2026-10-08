@@ -1945,6 +1945,67 @@
     }
 
     #[test]
+    fn default_cubes_map_widget_can_be_pushed() {
+        // On the raised cubes map a cube-top column is solid at z=0 but is not
+        // a wall for the player standing on it, so the widget on the next
+        // square must be classified as a Widget (pushable), not a Block.
+        let mut game = Game::new(400, 120, LogicalTime::ZERO);
+        crate::set_up_map_by_name(&mut game, None);
+        game.move_player_to(point2(18, 17));
+        game.try_slide_player(STEP_LEFT)
+            .expect("widget on a cube top should push");
+        assert_eq!(game.player_square(), point2(17, 17));
+        assert!(
+            game.widgets.contains_key(&point2(16, 17)),
+            "widget pushed one square west"
+        );
+    }
+
+    #[test]
+    fn default_cubes_map_player_can_blink_on_a_cube_top() {
+        let mut game = Game::new(400, 120, LogicalTime::ZERO);
+        crate::set_up_map_by_name(&mut game, None);
+        game.player_blink(STEP_LEFT);
+        assert_eq!(
+            game.player_square(),
+            point2(14, 19),
+            "blink should travel the full range across the cube top"
+        );
+    }
+
+    #[test]
+    fn default_cubes_map_belt_carries_a_widget_through_a_portal() {
+        // The east run (x20..27, right) ends at the P1 entrance (27,18), whose
+        // exit is (33,30) facing up onto the continuation run. A rider advances
+        // one square per movement period, so at tick 8 it should have crossed.
+        let mut game = Game::new(400, 120, LogicalTime::ZERO);
+        crate::set_up_map_by_name(&mut game, None);
+        assert!(game.widgets.contains_key(&point2(20, 18)), "rider starts here");
+
+        let tick = || CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(1.1);
+        for _ in 0..7 {
+            game.tick_realtime_effects(tick());
+        }
+
+        assert!(
+            game.widgets.contains_key(&point2(27, 18)),
+            "rider reaches the portal entrance after 7 ticks"
+        );
+
+        game.tick_realtime_effects(tick());
+        assert!(
+            game.widgets.contains_key(&point2(33, 30)),
+            "8th tick sends the rider through the portal onto the exit square"
+        );
+
+        game.tick_realtime_effects(tick());
+        assert!(
+            game.widgets.contains_key(&point2(33, 31)),
+            "the exit-side belt keeps carrying it up"
+        );
+    }
+
+    #[test]
     fn test_draw_widget() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
@@ -3465,9 +3526,25 @@
         // The player stands on the middle cube's top face (10 voxels tall).
         assert_eq!(game.player_square(), point2(19, 19));
         assert_eq!(game.height_at(point2(19, 19)), Some(10));
-        // Void between cubes; only the nine 10x10 footprints are solid.
-        assert_eq!(game.height_at(point2(12, 12)), None, "gap is void");
-        assert_eq!(game.terrain.occupied_squares().len(), 9 * 100);
+        // 3-wide bridges join the nine tops across the 2-square gaps; the
+        // corners between gaps stay void.
+        assert_eq!(game.height_at(point2(12, 18)), Some(10), "x-gap bridge");
+        assert_eq!(game.height_at(point2(6, 12)), Some(10), "y-gap bridge");
+        assert_eq!(game.height_at(point2(12, 12)), None, "gap corner is void");
+        assert_eq!(game.terrain.occupied_squares().len(), 9 * 100 + 12 * 6);
+        // Pushable widgets and conveyor belts are part of the default scene.
+        assert_eq!(game.widgets.len(), 6, "widgets placed");
+        // A belt sits on each side of the belt-through portal (P1): the east
+        // run's last square is its entrance, and the top-right cube run starts
+        // at its exit.
+        assert!(
+            game.blocks.conveyor_belts.contains_key(&point2(27, 18)),
+            "belt on the portal entrance"
+        );
+        assert!(
+            game.blocks.conveyor_belts.contains_key(&point2(33, 30)),
+            "belt continuing from the portal exit"
+        );
     }
 
     #[test]
