@@ -3469,3 +3469,156 @@
         assert_eq!(game.height_at(point2(12, 12)), None, "gap is void");
         assert_eq!(game.terrain.occupied_squares().len(), 9 * 100);
     }
+
+    #[test]
+    fn stars_seen_through_a_portal_use_the_destination_frames_camera() {
+        // Issues 0005/0006: a star in a portal frame (root R, rotation q) is
+        // anchored at R and placed at primary relative `rotate_{-q}(frame
+        // offset)`. So the star a frame draws also appears in the direct view
+        // from R, at the frame offset `rotate_q(primary relative)`. Checked for a
+        // translating (q=0) and a rotating (q=1) frame, at screen rotations 0
+        // and 1; the rotated-screen case is the 0006 capture, where a
+        // rotation-less mapping moved southern stars vertically on horizontal
+        // motion.
+        let star_chars = ['·', '.', '+', '*', '✦'];
+
+        let set_up = |player: WorldSquare, direct: bool, view_rotation: i32| {
+            let mut game = Game::new(400, 120, LogicalTime::ZERO);
+            crate::set_up_map_by_name(&mut game, Some("portals-and-death-cubes-demo"));
+            if direct {
+                // Drop the portals so the view from `player` reaches the world
+                // with no frame transform, and widen the sight radius so the FOV
+                // border does not overlap the (border-independent) star cells.
+                game.portal_geometry = Default::default();
+                game.set_player_sight_radius(40);
+            }
+            game.move_player_to(player);
+            game.rotate_view(view_rotation);
+            game.draw_headless_now();
+            game
+        };
+
+        let player = point2(23, 12);
+        let mut checked_translating = 0;
+        let mut checked_rotating = 0;
+        let mut checked_rotated_screen = 0;
+
+        for view_rotation in [0, 1] {
+            let entrance = set_up(player, false, view_rotation);
+            let entrance_screen = &entrance.graphics().screen;
+            let entrance_fov = entrance.player_field_of_view();
+
+            // Every star the entrance view draws, tagged with the frame root and
+            // rotation it was drawn for (the topmost visibility of its cell).
+            let mut entrance_stars = vec![];
+            for x in 0..entrance_screen.terminal_width() {
+                for y in 0..entrance_screen.terminal_height() {
+                    let glyph = entrance_screen.screen_buffer[x as usize][y as usize];
+                    if !star_chars.contains(&glyph.character) {
+                        continue;
+                    }
+                    let cell = ScreenBufferCharacterSquare::new(x, y);
+                    let world_square =
+                        entrance_screen.screen_buffer_character_square_to_world_square(cell);
+                    let relative = world_square - entrance_fov.root_square();
+                    let Some(visibility) = entrance_fov.resolved_visibility(relative) else {
+                        continue;
+                    };
+                    let center = visibility.absolute_fov_center_square();
+                    entrance_stars.push((
+                        cell,
+                        WorldSquare::new(center[0], center[1]),
+                        visibility
+                            .portal_rotation_from_relative_to_absolute()
+                            .quarter_turns(),
+                        glyph.character,
+                        glyph.fg_color,
+                    ));
+                }
+            }
+
+            let frames: std::collections::HashSet<(WorldSquare, i32)> = entrance_stars
+                .iter()
+                .filter(|(_, root, _, _, _)| *root != player)
+                .map(|(_, root, rotation, _, _)| (*root, *rotation))
+                .collect();
+            assert!(
+                !frames.is_empty(),
+                "expected stars seen through portal frames"
+            );
+
+            for (root, rotation_quarter_turns) in frames {
+                let direct = set_up(root, true, view_rotation);
+                let direct_screen = &direct.graphics().screen;
+                let rotation = QuarterTurnsAnticlockwise::new(rotation_quarter_turns);
+                for (cell, frame, frame_rotation, character, color) in &entrance_stars {
+                    if *frame != root || *frame_rotation != rotation_quarter_turns {
+                        continue;
+                    }
+                    // Undo the frame rotation to get the star's frame offset,
+                    // then look for the same star in the direct view there.
+                    let relative = entrance_screen
+                        .screen_buffer_character_square_to_world_square(*cell)
+                        - player;
+                    let frame_offset = rotation.rotate_vector(relative);
+                    let direct_world = root + frame_offset;
+                    // A star whose content sits on the board/void boundary can
+                    // round into a board cell in one view and a void cell in the
+                    // other, so the occupancy gate (legitimately) keeps it in
+                    // only one. Skip those; the invariance is only claimed over
+                    // open void.
+                    if (-1..=1).any(|dx| {
+                        (-1..=1).any(|dy| {
+                            direct
+                                .height_at(direct_world + WorldStep::new(dx, dy))
+                                .is_some()
+                        })
+                    }) {
+                        continue;
+                    }
+                    let direct_left = direct_screen
+                        .world_square_to_left_screen_buffer_character_square(direct_world);
+                    // The 2:1 character grid means a 90-degree world turn does
+                    // not commute with cell rounding, so allow the immediate
+                    // cell neighborhood of the expected world square.
+                    let mut matched = false;
+                    'search: for dx in -2..=3 {
+                        for dy in -1..=1 {
+                            let cx = direct_left.x + dx;
+                            let cy = direct_left.y + dy;
+                            if cx < 0
+                                || cy < 0
+                                || cx >= direct_screen.terminal_width()
+                                || cy >= direct_screen.terminal_height()
+                            {
+                                continue;
+                            }
+                            let glyph = direct_screen.screen_buffer[cx as usize][cy as usize];
+                            if glyph.character == *character && glyph.fg_color == *color {
+                                matched = true;
+                                break 'search;
+                            }
+                        }
+                    }
+                    assert!(
+                        matched,
+                        "star {character:?} at {cell:?} via frame ({root:?}, {rotation_quarter_turns}) not found in the direct view near {direct_world:?} (screen rotation {view_rotation})"
+                    );
+                    if rotation_quarter_turns == 0 {
+                        checked_translating += 1;
+                    } else {
+                        checked_rotating += 1;
+                    }
+                    if view_rotation != 0 {
+                        checked_rotated_screen += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked_translating > 0, "no translating-frame stars checked");
+        assert!(checked_rotating > 0, "no rotating-frame stars checked");
+        assert!(
+            checked_rotated_screen > 0,
+            "no stars checked under a rotated view"
+        );
+    }

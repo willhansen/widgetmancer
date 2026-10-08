@@ -78,12 +78,23 @@ The black beyond the board edge is filled by a procedural starfield
 (`crates/game/src/graphics/starfield.rs`). It only writes cells whose world
 square is off-board, so it composes after the FOV pass without touching the
 board. There are three depth layers; each is anchored at a fraction
-(`parallax`) of the camera's motion, so near layers slide further than far
-ones as the player moves, plus a slow linear drift so the field keeps moving
+(`parallax`) of the **view frame's** motion, so near layers slide further than
+far ones as the player moves, plus a slow linear drift so the field keeps moving
 while standing still. Stars come from an infinite hashed lattice — moving or
 drifting simply reveals new cells, so nothing is generated or recycled.
 
-`Starfield::draw` is a pure function of `(screen, board_size, time)`: it
+The camera is the root of the FOV frame a cell is actually seen through, not the
+player's absolute square: the field is painted once per `view_frames()` entry
+(root + rotation), each star gated to the frame its cell resolves to
+(`resolved_visibility`). A portal frame's stars are anchored at that frame's root
+and projected back to primary space through the frame's inverse rotation
+(`frame_to_primary_offset`), so both the sky's *position* and the direction it
+parallaxes turn with the frame. This keeps the sky continuous when the player
+steps through a portal (the board view is already portal-continuous); a
+portal-free scene has a single frame rooted at the player, so the output is
+byte-for-byte the pre-portal-aware render.
+
+`Starfield::draw` is a pure function of `(screen, fov, board_size, time)`: it
 carries no per-frame state, which is what keeps repeated draws of the same
 moment byte-identical (`test_headless_frames_are_byte_identical`).
 

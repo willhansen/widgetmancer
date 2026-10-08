@@ -629,6 +629,20 @@ impl FieldOfViewResult {
         !self.visibilities_of_relative_square(step).is_empty()
     }
 
+    /// The topmost visibility at `relative_square`, in the same draw order the
+    /// renderer uses (topmost visibility last). Carries the absolute square
+    /// *and* the frame it was reached through
+    /// (`absolute_fov_center_square` / `portal_rotation_from_relative_to_absolute`),
+    /// which callers need to place content consistently across portals.
+    ///
+    /// Returns `None` when the relative square is not visible at all.
+    pub fn resolved_visibility(
+        &self,
+        relative_square: WorldStep,
+    ) -> Option<PositionedSquareVisibilityInFov> {
+        Self::sorted_by_draw_order(self.visibilities_of_relative_square(relative_square)).pop()
+    }
+
     /// The absolute square actually seen at `relative_square`, chosen in the
     /// same draw order the renderer uses (topmost visibility last). A portal
     /// can map an apparent on-board square to off-board void and vice versa,
@@ -637,9 +651,37 @@ impl FieldOfViewResult {
     ///
     /// Returns `None` when the relative square is not visible at all.
     pub fn resolved_absolute_square(&self, relative_square: WorldStep) -> Option<WorldSquare> {
-        Self::sorted_by_draw_order(self.visibilities_of_relative_square(relative_square))
-            .last()
+        self.resolved_visibility(relative_square)
             .map(|visibility| visibility.absolute_square())
+    }
+
+    /// Every view frame in this result: the root and accumulated rotation of
+    /// this view, then of every (recursively) transformed sub-view. A
+    /// portal-heavy scene can reach the same region at several depths, so the
+    /// result is deduplicated and sorted to keep the starfield's per-frame pass
+    /// deterministic.
+    ///
+    /// The rotation is what maps a frame offset back to a primary offset
+    /// (`primary = rotate_{-rotation}(frame_offset)`); it comes from composing
+    /// `view_transform_to(..).rotation()` down the sub-view tree.
+    pub fn view_frames(&self) -> Vec<(WorldSquare, QuarterTurnsAnticlockwise)> {
+        let mut frames = Vec::new();
+        self.collect_view_frames(QuarterTurnsAnticlockwise::default(), &mut frames);
+        frames.sort_by_key(|(square, rotation)| (square.x, square.y, rotation.quarter_turns()));
+        frames.dedup();
+        frames
+    }
+
+    fn collect_view_frames(
+        &self,
+        rotation_from_root: QuarterTurnsAnticlockwise,
+        out: &mut Vec<(WorldSquare, QuarterTurnsAnticlockwise)>,
+    ) {
+        out.push((self.root_square(), rotation_from_root));
+        for sub_fov in &self.transformed_sub_fovs {
+            let step = self.view_transform_to(sub_fov).rotation();
+            sub_fov.collect_view_frames(rotation_from_root + step, out);
+        }
     }
 
     pub fn visibilities_of_absolute_square(
@@ -2263,6 +2305,55 @@ mod tests {
                 point_to_string(*square)
             );
         });
+    }
+
+    #[test]
+    fn view_frames_reports_portal_frames_and_resolved_visibility_attributes_them() {
+        // The starfield needs, per cell, the frame root and rotation the cell
+        // resolves to (issue 0005). `view_frames` lists primary + sub-view
+        // frames; `resolved_visibility` carries the winning frame.
+        let mut portal_geometry = PortalGeometry::default();
+        let center = point2(10, 10);
+        portal_geometry.create_portal(
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(10, 4), STEP_DOWN.into()),
+            SquareWithOrthogonalDir::from_square_and_worldstep(point2(4, 4), STEP_DOWN.into()),
+        );
+        let fov =
+            portal_aware_field_of_view_from_square(center, 8, &Default::default(), &portal_geometry);
+
+        let frames = fov.view_frames();
+        assert!(
+            frames.contains(&(center, QuarterTurnsAnticlockwise::default())),
+            "primary frame missing: {frames:?}"
+        );
+        assert!(frames.len() > 1, "portal frame not listed: {frames:?}");
+
+        let [lower, upper] = fov.relative_limits_lower_left_and_upper_right();
+        let mut portal_cell = None;
+        'scan: for x in lower[0]..=upper[0] {
+            for y in lower[1]..=upper[1] {
+                let relative = WorldStep::new(x, y);
+                let Some(visibility) = fov.resolved_visibility(relative) else {
+                    continue;
+                };
+                let center_of_frame = visibility.absolute_fov_center_square();
+                let frame_root = WorldSquare::new(center_of_frame[0], center_of_frame[1]);
+                if frame_root != center {
+                    portal_cell = Some((relative, visibility, frame_root));
+                    break 'scan;
+                }
+            }
+        }
+        let (relative, visibility, frame_root) = portal_cell.expect("no portal-resolved square");
+        assert!(frames.contains(&(
+            frame_root,
+            visibility.portal_rotation_from_relative_to_absolute()
+        )));
+        // The old accessor still returns the same topmost absolute square.
+        assert_eq!(
+            fov.resolved_absolute_square(relative),
+            Some(visibility.absolute_square())
+        );
     }
 
     #[test]

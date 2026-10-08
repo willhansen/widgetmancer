@@ -2,15 +2,21 @@
 //!
 //! The board edge used to sit on flat black. This paints the void beyond it
 //! with a sparse field of stars. Depth is faked with parallax: each layer is
-//! anchored at a fraction of the camera's motion, so near layers slide further
-//! than far ones as the player moves. A slow linear drift keeps the field alive
-//! while the player stands still.
+//! anchored at a fraction of its **view frame's** motion, so near layers slide
+//! further than far ones as the player moves. A slow linear drift keeps the
+//! field alive while the player stands still.
 //!
-//! Everything is a pure function of `(screen, board_size, time)`: there is no
-//! per-frame state, so repeated draws of the same moment produce byte-identical
-//! buffers (see `test_headless_frames_are_byte_identical`). The star lattice is
-//! conceptually infinite — moving or drifting just reveals new cells — so no
-//! bounding region needs generating or recycling.
+//! The field is painted once per FOV view frame (`view_frames`), with that
+//! frame's root as the camera and its stars mapped back through the frame's
+//! inverse rotation (so the sky's position *and* parallax direction turn with
+//! the frame). This keeps the sky continuous when the player steps through a
+//! portal; a portal-free scene has a single frame rooted at the player.
+//!
+//! Everything is a pure function of `(screen, fov, board_size, time)`: there is
+//! no per-frame state, so repeated draws of the same moment produce
+//! byte-identical buffers (see `test_headless_frames_are_byte_identical`). The
+//! star lattice is conceptually infinite — moving or drifting just reveals new
+//! cells — so no bounding region needs generating or recycling.
 
 use std::collections::HashSet;
 use std::f32::consts::TAU;
@@ -116,91 +122,121 @@ impl Starfield {
         drawn: &HashSet<ScreenBufferSquare>,
     ) {
         let time_secs = time.as_secs_f32();
-        let camera = vec2(
-            screen.screen_center_as_world_square().x as f32,
-            screen.screen_center_as_world_square().y as f32,
-        );
         let center = screen.screen_center_as_screen_buffer_character_square();
         let char_half = vec2(
             screen.terminal_width() as f32 / 2.0,
             screen.terminal_height() as f32 / 2.0,
         );
 
-        for (layer_index, layer) in LAYERS.iter().enumerate() {
-            let translation = layer_translation(camera, time_secs, layer);
+        // Paint once per view frame: the primary view plus every frame reached
+        // through a portal. Each frame's stars are anchored at that frame's own
+        // (transformed) camera and drawn in that frame's orientation, so
+        // parallax is measured from the frame the player is actually looking
+        // through. With no portals there is a single frame rooted at the player,
+        // which reduces to the original single-camera field byte for byte.
+        let main_root = fov
+            .map(|fov| fov.root_square())
+            .unwrap_or_else(|| screen.screen_center_as_world_square());
+        let frames: Vec<(WorldSquare, QuarterTurnsAnticlockwise)> = match fov {
+            Some(fov) => fov.view_frames(),
+            None => vec![(main_root, QuarterTurnsAnticlockwise::default())],
+        };
 
-            let (anchor_min, anchor_max) = visible_anchor_bounds(screen, char_half, translation);
-            let i0 = (anchor_min.x / layer.cell).floor() as i64;
-            let i1 = (anchor_max.x / layer.cell).ceil() as i64;
-            let j0 = (anchor_min.y / layer.cell).floor() as i64;
-            let j1 = (anchor_max.y / layer.cell).ceil() as i64;
+        for (frame_root, frame_rotation) in frames {
+            let camera = vec2(frame_root.x as f32, frame_root.y as f32);
+            let rotation_quarter_turns = frame_rotation.quarter_turns();
 
-            for i in i0..=i1 {
-                for j in j0..=j1 {
-                    let h = hash_cell(layer_index as u64, i as u64, j as u64);
-                    if rand01(h) >= layer.density {
-                        continue;
-                    }
+            for (layer_index, layer) in LAYERS.iter().enumerate() {
+                let translation = layer_translation(camera, time_secs, layer);
 
-                    let anchor = vec2(
-                        (i as f32 + rand01(h ^ HASH_X)) * layer.cell,
-                        (j as f32 + rand01(h ^ HASH_Y)) * layer.cell,
-                    );
-                    let screen_world = anchor - translation;
-                    let char_off = world_offset_to_char_offset(screen, screen_world);
+                let (anchor_min, anchor_max) =
+                    visible_anchor_bounds(screen, char_half, translation, frame_rotation);
+                let i0 = (anchor_min.x / layer.cell).floor() as i64;
+                let i1 = (anchor_max.x / layer.cell).ceil() as i64;
+                let j0 = (anchor_min.y / layer.cell).floor() as i64;
+                let j1 = (anchor_max.y / layer.cell).ceil() as i64;
 
-                    let pos_x = center.x + char_off.x.round() as i32;
-                    let pos_y = center.y + char_off.y.round() as i32;
-                    if pos_x < 0
-                        || pos_y < 0
-                        || pos_x >= screen.terminal_width()
-                        || pos_y >= screen.terminal_height()
-                    {
-                        continue;
-                    }
-
-                    let world_square = screen.screen_buffer_character_square_to_world_square(
-                        ScreenBufferCharacterSquare::new(pos_x, pos_y),
-                    );
-                    if let Some(fov) = fov {
-                        // Only paint void the player can see...
-                        let relative = world_square - fov.root_square();
-                        if !fov.can_see_relative_square(relative) {
+                for i in i0..=i1 {
+                    for j in j0..=j1 {
+                        let h = hash_cell(layer_index as u64, i as u64, j as u64);
+                        if rand01(h) >= layer.density {
                             continue;
                         }
-                        // ...and only where the FOV composite drew nothing.
-                        let screen_square = screen.screen_buffer_character_square_to_screen_buffer_square(
+
+                        let anchor = vec2(
+                            (i as f32 + rand01(h ^ HASH_X)) * layer.cell,
+                            (j as f32 + rand01(h ^ HASH_Y)) * layer.cell,
+                        );
+                        // The star's offset in the frame's own coordinates is
+                        // `anchor - translation`; map it back to a primary
+                        // offset with the frame's inverse rotation before the
+                        // screen projection.
+                        let frame_offset = anchor - translation;
+                        let screen_world = frame_to_primary_offset(frame_offset, frame_rotation);
+                        let char_off = world_offset_to_char_offset(screen, screen_world);
+
+                        let pos_x = center.x + char_off.x.round() as i32;
+                        let pos_y = center.y + char_off.y.round() as i32;
+                        if pos_x < 0
+                            || pos_y < 0
+                            || pos_x >= screen.terminal_width()
+                            || pos_y >= screen.terminal_height()
+                        {
+                            continue;
+                        }
+
+                        let world_square = screen.screen_buffer_character_square_to_world_square(
                             ScreenBufferCharacterSquare::new(pos_x, pos_y),
                         );
-                        if drawn.contains(&screen_square) {
+                        if let Some(fov) = fov {
+                            // Only paint void the player can see...
+                            let relative = world_square - fov.root_square();
+                            let Some(visibility) = fov.resolved_visibility(relative) else {
+                                continue;
+                            };
+                            // ...and only if this exact frame is what the cell
+                            // actually shows (a nearer frame wins over this one).
+                            if visibility.absolute_fov_center_square()
+                                != [frame_root.x, frame_root.y]
+                                || visibility
+                                    .portal_rotation_from_relative_to_absolute()
+                                    .quarter_turns()
+                                    != rotation_quarter_turns
+                            {
+                                continue;
+                            }
+                            // ...and only where the FOV composite drew nothing.
+                            let screen_square = screen.screen_buffer_character_square_to_screen_buffer_square(
+                                ScreenBufferCharacterSquare::new(pos_x, pos_y),
+                            );
+                            if drawn.contains(&screen_square) {
+                                continue;
+                            }
+                            // Board-vs-void must be decided at the square
+                            // actually seen: a portal can map this apparent board
+                            // cell to off-board void (and the reverse), so the
+                            // naive projection would wrongly cull stars.
+                            if occupied.contains(&visibility.absolute_square()) {
+                                continue;
+                            }
+                        } else if occupied.contains(&world_square) {
                             continue;
                         }
-                        // Board-vs-void must be decided at the square actually
-                        // seen: a portal can map this apparent board cell to
-                        // off-board void (and the reverse), so the naive
-                        // projection would wrongly cull stars through portals.
-                        let seen = fov
-                            .resolved_absolute_square(relative)
-                            .unwrap_or(world_square);
-                        if occupied.contains(&seen) {
-                            continue;
-                        }
-                    } else if occupied.contains(&world_square) {
-                        continue;
+
+                        let palette_index = ((rand01(h ^ HASH_GLYPH) * layer.palette.len() as f32)
+                            as usize)
+                            .min(layer.palette.len() - 1);
+                        let (character, base_color) = layer.palette[palette_index];
+
+                        let phase = rand01(h ^ HASH_PHASE) * TAU;
+                        let rate = layer.twinkle_rate.0
+                            + rand01(h ^ HASH_RATE) * (layer.twinkle_rate.1 - layer.twinkle_rate.0);
+                        let brightness =
+                            0.45 + 0.55 * (0.5 + 0.5 * (time_secs * rate + phase).sin());
+
+                        screen.screen_buffer[pos_x as usize][pos_y as usize] =
+                            Glyph::new(character, scale_color(base_color, brightness), BLACK);
                     }
-
-                    let palette_index = ((rand01(h ^ HASH_GLYPH) * layer.palette.len() as f32)
-                        as usize)
-                        .min(layer.palette.len() - 1);
-                    let (character, base_color) = layer.palette[palette_index];
-
-                    let phase = rand01(h ^ HASH_PHASE) * TAU;
-                    let rate = layer.twinkle_rate.0
-                        + rand01(h ^ HASH_RATE) * (layer.twinkle_rate.1 - layer.twinkle_rate.0);
-                    let brightness = 0.45 + 0.55 * (0.5 + 0.5 * (time_secs * rate + phase).sin());
-
-                    screen.screen_buffer[pos_x as usize][pos_y as usize] =
-                        Glyph::new(character, scale_color(base_color, brightness), BLACK);
                 }
             }
         }
@@ -214,9 +250,28 @@ fn layer_translation(camera: Vec2, time_secs: f32, layer: &Layer) -> Vec2 {
     camera * layer.parallax - vec2(layer.drift.0 * time_secs, layer.drift.1 * time_secs)
 }
 
+/// Map a star's offset in a view frame back to a primary-screen offset. A portal
+/// frame's axes are the primary axes turned by `rotation`, so the inverse turn
+/// is applied before the screen projection. This is what orients parallax with
+/// the frame the player looks through (issue 0005).
+fn frame_to_primary_offset(
+    frame_offset: Vec2,
+    rotation: QuarterTurnsAnticlockwise,
+) -> Vec2 {
+    (-rotation).rotate_vector(frame_offset)
+}
+
 /// World-space offset pole of the visible screen rectangle, translated into
-/// anchor space so the lattice walk covers everything on screen.
-fn visible_anchor_bounds(screen: &Screen, char_half: Vec2, translation: Vec2) -> (Vec2, Vec2) {
+/// anchor space so the lattice walk covers everything on screen. The frame's
+/// rotation maps a primary offset back to the frame offset
+/// (`anchor = translation + rotate_rotation(primary)`), so the screen corners
+/// are rotated before the min/max.
+fn visible_anchor_bounds(
+    screen: &Screen,
+    char_half: Vec2,
+    translation: Vec2,
+    rotation: QuarterTurnsAnticlockwise,
+) -> (Vec2, Vec2) {
     let corners = [
         vec2(-char_half.x, -char_half.y),
         vec2(char_half.x, -char_half.y),
@@ -226,7 +281,7 @@ fn visible_anchor_bounds(screen: &Screen, char_half: Vec2, translation: Vec2) ->
     let mut min = vec2(f32::INFINITY, f32::INFINITY);
     let mut max = vec2(f32::NEG_INFINITY, f32::NEG_INFINITY);
     for corner in corners {
-        let world = char_offset_to_world_offset(screen, corner);
+        let world = rotation.rotate_vector(char_offset_to_world_offset(screen, corner));
         min = vec2(min.x.min(world.x), min.y.min(world.y));
         max = vec2(max.x.max(world.x), max.y.max(world.y));
     }
@@ -481,5 +536,27 @@ mod tests {
             "near layer should shift further: {near} vs {far}"
         );
         assert!((far - 8.0 * LAYERS[0].parallax).abs() < 1e-4);
+    }
+
+    #[test]
+    fn frame_rotation_maps_parallax_back_to_primary_space() {
+        // Issue 0005: a portal frame's sky must turn with the frame. A q=0
+        // (translating) frame is the identity; a q=1 frame maps its offset back
+        // through the inverse turn, e.g. frame offset (0,15) -> primary (15,0).
+        let identity = QuarterTurnsAnticlockwise::default();
+        assert_eq!(frame_to_primary_offset(vec2(3.0, -2.0), identity), vec2(3.0, -2.0));
+
+        let quarter = QuarterTurnsAnticlockwise::new(1);
+        assert_eq!(frame_to_primary_offset(vec2(0.0, 15.0), quarter), vec2(15.0, 0.0));
+        assert_eq!(frame_to_primary_offset(vec2(1.0, 0.0), quarter), vec2(0.0, -1.0));
+        // q and its inverse round-trip.
+        let offset = vec2(2.5, -7.0);
+        assert_eq!(
+            frame_to_primary_offset(
+                frame_to_primary_offset(offset, quarter),
+                QuarterTurnsAnticlockwise::new(3),
+            ),
+            offset
+        );
     }
 }

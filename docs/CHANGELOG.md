@@ -9,6 +9,82 @@ Newest first.
 
 ---
 
+## 2026-10-07 — Starfield parallax turns with the portal frame (0005 follow-up)
+
+### game: apply the view frame's rotation to the starfield (issue 0005)
+
+The first per-frame starfield pass (entry below) anchored each portal frame's
+stars at that frame's root but placed them at `frame_offset + (root - player)`
+with no rotation. The FOV's actual promise is
+`abs = root + rotate_q(main_relative)`, i.e.
+`main_relative = rotate_{-q}(frame_offset)` — a pure rotation, no translation
+(a q=1 frame maps frame offset `(0,15)` to primary `(15,0)`; verified against
+`snapshot_tool explain`). So the first pass mislocated every portal-frame star
+and dropped the ones whose shifted cell left the sight radius. Parallax
+*orientation* matters, not just position.
+
+- **FOV.** `view_frame_roots()` becomes `view_frames() -> Vec<(WorldSquare,
+  QuarterTurnsAnticlockwise)>`, composing `view_transform_to(..).rotation()`
+  recursively. The gate now matches the cell's topmost frame root *and* its
+  `portal_rotation_from_relative_to_absolute`.
+- **Starfield.** New `frame_to_primary_offset(frame_offset, rotation) =
+  (-rotation).rotate_vector(frame_offset)`; `visible_anchor_bounds` rotates the
+  screen corners by `+rotation`; the `(root - player)` shift is gone. q=0 is
+  the identity, so portal-free output stays byte-identical.
+- **Tests.** `frame_rotation_maps_parallax_back_to_primary_space` (exact unit
+  test); `stars_seen_through_a_portal_use_the_destination_frames_camera` now
+  checks *both* a translating (q=0) and a rotating (q=1) frame at screen
+  rotations 0 and 1 — a portal frame's stars must match the direct view from its
+  root at `rotate_q(primary relative)`, skipping board-edge cells where the
+  occupancy rounding legitimately differs. Fails with either the old player
+  camera or a rotation-less mapping.
+- **Issue 0006.** The rotation-less intermediate pass also produced issue 0006
+  (moving left/right moved southern stars up/down). The capture matches the old
+  render to within 4 cells and the corrected render differs by 129; archived to
+  `issues/solved/0006` with its pre-fix render.
+- `snapshot/`, `issues/solved/0005/snapshot` and `issues/solved/0006/snapshot`
+  re-blessed; `docs/RENDERING.md` updated.
+
+Verified: `cargo test --workspace` green; `snapshot_tool diff` OK for
+`snapshot/`, `issues/solved/0003/snapshot` (portal-free),
+`issues/solved/0005/snapshot`, and `issues/solved/0006/snapshot`.
+
+---
+
+## 2026-10-07 — Starfield camera follows the portal frame; fix 0005
+
+### game: paint the starfield once per FOV frame (issue 0005)
+
+Issue 0005: stepping right through the demo's portal bank made the stars off to
+the right abruptly shift. The starfield anchored its parallax camera on the
+player's absolute square (`screen_center_as_world_square`). The board is
+composited through the portal-aware FOV, so a portal crossing keeps the view
+continuous, but the player's absolute square jumps by the portal displacement
+(`(23,12)` -> `(28,17)`, a `(5,5)` step). The star lattice therefore moved by
+`parallax * displacement` (up to ~3 world squares on the near layer) instead of
+the one apparent step.
+
+- **FOV.** `FieldOfViewResult::resolved_visibility` returns the topmost
+  visibility (and the frame it was reached through);
+  `resolved_absolute_square` is now a thin wrapper. `view_frame_roots()`
+  collects every frame root (primary + recursive sub-views), sorted and deduped.
+  (Superseded by `view_frames`, see the entry above.)
+- **Starfield.** `Starfield::draw` paints once per view frame with that frame's
+  root as the camera, and keeps a star only when the cell's topmost visibility
+  frame root matches — so the sky is anchored where it is actually seen. No
+  portals => a single frame rooted at the player => byte-identical output.
+  (The `(frame_root - player)` translation from this first pass was wrong; see
+  the entry above.)
+- **Tests.** `stars_seen_through_a_portal_use_the_destination_frames_camera`
+  and `issues/solved/0003/snapshot` (portal-free) diffs clean.
+- `issues/0005` archived to `issues/solved/0005` with its pre-fix render kept as
+  `screen.pre-fix.txt`; `docs/RENDERING.md` starfield section updated.
+
+Verified: `cargo test --workspace` green; `snapshot_tool diff` OK for
+`snapshot/`, `issues/solved/0003/snapshot`, and `issues/solved/0005/snapshot`.
+
+---
+
 ## 2026-10-07 — Re-bless the 0004 and touching captures to their fixed renders
 
 ### issues: bless resolved captures; keep the pre-fix render beside them
