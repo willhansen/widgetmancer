@@ -79,6 +79,24 @@ impl Game {
         push_directions: &HashMap<WorldSquare, KingWorldStep>,
         push_distance: f32,
     ) {
+        let push_distances: HashMap<WorldSquare, f32> = push_directions
+            .keys()
+            .map(|&square| (square, push_distance))
+            .collect();
+        self.simultaneously_push_floating_entities_at_several_squares_with_distances(
+            push_directions,
+            &push_distances,
+        );
+    }
+
+    /// Like [`Self::simultaneously_push_floating_entities_at_several_squares`],
+    /// but each square can carry its entity a different distance — conveyor
+    /// belts on different squares can run at different speeds (issue 0016).
+    pub(crate) fn simultaneously_push_floating_entities_at_several_squares_with_distances(
+        &mut self,
+        push_directions: &HashMap<WorldSquare, KingWorldStep>,
+        push_distances: &HashMap<WorldSquare, f32>,
+    ) {
         let mut push_end_squares = HashSet::new();
         push_directions
             .clone()
@@ -91,6 +109,7 @@ impl Game {
                         push_direction.into(),
                     ));
                     if let Ok((end_square, _)) = push_end_pose.map(|x| x.tuple()) {
+                        let push_distance = *push_distances.get(&start_square).unwrap_or(&0.0);
                         self.push_floating_entities_that_are_in_square_in_king_direction(
                             start_square,
                             push_direction.into(),

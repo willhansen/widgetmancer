@@ -2442,6 +2442,87 @@
         assert!(game.widgets.contains_key(&(square + dir)));
     }
     #[test]
+    fn faster_conveyor_belt_steps_grid_entities_on_its_own_period() {
+        // Issue 0016: a belt four times the default speed has a quarter of the
+        // period, so it steps an entity long before a default belt would.
+        let dt = Duration::from_secs_f32(0.6);
+        let square = point2(5, 5);
+
+        let mut fast = set_up_10x10_game();
+        fast.place_player(square);
+        fast.place_conveyor_belt_with_speed(square, STEP_RIGHT, 4.0);
+        fast.tick_realtime_effects(dt);
+        assert_eq!(
+            fast.player_square(),
+            square + STEP_RIGHT,
+            "the fast belt crossed its 0.5s period"
+        );
+
+        let mut slow = set_up_10x10_game();
+        slow.place_player(square);
+        slow.place_conveyor_belt(square, STEP_RIGHT);
+        slow.tick_realtime_effects(dt);
+        assert_eq!(
+            slow.player_square(),
+            square,
+            "the default belt's 2s period has not elapsed"
+        );
+    }
+
+    #[test]
+    fn faster_conveyor_belt_pushes_floating_entities_farther() {
+        // Issue 0016: floating entities move continuously, each at its belt's
+        // speed.
+        let mut game = set_up_nxn_game(14);
+        let slow = point2(3, 3);
+        let fast = point2(3, 9);
+        game.place_floating_hunter_drone(slow.to_f32(), STEP_ZERO.to_f32(), Angle::degrees(0.0));
+        game.place_floating_hunter_drone(fast.to_f32(), STEP_ZERO.to_f32(), Angle::degrees(0.0));
+        game.place_conveyor_belt_with_speed(slow, STEP_RIGHT, 1.0);
+        game.place_conveyor_belt_with_speed(fast, STEP_RIGHT, 4.0);
+
+        game.tick_realtime_effects(Duration::from_secs_f32(0.5));
+
+        let x_of = |y: f32| {
+            game.floating_hunter_drones
+                .iter()
+                .find(|drone| (drone.position.y - y).abs() < 0.5)
+                .unwrap()
+                .position
+                .x
+        };
+        let slow_moved = x_of(slow.y as f32) - slow.x as f32;
+        let fast_moved = x_of(fast.y as f32) - fast.x as f32;
+        assert!(
+            fast_moved > slow_moved + 0.1,
+            "fast belt moved {fast_moved}, slow belt moved {slow_moved}"
+        );
+    }
+
+    #[test]
+    fn conveyor_belt_visual_phase_follows_its_own_period() {
+        // Issue 0016: a faster belt visibly animates faster.
+        let mut game = set_up_nxn_game(14);
+        let slow = point2(4, 4);
+        let fast = point2(6, 4);
+        game.place_conveyor_belt_with_speed(slow, STEP_RIGHT, 1.0);
+        game.place_conveyor_belt_with_speed(fast, STEP_RIGHT, 3.0);
+        game.tick_realtime_effects(Duration::from_secs_f32(1.0));
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let glyph_at = |square| {
+            screen.get_glyphs_at_screen_square(screen.world_square_to_screen_buffer_square(square))
+        };
+        // Same direction and parity, different phase => different glyphs.
+        assert_ne!(
+            glyph_at(slow)[0].character,
+            glyph_at(fast)[0].character,
+            "belts at different speeds should show different phases"
+        );
+    }
+
+    #[test]
     fn test_conveyor_belt_push_hunter_drone() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -3218,6 +3299,10 @@
         assert_eq!(wall_glyphs[0].character, '▒', "wall character");
         assert_ne!(wall_glyphs[0].bg_color, BLACK, "wall should be tinted");
         assert_eq!(wall_glyphs[0].bg_color, wall_glyphs[1].bg_color);
+        assert_ne!(
+            wall_glyphs[0].bg_color, top_glyphs[0].bg_color,
+            "a voxel's side must differ in color from its top (issue 0015)"
+        );
     }
 
     #[test]
@@ -3394,6 +3479,37 @@
     }
 
     #[test]
+    fn belt_under_the_player_rotates_with_the_view() {
+        // Issue 0014: on the cubes map the player stands on a raised belt run
+        // under a rotated view. The belt half baked into the player's drawable
+        // stayed in world orientation, so it read as going the wrong way.
+        let mut game = set_up_nxn_game(14);
+        let run = [point2(5, 7), point2(5, 9)];
+        for &square in &run {
+            game.place_solid_column(square, 3);
+            game.place_conveyor_belt(square, STEP_UP);
+        }
+        game.place_player(run[0]);
+        game.rotate_view(2);
+        // Advance to a phase where the up and down belt glyphs differ, so the
+        // test can tell a rotated belt from a world-oriented one.
+        game.tick_realtime_effects(Duration::from_secs_f32(0.5));
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        // (5,7) and (5,9) have the same parity, so the same belt phase.
+        let player_top = screen.world_square_and_altitude_to_screen_buffer_square(run[0], 3);
+        let neighbor_top = screen.world_square_and_altitude_to_screen_buffer_square(run[1], 3);
+        let player_glyphs = screen.get_glyphs_at_screen_square(player_top);
+        let neighbor_glyphs = screen.get_glyphs_at_screen_square(neighbor_top);
+
+        assert_eq!(
+            player_glyphs[1].character, neighbor_glyphs[0].character,
+            "the belt half under the player must rotate with the view like the run"
+        );
+    }
+
+    #[test]
     fn terrain_walls_do_not_paint_through_a_portal_view() {
         use euclid::vec2;
         // Issue 0011: on the cubes map, the z-shifted wall of a directly visible
@@ -3465,6 +3581,65 @@
             screen.get_glyphs_at_screen_square(absolute_top)[0].character,
             UPPER_HALF_BLOCK,
             "the column must not be raised at its (hidden) absolute cell"
+        );
+    }
+
+    #[test]
+    fn raised_column_visible_directly_and_through_a_portal_is_drawn_at_both_cells() {
+        // Issue 0013: the player stands just inside a portal that looks into
+        // another part of the board. A raised column there is *also* directly
+        // visible (its depth-0 view is at a different relative cell). The
+        // forward pass used to collapse each absolute column to its single
+        // shallowest view — the direct one — so the portal cell kept the flat
+        // board checkerboard instead of the raised top; stepping through then
+        // swapped in the real terrain ("way too much changes"). The column
+        // must be drawn at the portal's apparent cell too.
+        let mut game = set_up_nxn_game(20);
+        // The player is on the north edge facing up, so the portal's apparent
+        // cell (one north, off-board void directly) is only reachable through
+        // the portal; the direct view of the column is elsewhere (on-board).
+        let player = point2(5, 19);
+        game.place_player(player);
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(player, STEP_UP.into());
+        let exit = SquareWithOrthogonalDir::from_square_and_step(point2(14, 18), STEP_UP.into());
+        game.place_double_sided_two_way_portal(entrance, exit);
+        let column = point2(14, 19);
+        game.place_solid_column(column, 4);
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let fov = game.player_field_of_view();
+        let direct_relative = column - player;
+
+        // The column really is directly visible (this is the view the old pass
+        // latched onto), at a relative cell distinct from the portal's.
+        assert_eq!(
+            fov.resolved_visibility(direct_relative)
+                .map(|visibility| visibility.absolute_square()),
+            Some(column),
+            "the column should be directly visible on the open board"
+        );
+
+        // It is also visible through the portal, at another cell where the
+        // raised top's rim must be drawn.
+        let apparent_relative = fov
+            .at_least_partially_visible_relative_squares_including_subviews()
+            .into_iter()
+            .find(|&relative| {
+                relative != direct_relative
+                    && fov.resolved_visibility(relative)
+                        .map(|visibility| visibility.absolute_square())
+                        == Some(column)
+            })
+            .expect("the raised column should be visible through the portal");
+        let altitude_shift = -(4 - game.player_altitude());
+        let apparent_top = screen
+            .world_square_to_screen_buffer_square(fov.root_square() + apparent_relative)
+            + ScreenBufferStep::new(0, altitude_shift);
+        assert_eq!(
+            screen.get_glyphs_at_screen_square(apparent_top)[0].character,
+            UPPER_HALF_BLOCK,
+            "the raised top should be drawn at the portal's apparent cell"
         );
     }
 
@@ -3668,6 +3843,12 @@
             game.blocks.conveyor_belts.contains_key(&point2(33, 30)),
             "belt continuing from the portal exit"
         );
+        // Issue 0016: belts run at different speeds, and the vertical run ramps
+        // slow at the ends to fastest at the middle.
+        let speed_at = |square| game.blocks.conveyor_belts.get(&square).unwrap().speed();
+        assert!(speed_at(point2(20, 18)) > speed_at(point2(9, 18)));
+        assert!(speed_at(point2(6, 12)) > speed_at(point2(6, 9)), "ramp speeds up");
+        assert!(speed_at(point2(6, 12)) > speed_at(point2(6, 16)), "and back down");
     }
 
     #[test]

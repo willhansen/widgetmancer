@@ -257,3 +257,17 @@ wall cell itself to resolve to the same view frame
 cannot paint into cells the portal resolves to void/another region. And the
 top-face background recolor now skips a `ConveyorBelt`, compositing it over a
 material base so its own black background survives.
+
+Issue 0013 closed the remaining collapse: the pass had picked each absolute
+column's single shallowest-portal view, so a column visible both directly (at an
+off-terminal relative cell) and through a portal was drawn only for the direct
+view and the portal cell kept the flat board checkerboard. The pass now walks
+the FOV's relative cells and draws the terrain column named by each cell's
+`resolved_visibility`, so raised geometry appears in every view it is visible
+through.
+
+The wall gradient's top color was the material tint itself, so a cube's side
+matched its top's light checker and a step read as walkable (issue 0015). The
+gradient endpoint is now a darkened shade of the material
+(`WALL_TINT_SHADE`), keeping every column's exposed side clearly darker than
+its top.

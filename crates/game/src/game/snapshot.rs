@@ -13,7 +13,7 @@ use euclid::Angle;
 use serde::Deserialize;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
-use crate::game::{DeathCube, FloatingEntityId, FloatingHunterDrone, Game, IncubatingPawn, Player, TerrainMaterial, Widget, SLAB_VOXEL_Z};
+use crate::game::{ConveyorBelt, DeathCube, FloatingEntityId, FloatingHunterDrone, Game, IncubatingPawn, Player, TerrainMaterial, Widget, CONVEYOR_BELT_MOVEMENT_PERIOD, SLAB_VOXEL_Z};
 use crate::piece::{Faction, Piece, PieceType, Upgrade};
 use rgb::RGB8;
 use terminal_rendering::glyph::Glyph;
@@ -214,7 +214,7 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
                 game.blocks
                     .conveyor_belts
                     .iter()
-                    .map(|(&square, step)| directed_square_json(square, step.step())),
+                    .map(|(&square, &belt)| conveyor_belt_json(square, belt)),
             ),
         ),
         (
@@ -453,6 +453,23 @@ fn directed_square_json(square: WorldSquare, step: WorldStep) -> String {
     ])
 }
 
+/// A conveyor belt. The movement period is omitted at the default so snapshots
+/// of default-speed belts are unchanged; a per-belt period lets a run ramp and
+/// separate belts differ (issue 0016).
+fn conveyor_belt_json(square: WorldSquare, belt: ConveyorBelt) -> String {
+    let mut fields: Vec<(&'static str, String)> = vec![
+        ("square", square_json(square)),
+        ("direction", step_json(belt.direction.step())),
+    ];
+    if belt.movement_period != CONVEYOR_BELT_MOVEMENT_PERIOD {
+        fields.push((
+            "period_millis",
+            belt.movement_period.as_millis().to_string(),
+        ));
+    }
+    json_object(fields)
+}
+
 fn pose_json(pose: utility::SquareWithOrthogonalDir) -> String {
     json_object([
         ("square", square_json(pose.square())),
@@ -572,7 +589,7 @@ struct SnapshotData {
     #[serde(default)]
     upgrades: Vec<UpgradeDto>,
     #[serde(default)]
-    conveyor_belts: Vec<DirectedDto>,
+    conveyor_belts: Vec<ConveyorBeltDto>,
     #[serde(default)]
     floor_push_arrows: Vec<DirectedDto>,
     #[serde(default)]
@@ -619,6 +636,15 @@ struct UpgradeDto {
 struct DirectedDto {
     square: [i32; 2],
     direction: [i32; 2],
+}
+
+#[derive(Deserialize)]
+struct ConveyorBeltDto {
+    square: [i32; 2],
+    direction: [i32; 2],
+    /// Absent in older captures and for default-speed belts.
+    #[serde(default)]
+    period_millis: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -820,10 +846,15 @@ impl Game {
             game.place_piece(new_piece, square_from_array(piece.square));
         }
         for belt in &data.conveyor_belts {
-            game.place_conveyor_belt(
-                square_from_array(belt.square),
-                step_from_array(belt.direction),
-            );
+            let square = square_from_array(belt.square);
+            let direction = step_from_array(belt.direction);
+            let belt = match belt.period_millis {
+                Some(period_millis) => {
+                    ConveyorBelt::new(direction.into(), Duration::from_millis(period_millis))
+                }
+                None => ConveyorBelt::with_default_period(direction.into()),
+            };
+            game.blocks.conveyor_belts.insert(square, belt);
         }
         for arrow in &data.floor_push_arrows {
             game.place_floor_push_arrow(
@@ -1033,6 +1064,7 @@ mod tests {
         game.place_voxel(WorldVoxel::new(base.x + 4, base.y, 5));
         game.place_upgrade(Upgrade::BlinkRange, base + STEP_DOWN * 2);
         game.place_conveyor_belt(base + STEP_DOWN * 3, STEP_RIGHT);
+        game.place_conveyor_belt_with_speed(base + STEP_DOWN * 6, STEP_LEFT, 3.0);
         game.place_floor_push_arrow(base + STEP_DOWN * 4, STEP_LEFT);
         game.place_widget(Widget::new(3), base + STEP_DOWN * 5);
         game.place_linear_death_cube(base.to_f32() + vec2(0.5, 0.5), vec2(1.0, 0.0));

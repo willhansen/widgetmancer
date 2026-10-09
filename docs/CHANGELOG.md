@@ -9,6 +9,139 @@ Newest first.
 
 ---
 
+## 2026-10-09 — Per-belt and per-segment conveyor speeds (fixes 0016)
+
+### game: give each conveyor-belt square its own movement period
+
+Issue 0016: "each conveyor belt going a different speed", and one belt whose
+segments ramp slow → fastest → slow. Belts were direction-only over one global
+2s movement period, which drove all grid-entity steps, all floating-entity push
+distances, and one global visual phase.
+
+Each belt square now owns a `ConveyorBelt { direction, movement_period }`
+(shorter = faster). `tick_conveyor_belts` steps a grid entity only when *that*
+belt's period boundary is crossed and pushes floating entities by `speed *
+delta`, each square independently; `draw_conveyor_belts` runs the visual phase
+on each belt's own `2 * period`. Default-period belts are byte-identical.
+
+- `MapOp::ConveyorBelt` gains an optional `speed` multiplier (1.0 = default);
+  `Game::place_conveyor_belt_with_speed` / `Blocks::place_conveyor_belt_with_speed`
+  author it.
+- Snapshot round-trips a non-default `period_millis`; older captures and
+  default belts omit it and load at the original speed.
+- `maps/cubes.json` gives the runs different speeds (west 0.5, east 2.0,
+  top-right 0.75) and ramps the vertical run's segments (0.25, 0.5, 0.75, 1.5,
+  1.5, 0.75, 0.5, 0.25).
+- Tests: `faster_conveyor_belt_steps_grid_entities_on_its_own_period`,
+  `faster_conveyor_belt_pushes_floating_entities_farther`,
+  `conveyor_belt_visual_phase_follows_its_own_period`,
+  `map_file_parses_and_applies_ops` (a speed multiplier), the cubes recipe ramp
+  assertions, and the snapshot round-trip with a non-default-speed belt.
+- Captures: `issues/0016` moved to `issues/solved/0016` with
+  `screen.pre-fix.txt` and a re-blessed `screen.txt`. The other captures are
+  byte-identical (default belts render as before).
+- Docs: `RENDERING.md` layer bullet updated.
+
+Verified: `cargo test --workspace` green (330 game lib tests); `snapshot_tool
+diff` OK for `snapshot/` and `solved/0003/0005/0006/0007`–`0016`.
+
+---
+
+## 2026-10-09 — Voxel walls are a distinct shade from voxel tops (fixes 0015)
+
+### game: darken a tinted column's wall gradient endpoint
+
+Issue 0015 (cubes map): a cube's side was the same color as its top — "it looks
+like I should be able to step down here, but I can't." The wall gradient ran
+from `TERRAIN_WALL_BASE` toward `terrain_tint(material)`, and for a `Tint`
+material that returned the material color itself, so the wall reached exactly
+the top face's light checker color at the top voxel.
+
+`terrain_tint` now returns a darkened shade of the material (`WALL_TINT_SHADE`,
+0.5) for `Tint`; `Floor` is unchanged. A column's exposed side is now clearly
+darker than its top.
+
+- Test: `raised_terrain_shifts_the_top_face_and_draws_a_wall` additionally
+  asserts the wall color differs from the top color (fails before the change).
+- Captures: `issues/0015` moved to `issues/solved/0015` with
+  `screen.pre-fix.txt` and a re-blessed `screen.txt`; the other raised-terrain
+  captures (`solved/0003`, `0007`–`0014`) re-blessed. Flat `snapshot/`,
+  `solved/0005`, `0006` unchanged.
+- Docs: `CUBE_ISO_PORT.md` post-port note updated.
+
+Verified: `cargo test --workspace` green (327 game lib tests); `snapshot_tool
+diff` OK for `snapshot/` and `solved/0003/0005/0006/0007`–`0015`.
+
+---
+
+## 2026-10-09 — Keep floor features layered so they rotate with content (fixes 0014)
+
+### game: a conveyor belt under content rotates with the view
+
+Issue 0014 (cubes map): with the view rotated 180°, the right glyph of the
+player's square showed the belt going *up* while the belt run beside it went
+down. The player is drawn over the belt via `Graphics::draw_above_square`, which
+composited the belt's half-glyph into the arrow's `TextDrawable` immediately (in
+world orientation). The FOV/terrain pass then rotates the composite for the
+view, but `ArrowDrawable::rotated` only re-derives the arrow glyph, so the baked
+belt half stayed unrotated.
+
+`draw_above_square` now keeps a conveyor belt (or an existing stack) under new
+content as a separate layer: a new `LayeredDrawable { under, over }` whose
+`rotated` rotates both layers before compositing, while `to_glyphs` reuses the
+same `drawn_over` composition (preserving the `PartialVisibility` /
+`OffsetSquare` special cases). The belt half under the player now matches the
+rotated run.
+
+- Tests: `belt_under_the_player_rotates_with_the_view` (game; fails on the baked
+  composite) and `belt_beneath_content_rotates_with_the_composite` (drawable).
+- Captures: `issues/0014` moved to `issues/solved/0014` with
+  `screen.pre-fix.txt` and a re-blessed `screen.txt`. The other captures are
+  byte-identical.
+- Docs: `RENDERING.md` drawable-abstraction section documents
+  `LayeredDrawable`.
+
+Verified: `cargo test --workspace` green (327 game lib tests); `snapshot_tool
+diff` OK for `snapshot/` and `solved/0003/0005/0006/0007`–`0014`.
+
+---
+
+## 2026-10-09 — Portal-aware terrain draws every view a column is visible through (fixes 0013)
+
+### game: draw raised terrain per relative cell, not per absolute column
+
+Issue 0013 (cubes map): standing just inside a portal, the view "changed way too
+much" when stepping through — the portal showed the floor's checkerboard and
+cube sides/edges came and went. The forward terrain pass
+(`Graphics::load_screen_buffer_from_terrain`) collapsed each absolute column to
+its single *shallowest*-portal visibility and drew only there. On this map the
+portal looks into cube clusters whose columns are also directly visible, but at
+relative cells off the 35-row terminal; collapsing to the direct view drew those
+columns nowhere, so the portal cell kept the flat composite's base board
+checkerboard (red-tinted by portal depth — the "off" portal edge color). Making
+those cells direct on the next step swapped the checker for real terrain.
+
+The pass now walks the FOV's relative cells and, for each, draws the terrain
+column named by `resolved_visibility` (the topmost view — exactly what the flat
+composite paints) with that view's rotation and tint. A column is therefore
+raised at *every* cell it is visible through, direct and portal alike.
+
+- Test: `raised_column_visible_directly_and_through_a_portal_is_drawn_at_both_cells`
+  (fails on the per-absolute collapse: the column is directly visible off-frame
+  and through a portal on-frame, and the portal-cell rim was missing).
+- Captures: `issues/0013` moved to `issues/solved/0013` with
+  `screen.pre-fix.txt` and a re-blessed `screen.txt`; `solved/0007`–`0012`
+  re-blessed (they gain the previously-missing portal terrain). Flat
+  `snapshot/` and the non-cubes captures are unchanged.
+- Docs: `RENDERING.md` FOV-compositing and `CUBE_ISO_PORT.md` post-port notes
+  updated.
+
+Verified: `cargo test -p game --lib` green (325 tests); `snapshot_tool diff`
+OK for `snapshot/`, `solved/0007`–`0013`, `solved/0003/0005/0006`,
+`touching-floating-square-background`.
+
+---
+
 ## 2026-10-09 — Terrain walls gate on their own cell's view frame; belts keep their colors (fixes 0010/0011/0012)
 
 ### game: gate terrain walls by the wall cell's view frame; don't clobber a belt's background

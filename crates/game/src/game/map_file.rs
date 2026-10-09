@@ -87,8 +87,15 @@ pub enum MapOp {
     /// A pushable numbered widget. Values 1-10 are preferred (see `Widget::new`).
     Widget { x: i32, y: i32, value: u32 },
     /// A conveyor belt that carries whatever is on the square in `dir` each
-    /// movement period.
-    ConveyorBelt { x: i32, y: i32, dir: MapDir },
+    /// movement period. `speed` multiplies the default belt speed (1.0 =
+    /// default), per square, so a run can ramp and separate belts can differ.
+    ConveyorBelt {
+        x: i32,
+        y: i32,
+        dir: MapDir,
+        #[serde(default)]
+        speed: Option<f32>,
+    },
 }
 
 /// A world-space orthogonal direction, named as it reads on screen. `up` is
@@ -207,8 +214,13 @@ impl Game {
             MapOp::Widget { x, y, value } => {
                 self.place_widget(Widget::new(value), point2(x, y))
             }
-            MapOp::ConveyorBelt { x, y, dir } => {
-                self.place_conveyor_belt(point2(x, y), dir.to_step())
+            MapOp::ConveyorBelt { x, y, dir, speed } => {
+                let square = point2(x, y);
+                let step = dir.to_step();
+                match speed {
+                    Some(speed) => self.place_conveyor_belt_with_speed(square, step, speed),
+                    None => self.place_conveyor_belt(square, step),
+                }
             }
         }
     }
@@ -247,8 +259,8 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::{ConveyorBelt, CONVEYOR_BELT_MOVEMENT_PERIOD};
     use euclid::point2;
-    use utility::OrthogonalWorldStep;
 
     #[test]
     fn map_file_parses_and_applies_ops() {
@@ -259,7 +271,8 @@ mod tests {
                 { "op": "column", "x": 2, "y": 2, "height": 3 },
                 { "op": "voxel", "x": 4, "y": 4, "z": 6 },
                 { "op": "widget", "x": 5, "y": 5, "value": 4 },
-                { "op": "conveyor_belt", "x": 6, "y": 5, "dir": "right" }
+                { "op": "conveyor_belt", "x": 6, "y": 5, "dir": "right" },
+                { "op": "conveyor_belt", "x": 7, "y": 5, "dir": "up", "speed": 2.0 }
             ],
             "player": [2, 2]
         }"#;
@@ -275,8 +288,16 @@ mod tests {
         assert!(game.widgets.contains_key(&point2(5, 5)), "widget placed");
         assert_eq!(
             game.blocks.conveyor_belts.get(&point2(6, 5)),
-            Some(&OrthogonalWorldStep::from(STEP_RIGHT)),
-            "belt placed"
+            Some(&ConveyorBelt::with_default_period(STEP_RIGHT.into())),
+            "default-speed belt placed"
+        );
+        assert_eq!(
+            game.blocks.conveyor_belts.get(&point2(7, 5)),
+            Some(&ConveyorBelt::new(
+                STEP_UP.into(),
+                CONVEYOR_BELT_MOVEMENT_PERIOD.div_f32(2.0)
+            )),
+            "belt speed multiplier shortens its period"
         );
     }
 

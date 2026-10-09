@@ -33,6 +33,69 @@ pub enum DrawableEnum {
     Arrow(ArrowDrawable),
     ConveyorBelt(ConveyorBeltDrawable),
     OffsetSquare(OffsetSquareDrawable),
+    Layered(LayeredDrawable),
+}
+
+/// Two drawables stacked (`over` on top of `under`) but kept apart until glyph
+/// time. Compositing bakes the lower glyphs immediately, which loses a
+/// *directional* lower layer's orientation when the composite is later rotated
+/// for the view: a conveyor belt drawn under the player was baked in world
+/// orientation, so under a rotated camera its half stayed wrong (issue 0014).
+/// Keeping the layers lets `rotated` rotate each before compositing, while
+/// `to_glyphs` reuses the same `drawn_over` composition (and its special cases)
+/// the unbaked path used.
+#[derive(Debug, Clone)]
+pub struct LayeredDrawable {
+    under: Box<DrawableEnum>,
+    over: Box<DrawableEnum>,
+}
+
+impl LayeredDrawable {
+    pub fn new(under: DrawableEnum, over: DrawableEnum) -> Self {
+        LayeredDrawable {
+            under: Box::new(under),
+            over: Box::new(over),
+        }
+    }
+}
+
+impl Drawable for LayeredDrawable {
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+        LayeredDrawable {
+            under: Box::new(self.under.rotated(quarter_rotations_anticlockwise)),
+            over: Box::new(self.over.rotated(quarter_rotations_anticlockwise)),
+        }
+        .into()
+    }
+
+    fn to_glyphs(&self) -> DoubleGlyph {
+        self.over.drawn_over(self.under.as_ref()).to_glyphs()
+    }
+
+    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+        // `self` is the top layer, `other` goes beneath the whole stack.
+        LayeredDrawable {
+            under: Box::new(other.to_enum()),
+            over: Box::new(self.to_enum()),
+        }
+        .into()
+    }
+
+    fn color_if_backgroundified(&self) -> RGB8 {
+        self.over.color_if_backgroundified()
+    }
+
+    fn to_enum(&self) -> DrawableEnum {
+        self.clone().into()
+    }
+
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum {
+        LayeredDrawable {
+            under: Box::new(self.under.tinted(color, strength)),
+            over: Box::new(self.over.tinted(color, strength)),
+        }
+        .into()
+    }
 }
 
 #[derive(Debug, Clone, CopyGetters)]
@@ -737,6 +800,32 @@ mod tests {
     fn test_conveyor_belt_drawable_half_down() {
         let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.25);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
+    }
+
+    #[test]
+    fn belt_beneath_content_rotates_with_the_composite() {
+        // Issue 0014: compositing baked the belt's half-glyph in world
+        // orientation, so a belt under the player stayed pointing "up" under a
+        // rotated view. Keeping the layers lets the belt rotate with the arrow.
+        let phase = 0.25;
+        let belt = ConveyorBeltDrawable::new(STEP_UP.into(), phase);
+        let arrow = ArrowDrawable::new(STEP_UP.into(), THICK_ARROWS, BLUE);
+        let composite = LayeredDrawable::new(belt.to_enum(), arrow.to_enum());
+
+        let rotated_belt_half = composite.rotated(2).to_glyphs()[1].character;
+        let expected = ConveyorBeltDrawable::new(STEP_UP.into(), phase)
+            .rotated(2)
+            .to_glyphs()[0]
+            .character;
+        assert_eq!(
+            rotated_belt_half, expected,
+            "the belt half must rotate with the view"
+        );
+        assert_ne!(
+            rotated_belt_half,
+            belt.to_glyphs()[0].character,
+            "and must differ from the unrotated glyph"
+        );
     }
     #[test]
     fn test_offset_square_drawn_over_solid() {

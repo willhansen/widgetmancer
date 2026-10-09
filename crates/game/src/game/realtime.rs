@@ -192,23 +192,40 @@ impl Game {
     }
 
     fn tick_conveyor_belts(&mut self, delta: Duration) {
-        let just_finished_full_movement_period =
-            conveyor_period_just_elapsed(self.world_time_since_start(), delta);
+        let prev_time_since_start = self.world_time_since_start();
 
+        // Grid entities step one square only when their own belt's movement
+        // period boundary is crossed, so different belts can run at different
+        // speeds (issue 0016).
+        let push_this_tick: HashMap<WorldSquare, KingWorldStep> = self
+            .blocks
+            .conveyor_belts
+            .iter()
+            .filter(|(_, belt)| {
+                conveyor_period_just_elapsed(prev_time_since_start, delta, belt.movement_period)
+            })
+            .map(|(&start_square, belt)| (start_square, belt.direction.into()))
+            .collect();
+        if !push_this_tick.is_empty() {
+            self.simultaneously_push_several_grid_entities(&push_this_tick);
+        }
+
+        // Floating entities move continuously, each square at its belt's speed.
         let push_directions: HashMap<WorldSquare, KingWorldStep> = self
             .blocks
             .conveyor_belts
             .iter()
-            .map(|(&start_square, &push_direction)| (start_square, push_direction.into()))
+            .map(|(&start_square, belt)| (start_square, belt.direction.into()))
             .collect();
-        if just_finished_full_movement_period {
-            self.simultaneously_push_several_grid_entities(&push_directions);
-        }
-
-        let conveyor_distance = Game::conveyor_belt_speed() * delta.as_secs_f32();
-        self.simultaneously_push_floating_entities_at_several_squares(
+        let push_distances: HashMap<WorldSquare, f32> = self
+            .blocks
+            .conveyor_belts
+            .iter()
+            .map(|(&start_square, belt)| (start_square, belt.speed() * delta.as_secs_f32()))
+            .collect();
+        self.simultaneously_push_floating_entities_at_several_squares_with_distances(
             &push_directions,
-            conveyor_distance,
+            &push_distances,
         );
     }
 

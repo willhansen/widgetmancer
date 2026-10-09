@@ -35,7 +35,8 @@ order:
 1. Static board floor (`SolidColorDrawable`, from the floor-color function —
    default is a 3×3-tile checkerboard, `Graphics::big_chess_pattern`)
 2. Board-wide animation if active (recoiling board, radial shockwave)
-3. Floor push arrows, conveyor belts (phase-offset per square parity)
+3. Floor push arrows, conveyor belts (each belt's own speed drives its phase,
+   offset by square parity)
 4. Move/capture marker squares
 5. Blocks, pieces (chess-character glyphs), upgrades
 6. Floating entities — death cubes and hunter drones are positioned at
@@ -141,11 +142,16 @@ buffer.
 
 On a raised board, the forward terrain column pass
 (`Graphics::load_screen_buffer_from_terrain`) uses the same resolved
-visibilities: each column is drawn at the relative cell its shallowest-portal
-visibility resolves it to, with the portal rotation and tint applied and the
-camera-facing wall direction rotated through the portal, so raised geometry is
-re-projected through portals just like flat floor and entities. Writes are
-clamped to the FOV frame (`sight_radius + 1`).
+visibilities, per relative cell: each cell's topmost view
+(`resolved_visibility`) names the absolute square it shows, and if that square
+is a terrain column it is drawn there, with the portal rotation and tint applied
+and the camera-facing wall direction rotated through the portal, so raised
+geometry is re-projected through portals just like flat floor and entities.
+Drawing per cell (not per absolute column) keeps a column in *every* view it is
+visible through — a cube seen both directly and through a portal is raised at
+both cells, instead of collapsing to the direct view and leaving the portal cell
+with the flat checkerboard (issue 0013). Writes are clamped to the FOV frame
+(`sight_radius + 1`).
 
 A wall voxel is written up to `camera_altitude - z` rows below the column's
 occlusion-checked top cell, so that wall cell is checked separately: it must
@@ -172,7 +178,17 @@ pub trait Drawable: Clone + Debug {
 
 `DrawableEnum` (via `ambassador` delegation) covers: `TextDrawable`,
 `SolidColorDrawable`, `PartialVisibilityDrawable`, `BrailleDrawable`,
-`ArrowDrawable`, `ConveyorBeltDrawable`, `OffsetSquareDrawable`.
+`ArrowDrawable`, `ConveyorBeltDrawable`, `OffsetSquareDrawable`, and
+`LayeredDrawable`.
+
+`LayeredDrawable` holds two drawables (`under`, `over`) uncomposited. It exists
+because `drawn_over` bakes the lower glyphs immediately: a *directional* lower
+layer (a conveyor belt) then loses its orientation when the composite is rotated
+for the view (issue 0014 — the belt half under the player). `LayeredDrawable`
+rotates each layer before compositing, and `to_glyphs` still routes through the
+same `drawn_over` logic, so its special cases (`PartialVisibility`,
+`OffsetSquare`) are preserved. `Graphics::draw_above_square` wraps a conveyor
+belt (or an existing stack) under new content in a `LayeredDrawable`.
 
 Glyphs themselves are composable: `DoubleGlyphFunctions::drawn_over`
 (`terminal_rendering/src/glyph.rs`) does the low-level over-blending,

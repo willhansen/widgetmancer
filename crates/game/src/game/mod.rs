@@ -37,7 +37,7 @@ mod terrain;
 mod turns;
 pub use spawning::IncubatingPawn;
 pub use floating_entities::{DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
-pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
+pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, ConveyorBelt, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
 pub use terrain::{Terrain, TerrainMaterial, DEFAULT_TERRAIN_TINT, SLAB_TOP, SLAB_VOXEL_Z};
 
 pub const PLAYER_SIGHT_RADIUS: u32 = 16;
@@ -658,10 +658,10 @@ impl Game {
         self.graphics
             .draw_floor_push_arrows(&self.floor_push_arrows);
 
-        let global_phase_offset: f32 =
-            self.world_time_since_start().as_secs_f32() / CONVEYOR_BELT_VISUAL_PERIOD.as_secs_f32();
-        self.graphics
-            .draw_conveyor_belts(&self.blocks.conveyor_belts, global_phase_offset);
+        self.graphics.draw_conveyor_belts(
+            &self.blocks.conveyor_belts,
+            self.world_time_since_start().as_secs_f32(),
+        );
 
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
@@ -1024,6 +1024,16 @@ impl Game {
     }
     pub fn place_conveyor_belt(&mut self, square: WorldSquare, dir: WorldStep) {
         self.blocks.place_conveyor_belt(square, dir);
+    }
+    /// Place a conveyor belt at `speed_multiplier` times the default speed.
+    pub fn place_conveyor_belt_with_speed(
+        &mut self,
+        square: WorldSquare,
+        dir: WorldStep,
+        speed_multiplier: f32,
+    ) {
+        self.blocks
+            .place_conveyor_belt_with_speed(square, dir, speed_multiplier);
     }
     pub fn conveyor_belt_speed() -> f32 {
         conveyor_belt_speed()

@@ -11,12 +11,12 @@ use glyph::glyph_constants::*;
 
 use crate::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov};
 use crate::game::{
-    DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, Terrain,
+    ConveyorBelt, DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, Terrain,
     TerrainMaterial, SLAB_VOXEL_Z,
 };
 use crate::graphics::drawable::{
     ArrowDrawable, BrailleDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum,
-    OffsetSquareDrawable, SolidColorDrawable, TextDrawable,
+    LayeredDrawable, OffsetSquareDrawable, SolidColorDrawable, TextDrawable,
     remap_floating_square_drawables_through_portals,
 };
 use crate::graphics::screen::{
@@ -69,14 +69,21 @@ const TERRAIN_WALL_BASE: RGB8 = RGB8::new(24, 24, 36);
 /// pattern.
 const CHECKER_BLOCK: i32 = 3;
 
-/// The base color a wall gradient runs toward for a column's material. The
-/// floor slab edge uses a neutral slate; a tint uses itself.
+/// The base color a wall gradient runs toward for a column's material. Kept
+/// clearly darker than the top face so a cube's vertical side reads differently
+/// from its top and a step reads as a step rather than a walkable surface
+/// (issue 0015). For a tint it is a darkened shade of the material; the floor
+/// slab keeps a neutral slate.
 fn terrain_tint(material: TerrainMaterial) -> RGB8 {
     match material {
-        TerrainMaterial::Tint(color) => color,
+        TerrainMaterial::Tint(color) => scale_rgb(color, WALL_TINT_SHADE),
         TerrainMaterial::Floor => RGB8::new(64, 64, 82),
     }
 }
+
+/// How dark a tinted column's wall runs relative to its top. Below 1 so the
+/// wall never matches the top's light checker color.
+const WALL_TINT_SHADE: f32 = 0.5;
 
 /// Fraction up the column for a wall voxel, 0 at the slab base and 1 at the top.
 fn wall_gradient_t(z: i32, top_voxel: i32) -> f32 {
@@ -415,45 +422,30 @@ impl Graphics {
             offset.x.abs() <= frame_extent && offset.y.abs() <= frame_extent
         };
 
-        // Each absolute column's best (shallowest-portal) visibility fixes the
-        // relative square it is drawn at. A direct (depth-0) view wins over a
-        // portal view, so a cube seen both ways renders where it is directly
-        // visible. The relative squares are sorted so equal-depth ties resolve
-        // deterministically (the FOV set is unordered).
+        // Draw the terrain per *relative cell*: the FOV resolves each cell to
+        // exactly one topmost visibility, which is the same drawable the flat
+        // composite paints. If that absolute square is a terrain column, draw
+        // the column here. Iterating cells (rather than collapsing each
+        // absolute column to its single shallowest view) keeps raised terrain
+        // in every view it is visible through: a column seen both directly and
+        // through a portal is drawn at both cells. Collapsing to the direct
+        // (shallowest) view dropped the portal copy whenever the direct cell
+        // was off the terminal, leaving the flat checkerboard at the portal
+        // cell and making the terrain pop when the player stepped through
+        // (issue 0013). Relative cells are sorted so painter-order ties are
+        // deterministic (the FOV set is unordered).
+        let column_tops: HashMap<WorldSquare, i32> = terrain.columns().into_iter().collect();
         let mut relative_squares: Vec<WorldStep> = field_of_view
             .at_least_partially_visible_relative_squares_including_subviews()
             .into_iter()
             .collect();
         relative_squares.sort_by_key(|relative| (relative.x, relative.y));
-        let mut apparent: HashMap<WorldSquare, PositionedSquareVisibilityInFov> = HashMap::new();
-        for relative in relative_squares {
-            for visibility in field_of_view.visibilities_of_relative_square(relative) {
-                apparent
-                    .entry(visibility.absolute_square())
-                    .and_modify(|existing| {
-                        if visibility.portal_depth() < existing.portal_depth() {
-                            *existing = visibility;
-                        }
-                    })
-                    .or_insert(visibility);
-            }
-        }
-
-        let mut columns: Vec<(WorldSquare, i32, PositionedSquareVisibilityInFov)> = terrain
-            .columns()
+        let mut columns: Vec<(WorldSquare, i32, PositionedSquareVisibilityInFov)> = relative_squares
             .into_iter()
-            .filter_map(|(square, top_voxel)| {
-                let visibility = *apparent.get(&square)?;
-                // Draw only where this column is what the cell actually
-                // resolves to; a shallower view at the same relative square
-                // occludes it in the flat composite too.
-                if field_of_view
-                    .resolved_visibility(visibility.relative_square())
-                    .map(|topmost| topmost.absolute_square())
-                    != Some(square)
-                {
-                    return None;
-                }
+            .filter_map(|relative| {
+                let visibility = field_of_view.resolved_visibility(relative)?;
+                let square = visibility.absolute_square();
+                let top_voxel = *column_tops.get(&square)?;
                 Some((square, top_voxel, visibility))
             })
             .collect();
@@ -650,12 +642,23 @@ impl Graphics {
         drawable: &T,
         world_square: WorldSquare,
     ) {
-        let to_draw = if let Some(below) = self.draw_buffer.get(&world_square) {
-            drawable.drawn_over(below)
-        } else {
-            drawable.clone().to_enum()
+        let to_draw = match self.draw_buffer.get(&world_square) {
+            // Keep a floor feature (or an existing stack) as its own layer: a
+            // view rotation must rotate it with the content on top, not bake
+            // its glyph in world orientation (issue 0014 — a conveyor belt
+            // under the player).
+            Some(below)
+                if matches!(
+                    below,
+                    DrawableEnum::ConveyorBelt(_) | DrawableEnum::Layered(_)
+                ) =>
+            {
+                LayeredDrawable::new(below.clone(), drawable.clone().to_enum()).to_enum()
+            }
+            Some(below) => drawable.drawn_over(below),
+            None => drawable.clone().to_enum(),
         };
-        self.draw_buffer.insert(world_square, to_draw.to_enum());
+        self.draw_buffer.insert(world_square, to_draw);
     }
 
     pub fn draw_drawable_to_draw_buffer<T: Drawable + Debug>(
@@ -862,13 +865,19 @@ impl Graphics {
     }
     pub fn draw_conveyor_belts(
         &mut self,
-        conveyor_belts: &HashMap<WorldSquare, OrthogonalWorldStep>,
-        global_phase: f32,
+        conveyor_belts: &HashMap<WorldSquare, ConveyorBelt>,
+        world_time_seconds: f32,
     ) {
-        conveyor_belts.iter().for_each(|(&square, &dir)| {
-            let phase = global_phase + if square_is_odd(square) { 0.5 } else { 0.0 };
-            self.draw_drawable_to_draw_buffer(square, &ConveyorBeltDrawable::new(dir, phase))
-        })
+        conveyor_belts.iter().for_each(|(&square, belt)| {
+            // Each belt's phase runs on its own visual period, so faster belts
+            // visibly animate faster (issue 0016).
+            let phase = world_time_seconds / belt.visual_period().as_secs_f32()
+                + if square_is_odd(square) { 0.5 } else { 0.0 };
+            self.draw_drawable_to_draw_buffer(
+                square,
+                &ConveyorBeltDrawable::new(belt.direction, phase),
+            )
+        });
     }
 
     /// Push an active animation stamped with the current frame's logical time.
