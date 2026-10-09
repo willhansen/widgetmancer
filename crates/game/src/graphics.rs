@@ -211,6 +211,12 @@ impl Graphics {
         self.start_time
     }
 
+    /// The logical time this frame was drawn at (the clock the starfield and
+    /// animations read). Captured so a snapshot can be re-rendered byte-for-byte.
+    pub fn current_time(&self) -> LogicalTime {
+        self.current_time
+    }
+
     /// Set the logical time animations spawned this frame should be stamped
     /// with. Called by the render path and by the driver before input handling.
     pub fn set_current_time(&mut self, time: LogicalTime) {

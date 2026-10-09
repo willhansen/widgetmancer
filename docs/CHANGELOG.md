@@ -9,6 +9,52 @@ Newest first.
 
 ---
 
+## 2026-10-09 — Debug-tooling hardening from the 0013–0016 session
+
+### tooling: reproducible captures, snapshot-tool wrapper, and review commands
+
+Follow-ups to the debugging friction hit while fixing 0013–0016.
+
+- **Never trust a stale binary.** New repo-root `./snapshot-tool` wrapper runs
+  `cargo run -p game --features debug-tools --bin snapshot_tool --`, so the
+  binary always matches the sources (a stale `target/**/snapshot_tool` silently
+  reported wrong diffs and nearly caused a wrong conclusion). `AGENTS.md`
+  documents: use the wrapper, never the prebuilt path.
+- **Captures byte-reproduce.** The snapshot now records
+  `logical_time_seconds` — the draw clock (`graphics.current_time - start`),
+  which the starfield/animations read and which differs from `world_time`. The
+  three headless render paths draw at it (old captures fall back to
+  `world_time_seconds`), and `from_snapshot` restores it, so future captures
+  diff with no time-dependent star churn. Test:
+  `snapshot_round_trips_the_draw_clock`.
+- **Diff categories.** `render_diff_report` now prints a
+  `char / fg-only / bg-only` split, so time-dependent starfield churn no longer
+  drowns a real glyph change.
+- **Frame labeling.** `explain` prints `screen-square (X,Y) = char cols ..
+  ..`, and takes `--char-col` to accept a terminal character column.
+- **Reproduce a transition.** `render-at <dir> [--player X Y] [--rotate N]`
+  renders a capture with the player moved/rotated (e.g. the step 0013
+  described); `simulate <dir> --keys <chars> [--render-each]` steps a capture
+  forward. Replaying `input_history` was rejected: a snapshot is the state
+  *after* the inputs, so replay would double-apply.
+- **Mechanical re-bless review.** `explain-diff <dir> <ref>` prints each changed
+  cell's old/new glyphs plus how the new render resolved it.
+- **Two-sided fixtures.** `verify-issues` walks `issues/solved/*` and requires
+  each render to match `screen.txt` and differ from `screen.pre-fix.txt`; a
+  fixture that matches both proves nothing. It immediately caught a stale
+  `solved/0004` render (pre-existing), now re-blessed. `AGENTS.md` records the
+  rule: a regression test must be shown to fail on the pre-fix revision.
+- `QuarterTurnsAnticlockwise`'s `AddAssign` no longer bypasses normalization
+  (the derived impl accumulated unbounded, yielding snapshot values like 131);
+  it now routes through `Add` so rotation stays 0..=3. Test:
+  `quarter_turns_add_assign_stays_normalized`.
+
+Verified: `cargo test --workspace` green (331 game lib tests); `cargo test -p
+game --features debug-tools --lib` green (341); `./snapshot-tool verify-issues`
+all 15 fixtures OK; flat `snapshot/` unchanged.
+
+---
+
 ## 2026-10-09 — Per-belt and per-segment conveyor speeds (fixes 0016)
 
 ### game: give each conveyor-belt square its own movement period

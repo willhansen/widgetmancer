@@ -7,9 +7,9 @@ use std::f32::consts::{LN_2, PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
-use std::ops::{Add, Neg, Sub};
+use std::ops::{Add, AddAssign, Neg, Sub};
 
-use derive_more::{AddAssign, Constructor, Neg};
+use derive_more::{Constructor, Neg};
 use euclid::approxeq::ApproxEq;
 use euclid::*;
 use getset::CopyGetters;
@@ -92,7 +92,7 @@ macro_rules! boxx {
     };
 }
 
-#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, CopyGetters, AddAssign)]
+#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
 pub struct QuarterTurnsAnticlockwise {
     quarter_turns: i32,
@@ -159,6 +159,15 @@ impl Add for QuarterTurnsAnticlockwise {
 
     fn add(self, rhs: Self) -> Self::Output {
         Self::new(self.quarter_turns() + rhs.quarter_turns())
+    }
+}
+
+impl AddAssign for QuarterTurnsAnticlockwise {
+    fn add_assign(&mut self, rhs: Self) {
+        // Route through `Add` so the accumulated field stays normalized to
+        // 0..=3; the `derive_more` AddAssign used to accumulate unbounded,
+        // producing quarter_turns like 131 in snapshots.
+        *self = *self + rhs;
     }
 }
 
@@ -2093,6 +2102,19 @@ mod tests {
             ),
             point2(4, 7)
         );
+    }
+
+    #[test]
+    fn quarter_turns_add_assign_stays_normalized() {
+        // Screen rotation accumulates via `+=`; it must stay 0..=3 so snapshots
+        // record a real quarter turn (not 131).
+        let mut turns = QuarterTurnsAnticlockwise::new(0);
+        for _ in 0..131 {
+            turns += QuarterTurnsAnticlockwise::new(1);
+        }
+        assert_eq!(turns.quarter_turns(), 131 % 4);
+        turns += QuarterTurnsAnticlockwise::new(3);
+        assert!((0..4).contains(&turns.quarter_turns()));
     }
 
     #[test]

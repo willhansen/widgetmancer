@@ -31,6 +31,22 @@ reset. Snapshots can be combined with `--map` only when not loading.
 The repo-root `snapshot/` directory is still used by `snapshot_tool` and manual
 dumps; `Ctrl-P` files captures under `issues/` instead.
 
+### `snapshot-tool` (headless debug)
+
+Always run it through the repo-root wrapper, which rebuilds from source so the
+binary can't be stale:
+
+    ./snapshot-tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|explain-diff|invariants|render-at|simulate|verify-issues|minimize> <dir> [args]
+
+Notable modes: `diff` reports a char/fg/bg category split (fg/bg-only is usually
+time-dependent starfield); `explain X Y [--char-col]` says how a cell was
+resolved; `explain-diff <dir> <ref>` explains each changed cell in the current
+render; `render-at <dir> [--player X Y] [--rotate N]` renders a capture with the
+player moved (e.g. one step from where it was filed); `simulate <dir> --keys
+<chars> [--render-each]` steps a capture forward; and `verify-issues` checks that
+every `issues/solved/*` render matches its blessed `screen.txt` and still
+differs from `screen.pre-fix.txt` (a fixture that matches both proves nothing).
+
 ## Font debugging
 
 Many glyphs the game draws are not in the configured terminal font, so the

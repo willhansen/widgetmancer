@@ -180,6 +180,17 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
             "world_time_seconds",
             game.world_time_since_start().as_secs_f32().to_string(),
         ),
+        // The clock the captured frame was *drawn* at. The starfield and
+        // animations read this, and it differs from `world_time` (which drives
+        // gameplay), so re-rendering at `world_time` alone drifts the stars.
+        (
+            "logical_time_seconds",
+            game.graphics
+                .current_time()
+                .saturating_duration_since(game.graphics.start_time())
+                .as_secs_f32()
+                .to_string(),
+        ),
         ("player", player_json(game)),
         ("sight_radius", game.player_sight_radius.to_string()),
         ("pieces", json_sorted_array(game.pieces.iter().map(|(&square, &piece)| piece_json(square, &piece)))),
@@ -566,6 +577,10 @@ struct SnapshotData {
     board_height: u32,
     turn_count: u32,
     world_time_seconds: f32,
+    /// Logical (draw) time at capture. Absent in older snapshots, which fall
+    /// back to `world_time_seconds`.
+    #[serde(default)]
+    logical_time_seconds: Option<f32>,
     player: Option<PlayerDto>,
     /// Player sight radius at capture. Absent in older snapshots, which fall
     /// back to `PLAYER_SIGHT_RADIUS`. Maps can override it (e.g. `cubes`).
@@ -607,6 +622,18 @@ struct SnapshotData {
     #[serde(default)]
     rng_state: Option<String>,
     screen: ScreenDto,
+}
+
+impl SnapshotData {
+    /// The draw clock to re-render at: the captured logical time, or
+    /// `world_time_seconds` for older snapshots that predate the field.
+    fn draw_elapsed(&self) -> Duration {
+        let seconds = self
+            .logical_time_seconds
+            .unwrap_or(self.world_time_seconds)
+            .max(0.0);
+        Duration::from_secs_f32(seconds)
+    }
 }
 
 #[derive(Deserialize)]
@@ -795,6 +822,10 @@ impl Game {
         }
         game.world_start_time = start_time;
         game.world_time = start_time + Duration::from_secs_f32(data.world_time_seconds.max(0.0));
+        // Restore the draw clock too, so a loaded game's next serialize matches
+        // and a re-render at `draw_elapsed()` is byte-identical.
+        game.graphics
+            .set_current_time(start_time + data.draw_elapsed());
         game.graphics
             .screen
             .set_rotation(QuarterTurnsAnticlockwise::new(data.screen.rotation_quarter_turns));
@@ -1096,6 +1127,25 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_round_trips_the_draw_clock() {
+        // The starfield/animations read the draw clock (`graphics.current_time`
+        // - start), which differs from `world_time`. It must round-trip so a
+        // re-render is byte-identical.
+        let mut game = set_up_game_with_player();
+        game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.5));
+        let json = game_state_json(&game, Some("test"));
+        let data: SnapshotData = serde_json::from_str(&json).expect("parse snapshot");
+        assert_eq!(data.logical_time_seconds, Some(1.5));
+
+        let loaded = Game::from_snapshot(data, game.graphics().start_time());
+        assert_eq!(
+            loaded.graphics().current_time(),
+            game.graphics().current_time(),
+            "the draw clock must survive the round-trip"
+        );
+    }
+
+    #[test]
     fn snapshot_round_trips_sight_radius() {
         // Maps can override the sight radius (e.g. `cubes`: 24). It must
         // survive a snapshot so a headless render matches the capture instead
@@ -1299,7 +1349,6 @@ mod tests {
 pub mod debug {
     use std::io::Write;
     use std::path::{Path, PathBuf};
-    use std::time::Duration;
     use crate::LogicalTime;
 
     use regex::Regex;
@@ -1309,7 +1358,8 @@ pub mod debug {
     use utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
 
     use super::{
-        game_state_json, load_snapshot_game, screen_text, snapshot_dir, Game, SnapshotData,
+        game_state_json, issues_dir, load_snapshot_game, screen_text, snapshot_dir, Game,
+        SnapshotData,
     };
 
     /// Render `dir/game_state.json` headless at the captured world time and
@@ -1321,7 +1371,7 @@ pub mod debug {
             .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
         let data: SnapshotData = serde_json::from_str(&contents)
             .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
-        let elapsed = Duration::from_secs_f32(data.world_time_seconds.max(0.0));
+        let elapsed = data.draw_elapsed();
         let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
         game.draw_headless_at_duration_from_start(elapsed);
         Ok(screen_text(&game))
@@ -1387,7 +1437,7 @@ pub mod debug {
             .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
         let data: SnapshotData = serde_json::from_str(&contents)
             .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
-        let elapsed = Duration::from_secs_f32(data.world_time_seconds.max(0.0));
+        let elapsed = data.draw_elapsed();
         let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
         game.draw_headless_at_duration_from_start(elapsed);
         Ok(game.explain_screen_cell(x, y))
@@ -1412,10 +1462,191 @@ pub mod debug {
     fn render_value_at_captured_time(value: &serde_json::Value) -> Result<Game, String> {
         let data: SnapshotData = serde_json::from_value(value.clone())
             .map_err(|error| format!("invalid snapshot value: {error}"))?;
-        let elapsed = Duration::from_secs_f32(data.world_time_seconds.max(0.0));
+        let elapsed = data.draw_elapsed();
         let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
         game.draw_headless_at_duration_from_start(elapsed);
         Ok(game)
+    }
+
+    /// Render `dir` with the player optionally moved and/or the view rotated,
+    /// writing nothing. Lets a capture be inspected one step from where it was
+    /// filed (e.g. issue 0013, "steps left through this portal") without a live
+    /// session. Draws at the captured logical time so the frame is comparable
+    /// to `screen.txt`.
+    pub fn render_at(
+        dir: &Path,
+        player: Option<(i32, i32)>,
+        rotate: Option<i32>,
+    ) -> Result<String, String> {
+        let mut game = load_snapshot_game(dir)?;
+        if let Some((x, y)) = player {
+            game.move_player_to(WorldSquare::new(x, y));
+        }
+        if let Some(quarter_turns) = rotate {
+            game.rotate_view(quarter_turns);
+        }
+        let elapsed = game
+            .graphics()
+            .current_time()
+            .saturating_duration_since(game.graphics().start_time());
+        game.draw_headless_at_duration_from_start(elapsed);
+        Ok(screen_text(&game))
+    }
+
+    /// For each differing cell between `dir`'s render and `ref` (default
+    /// `dir/screen.txt`), print the old/new glyphs and how the *new* render
+    /// resolved that cell. Makes reviewing a re-bless mechanical: each changed
+    /// cell can be checked against the invariant the fix promises rather than
+    /// by eye. (The old render's own resolution is not recoverable, only its
+    /// glyphs.)
+    pub fn explain_diff(
+        dir: &Path,
+        ref_path: &Path,
+        max_cells: usize,
+    ) -> Result<String, String> {
+        let path = dir.join("game_state.json");
+        let contents = std::fs::read_to_string(&path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+        let data: SnapshotData = serde_json::from_str(&contents)
+            .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
+        let elapsed = data.draw_elapsed();
+        let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
+        game.draw_headless_at_duration_from_start(elapsed);
+
+        let expected = parse_screen_text_file(ref_path)?;
+        let actual = parse_screen_text(&screen_text(&game))?;
+        let diffs = diff_cells(&expected, &actual);
+
+        let mut out = format!(
+            "{} differing cells in {} (showing {}):\n",
+            diffs.len(),
+            ref_path.display(),
+            diffs.len().min(max_cells)
+        );
+        for diff in diffs.iter().take(max_cells) {
+            out.push_str(&format!(
+                "({}, {}) exp: {}\n          got: {}\n",
+                diff.row,
+                diff.col,
+                show_cell(&diff.expected),
+                show_cell(&diff.actual),
+            ));
+            // `explain_screen_cell` doubles X internally.
+            out.push_str(&game.explain_screen_cell(diff.col / 2, diff.row));
+            out.push('\n');
+        }
+        Ok(out)
+    }
+
+    /// The two-sided fixture check: for every solved capture with a
+    /// `screen.pre-fix.txt`, the headless render must match the blessed
+    /// `screen.txt` **and** differ from `screen.pre-fix.txt`. The second half is
+    /// what makes a regression test non-vacuous — a fixture that renders the
+    /// same before and after proves nothing. With no `dirs`, walks
+    /// `issues/solved/*/snapshot`.
+    pub fn verify_issues(dirs: &[PathBuf]) -> Result<String, String> {
+        let targets: Vec<PathBuf> = if dirs.is_empty() {
+            default_issue_snapshot_dirs()?
+        } else {
+            dirs.to_vec()
+        };
+        let mut out = String::new();
+        let mut checked = 0usize;
+        let mut failures = 0usize;
+        for dir in &targets {
+            let pre_fix_path = dir.join("screen.pre-fix.txt");
+            if !pre_fix_path.exists() {
+                continue;
+            }
+            let fixed_path = dir.join("screen.txt");
+            if !fixed_path.exists() {
+                out.push_str(&format!("SKIP {} (no screen.txt)\n", dir.display()));
+                continue;
+            }
+            let rendered = parse_screen_text(&render_snapshot_headless(dir)?)?;
+            let fixed = parse_screen_text_file(&fixed_path)?;
+            let pre_fix = parse_screen_text_file(&pre_fix_path)?;
+            checked += 1;
+            let matches_fixed = rendered == fixed;
+            let differs_from_pre_fix = rendered != pre_fix;
+            if matches_fixed && differs_from_pre_fix {
+                out.push_str(&format!(
+                    "OK {} ({} cells differ from pre-fix)\n",
+                    dir.display(),
+                    diff_cells(&pre_fix, &rendered).len()
+                ));
+            } else {
+                failures += 1;
+                if !matches_fixed {
+                    out.push_str(&format!("FAIL {}: render != screen.txt\n", dir.display()));
+                }
+                if !differs_from_pre_fix {
+                    out.push_str(&format!(
+                        "FAIL {}: render == screen.pre-fix.txt (fixture is vacuous)\n",
+                        dir.display()
+                    ));
+                }
+            }
+        }
+        if failures > 0 {
+            return Err(format!("{out}{failures} of {checked} fixtures failed"));
+        }
+        Ok(format!("{out}all {checked} fixtures OK\n"))
+    }
+
+    fn default_issue_snapshot_dirs() -> Result<Vec<PathBuf>, String> {
+        let solved = issues_dir().join("solved");
+        let entries =
+            std::fs::read_dir(&solved).map_err(|error| format!("read {}: {error}", solved.display()))?;
+        let mut dirs: Vec<PathBuf> = Vec::new();
+        for entry in entries {
+            let snapshot = entry.map_err(|error| error.to_string())?.path().join("snapshot");
+            if snapshot.join("game_state.json").exists() {
+                dirs.push(snapshot);
+            }
+        }
+        dirs.sort();
+        Ok(dirs)
+    }
+
+    /// Step `dir` forward with `keys` (one input event per character) and return
+    /// the render after each step, or just the final frame. Read-only.
+    ///
+    /// A snapshot is the state *after* the recorded inputs, so replaying the
+    /// saved history would double-apply every move; stepping forward from the
+    /// captured state is the reproducible way to watch a transition.
+    pub fn simulate_keys(
+        dir: &Path,
+        keys: &[char],
+        render_each: bool,
+    ) -> Result<String, String> {
+        let mut game = load_snapshot_game(dir)?;
+        let mut input_map = crate::inputmap::InputMap::new(
+            game.graphics().screen.terminal_width,
+            game.graphics().screen.terminal_height,
+        );
+        let mut elapsed = game
+            .graphics()
+            .current_time()
+            .saturating_duration_since(game.graphics().start_time());
+        let mut out = String::new();
+        for &key in keys {
+            elapsed += std::time::Duration::from_millis(100);
+            input_map.handle_event(
+                &mut game,
+                termion::event::Event::Key(termion::event::Key::Char(key)),
+            );
+            game.tick_game_logic();
+            game.draw_headless_at_duration_from_start(elapsed);
+            if render_each {
+                out.push_str(&format!("--- after {key:?} ---\n"));
+                out.push_str(&screen_text(&game));
+            }
+        }
+        if !render_each {
+            out.push_str(&screen_text(&game));
+        }
+        Ok(out)
     }
 
     /// The artifact to preserve while minimizing, anchored to the player so it
@@ -2043,7 +2274,32 @@ pub mod debug {
         }
 
         let diffs = diff_cells(expected, actual);
-        out.push_str(&format!("{} differing cells\n", diffs.len()));
+        // Character changes are structural; fg/bg-only changes are usually
+        // time-dependent visuals (the starfield drifts with the draw clock) or
+        // a pure color change. Reporting the split stops star churn from
+        // drowning a real glyph diff.
+        let char_changed = diffs
+            .iter()
+            .filter(|d| d.expected.character != d.actual.character)
+            .count();
+        let fg_only = diffs
+            .iter()
+            .filter(|d| {
+                d.expected.character == d.actual.character && d.expected.fg != d.actual.fg
+            })
+            .count();
+        let bg_only = diffs
+            .iter()
+            .filter(|d| {
+                d.expected.character == d.actual.character
+                    && d.expected.fg == d.actual.fg
+                    && d.expected.bg != d.actual.bg
+            })
+            .count();
+        out.push_str(&format!(
+            "{} differing cells ({char_changed} char, {fg_only} fg-only, {bg_only} bg-only; fg/bg-only is often time-dependent starfield/animation)\n",
+            diffs.len()
+        ));
 
         let mut rows_with_diffs: Vec<usize> = diffs.iter().map(|d| d.row).collect();
         rows_with_diffs.dedup();
@@ -2107,6 +2363,7 @@ pub mod debug {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use std::time::Duration;
         use crate::utils_for_tests::set_up_game_with_player;
 
         /// The parser must recover exactly the character/fg/bg trio the screen
@@ -2147,7 +2404,7 @@ pub mod debug {
             )
             .expect("parse single cell");
             assert!(diff_cells(&grid, &grid).is_empty());
-            assert_eq!(render_diff_report(&grid, &grid), "0 differing cells\n");
+            assert!(render_diff_report(&grid, &grid).starts_with("0 differing cells"));
         }
 
         /// A headless render must not depend on wall-clock reads: two loads of

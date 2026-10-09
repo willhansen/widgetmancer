@@ -31,7 +31,15 @@ use game::game::snapshot::debug;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "Usage: snapshot_tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|invariants|minimize> <dir> [args]\n\
+        "Usage: snapshot_tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|explain-diff|invariants|render-at|simulate|verify-issues|minimize> <dir> [args]\n\
+         \n\
+         Prefer the repo-root wrapper, which rebuilds from source:\n\
+         ./snapshot-tool <args>\n\
+         \n\
+         explain <dir> X Y [--char-col]   X,Y are screen-buffer squares unless --char-col\n\
+         render-at <dir> [--player X Y] [--rotate N]\n\
+         simulate  <dir> --keys <chars> [--render-each]\n\
+         verify-issues [<dir>...]         render must match screen.txt and differ from screen.pre-fix.txt\n\
          \n\
          Requires the `debug-tools` feature:\n\
          cargo run -p game --features debug-tools --bin snapshot_tool -- <args>"
@@ -41,7 +49,24 @@ fn usage() -> ExitCode {
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
-    let (Some(command), Some(dir)) = (args.first(), args.get(1)) else {
+    let Some(command) = args.first() else {
+        return usage();
+    };
+    // `verify-issues` takes optional dirs and defaults to all of `issues/solved`.
+    if command == "verify-issues" {
+        let dirs: Vec<PathBuf> = args.iter().skip(1).map(PathBuf::from).collect();
+        return match debug::verify_issues(&dirs) {
+            Ok(report) => {
+                print!("{report}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    let Some(dir) = args.get(1) else {
         return usage();
     };
     let dir = PathBuf::from(dir);
@@ -184,6 +209,26 @@ fn main() -> ExitCode {
                 _ => usage(),
             }
         }
+        "explain-diff" => {
+            let ref_path = args
+                .get(2)
+                .map(PathBuf::from)
+                .unwrap_or_else(|| dir.join("screen.txt"));
+            let max_cells = args
+                .get(3)
+                .and_then(|value| value.parse::<usize>().ok())
+                .unwrap_or(20);
+            match debug::explain_diff(&dir, &ref_path, max_cells) {
+                Ok(report) => {
+                    print!("{report}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         "invariants" => match debug::fov_invariants_report(&dir) {
             Ok(report) => {
                 print!("{report}");
@@ -195,21 +240,104 @@ fn main() -> ExitCode {
             }
         },
         "explain" => {
-            let (Some(x), Some(y)) = (args.get(2), args.get(3)) else {
+            let mut char_col = false;
+            let mut positionals: Vec<&String> = Vec::new();
+            for arg in args.iter().skip(2) {
+                if arg == "--char-col" {
+                    char_col = true;
+                } else {
+                    positionals.push(arg);
+                }
+            }
+            let (Some(x), Some(y)) = (positionals.first(), positionals.get(1)) else {
                 return usage();
             };
             match (x.parse::<usize>(), y.parse::<usize>()) {
-                (Ok(x), Ok(y)) => match debug::explain_cell(&dir, x, y) {
-                    Ok(report) => {
-                        print!("{report}");
-                        ExitCode::SUCCESS
+                (Ok(x), Ok(y)) => {
+                    // `X Y` are screen-buffer squares (2 chars wide); with
+                    // `--char-col`, X is a terminal character column instead.
+                    let square_x = if char_col { x / 2 } else { x };
+                    match debug::explain_cell(&dir, square_x, y) {
+                        Ok(report) => {
+                            print!("{report}");
+                            ExitCode::SUCCESS
+                        }
+                        Err(error) => {
+                            eprintln!("error: {error}");
+                            ExitCode::FAILURE
+                        }
                     }
-                    Err(error) => {
-                        eprintln!("error: {error}");
-                        ExitCode::FAILURE
-                    }
-                },
+                }
                 _ => usage(),
+            }
+        }
+        "render-at" => {
+            let mut player: Option<(i32, i32)> = None;
+            let mut rotate: Option<i32> = None;
+            let mut i = 2;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--player" => {
+                        let (Some(x), Some(y)) = (args.get(i + 1), args.get(i + 2)) else {
+                            return usage();
+                        };
+                        match (x.parse::<i32>(), y.parse::<i32>()) {
+                            (Ok(x), Ok(y)) => player = Some((x, y)),
+                            _ => return usage(),
+                        }
+                        i += 3;
+                    }
+                    "--rotate" => {
+                        let Some(turns) = args.get(i + 1) else {
+                            return usage();
+                        };
+                        match turns.parse::<i32>() {
+                            Ok(turns) => rotate = Some(turns),
+                            Err(_) => return usage(),
+                        }
+                        i += 2;
+                    }
+                    _ => return usage(),
+                }
+            }
+            match debug::render_at(&dir, player, rotate) {
+                Ok(text) => {
+                    print!("{text}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        "simulate" => {
+            let mut keys = String::new();
+            let mut render_each = false;
+            let mut i = 2;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--keys" => {
+                        keys = args.get(i + 1).cloned().unwrap_or_default();
+                        i += 2;
+                    }
+                    "--render-each" => {
+                        render_each = true;
+                        i += 1;
+                    }
+                    _ => return usage(),
+                }
+            }
+            let keys: Vec<char> = keys.chars().collect();
+            match debug::simulate_keys(&dir, &keys, render_each) {
+                Ok(text) => {
+                    print!("{text}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
             }
         }
         _ => usage(),

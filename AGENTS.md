@@ -32,3 +32,23 @@ this order, and don't skip to reading gameplay code:
 4. **Group the reports.** Numbered captures sharing a structure usually share
    one root cause; "can't do X, unclear why" often means model and render
    disagree.
+
+## Tooling: always run `snapshot_tool` through cargo
+
+Run it via the repo-root `./snapshot-tool ...` wrapper (which does
+`cargo run -p game --features debug-tools --bin snapshot_tool --`). **Never
+invoke `target/**/snapshot_tool` directly** and never trust one whose mtime
+predates a source edit: a stale binary silently reports wrong diffs (this has
+happened). If you must call the binary, first assert it is newer than
+`crates/game/src` (`ls -la --time-style=full-iso`).
+
+## Regression tests must fail on the pre-fix revision
+
+A test that passes before the fix proves nothing. For every regression test,
+verify it **fails against the parent revision** — e.g.
+`git stash push -- <fix files>` (keeping the test staged/unstaged), run it, see
+it fail, then `git stash pop`. Say in the commit body that the test was shown to
+fail pre-fix. For a bug captured under `issues/`, prefer the two-sided fixture
+check (`./snapshot-tool verify-issues`): the render must match the blessed
+`screen.txt` and differ from `screen.pre-fix.txt`.
+

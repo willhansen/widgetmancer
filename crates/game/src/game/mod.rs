@@ -1752,7 +1752,7 @@ impl Game {
         let x = square_x * 2;
         if x >= screen.terminal_width as usize || y >= screen.terminal_height as usize {
             return format!(
-                "cell (square {square_x}, row {y}) is out of bounds (terminal {}x{})",
+                "cell screen-square ({square_x}, row {y}) is out of bounds (terminal {}x{})",
                 screen.terminal_width, screen.terminal_height
             );
         }
@@ -1767,7 +1767,8 @@ impl Game {
 
         let mut out = String::new();
         out.push_str(&format!(
-            "cell (square {square_x}, row {y}) left_col {x} world({},{}) rel({},{}) fov_center({},{}):\n",
+            "cell screen-square ({square_x}, {y}) = char cols {x}..{} (row {y}); world({},{}) rel({},{}) fov_center({},{}):\n",
+            x + 1,
             world_square.x,
             world_square.y,
             relative_square.x,

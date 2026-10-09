@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Run snapshot_tool through cargo so the binary always matches the current
+# sources. Invoking target/**/snapshot_tool directly risks a stale binary
+# silently producing wrong diffs; cargo's incremental build makes this ~1s
+# when nothing changed. Extra args are forwarded to snapshot_tool, e.g.:
+#   ./snapshot-tool diff issues/solved/0013/snapshot
+#   ./snapshot-tool replay issues/solved/0013/snapshot
+set -euo pipefail
+
+# Re-exec inside the nix dev shell when cargo isn't on PATH (e.g. invoked
+# from a bare shell). The guard var prevents an infinite loop if the dev
+# shell itself fails to provide cargo.
+if ! command -v cargo >/dev/null 2>&1 && [[ -z "${_DEV_SHELL_GUARD:-}" ]]; then
+  export _DEV_SHELL_GUARD=1
+  exec nix develop --command "$(readlink -f "${BASH_SOURCE[0]}")" "$@"
+fi
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+exec cargo run -p game --features debug-tools --bin snapshot_tool -- "$@"
