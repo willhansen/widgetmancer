@@ -26,3 +26,6 @@
 - Why are there no bridges between the cubes?
 
 - Pushable widgets and also conveyor belts.
+
+- The current space bar effect is a kind of pulse thing. it'll need a new button, but I think it's effect should be adjusted as well. It should nudge blocks going radially outward from the player, or propagating through adjacent blocks maybe. swapping behaviour on every other time, just to make the variety easy to deal with? (yes, that third one).
+ - Will need a "voxel nudge" mechanic, just to make the visuals easy. the voxel just gets visually nudged in an orthogonal direction, and then shifts back.  It's a simple animation, but will need to deal with all 6 orthogonal 3d directions, and the voxel side rendering.
