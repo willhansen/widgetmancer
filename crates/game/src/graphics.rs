@@ -9,7 +9,7 @@ use rgb::RGB8;
 
 use glyph::glyph_constants::*;
 
-use crate::fov_stuff::FieldOfViewResult;
+use crate::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov};
 use crate::game::{
     DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, Terrain,
     TerrainMaterial, SLAB_VOXEL_Z,
@@ -383,64 +383,157 @@ impl Graphics {
     ///
     /// Only used when the terrain has more than one level (see
     /// `Terrain::max_top_altitude`), so flat boards keep the legacy path
-    /// byte-for-byte. Top faces reuse the FOV/draw-buffer lookup, so visibility,
-    /// partial shadows, and entity overlays still apply; the column's material
-    /// recolors the *background* only, leaving the glyph (`#`, piece, player)
-    /// visible. Partially-visible top faces are left as-is (their fg/bg encode
-    /// the shadow). The legacy inverse composite runs underneath for portal
-    /// views, so a square reachable only through a portal keeps its flat draw.
+    /// byte-for-byte. Column geometry is placed at the screen square it is
+    /// *seen* at through the portal-recursive FOV (not its absolute
+    /// projection), and is red-tinted by portal depth like the flat composite,
+    /// so a cube viewed through a portal is raised at the portal's apparent
+    /// cell instead of overwriting the portal view at its true location. Writes
+    /// outside the FOV frame are dropped, since the camera follows the player's
+    /// surface and pushes nearby walls below the frame otherwise.
+    ///
+    /// Top faces reuse the FOV/draw-buffer lookup, so visibility, partial
+    /// shadows, and entity overlays still apply; the column's material recolors
+    /// the *background* only, leaving the glyph (`#`, piece, player) visible.
+    /// Partially-visible top faces are left as-is (their fg/bg encode the
+    /// shadow). The legacy inverse composite still runs underneath, so portal
+    /// views of the floor and entities are preserved.
     pub fn load_screen_buffer_from_terrain(
         &mut self,
         field_of_view: &FieldOfViewResult,
         terrain: &Terrain,
+        sight_radius: u32,
     ) -> HashSet<ScreenBufferSquare> {
         let mut drawn: HashSet<ScreenBufferSquare> = HashSet::new();
         let rotation = self.screen.rotation().quarter_turns();
         let toward_camera = self.screen.screen_step_to_world_step(SCREEN_STEP_DOWN);
+        let center = self.screen.screen_center_as_screen_buffer_square();
+        // The border sits at `radius + 1`; content is clamped to it so a wall
+        // projected down by the camera altitude cannot spill past the frame.
+        let frame_extent = sight_radius as i32 + 1;
+        let within_frame = |square: ScreenBufferSquare| {
+            let offset = square - center;
+            offset.x.abs() <= frame_extent && offset.y.abs() <= frame_extent
+        };
 
-        let mut columns = terrain.columns();
+        // Each absolute column's best (shallowest-portal) visibility fixes the
+        // relative square it is drawn at. A direct (depth-0) view wins over a
+        // portal view, so a cube seen both ways renders where it is directly
+        // visible. The relative squares are sorted so equal-depth ties resolve
+        // deterministically (the FOV set is unordered).
+        let mut relative_squares: Vec<WorldStep> = field_of_view
+            .at_least_partially_visible_relative_squares_including_subviews()
+            .into_iter()
+            .collect();
+        relative_squares.sort_by_key(|relative| (relative.x, relative.y));
+        let mut apparent: HashMap<WorldSquare, PositionedSquareVisibilityInFov> = HashMap::new();
+        for relative in relative_squares {
+            for visibility in field_of_view.visibilities_of_relative_square(relative) {
+                apparent
+                    .entry(visibility.absolute_square())
+                    .and_modify(|existing| {
+                        if visibility.portal_depth() < existing.portal_depth() {
+                            *existing = visibility;
+                        }
+                    })
+                    .or_insert(visibility);
+            }
+        }
+
+        let mut columns: Vec<(WorldSquare, i32, PositionedSquareVisibilityInFov)> = terrain
+            .columns()
+            .into_iter()
+            .filter_map(|(square, top_voxel)| {
+                let visibility = *apparent.get(&square)?;
+                // Draw only where this column is what the cell actually
+                // resolves to; a shallower view at the same relative square
+                // occludes it in the flat composite too.
+                if field_of_view
+                    .resolved_visibility(visibility.relative_square())
+                    .map(|topmost| topmost.absolute_square())
+                    != Some(square)
+                {
+                    return None;
+                }
+                Some((square, top_voxel, visibility))
+            })
+            .collect();
         // Painter's order: far (small screen row) first, near (large) last, so a
         // nearer column overwrites the wall it stands in front of.
-        columns.sort_by_key(|&(square, _)| {
-            let base = self.screen.world_square_to_screen_buffer_square(square);
-            (base.y, square.x)
+        columns.sort_by_key(|&(square, _, visibility)| {
+            let cell = self
+                .screen
+                .world_square_to_screen_buffer_square(
+                    field_of_view.root_square() + visibility.relative_square(),
+                );
+            (cell.y, square.x, square.y)
         });
 
-        for (square, top_voxel) in columns {
+        let camera_altitude = self.screen.camera_altitude();
+        for (square, top_voxel, visibility) in columns {
+            let apparent_cell = self
+                .screen
+                .world_square_to_screen_buffer_square(
+                    field_of_view.root_square() + visibility.relative_square(),
+                );
+            let tint_strength = (0.1 * visibility.portal_depth() as f32).min(1.0);
+            // The face toward the screen bottom is the camera-facing side in
+            // the view frame this column is seen through; map that direction
+            // back into the column's absolute frame.
+            let toward_camera_abs = visibility
+                .portal_rotation_from_relative_to_absolute()
+                .rotate_vector(toward_camera);
             let material = terrain.material_at(square);
+
             for z in (SLAB_VOXEL_Z..=top_voxel).rev() {
                 if !terrain.is_solid_at(square.x, square.y, z) {
                     continue;
                 }
-                let neighbor = square + toward_camera;
-                if !terrain.is_solid_at(neighbor.x, neighbor.y, z)
-                    && field_of_view
-                        .can_see_relative_square(square - field_of_view.root_square())
-                {
-                    let wall_square = self
-                        .screen
-                        .world_square_and_altitude_to_screen_buffer_square(square, z);
-                    let color = lerp_rgb(
-                        TERRAIN_WALL_BASE,
-                        terrain_tint(material),
-                        wall_gradient_t(z, top_voxel),
-                    );
-                    let wall = [
-                        Glyph::new(TERRAIN_WALL_CHAR, color, color),
-                        Glyph::new(TERRAIN_WALL_CHAR, color, color),
-                    ];
-                    self.screen
-                        .draw_glyphs_straight_to_screen_square(wall, wall_square);
-                    drawn.insert(wall_square);
+                let neighbor = square + toward_camera_abs;
+                if !terrain.is_solid_at(neighbor.x, neighbor.y, z) {
+                    let wall_square = apparent_cell + vec2(0, -(z - camera_altitude));
+                    // The wall is written up to `camera_altitude - z` rows below
+                    // the column's (occlusion-checked) top cell, so its own cell
+                    // may resolve to something else entirely. If that cell is a
+                    // different view frame — a portal view of void or another
+                    // region — the wall must not paint over it (issue 0009's
+                    // artifact, which the top-cell check alone missed because it
+                    // only validated `visibility.relative_square()`).
+                    let wall_relative =
+                        visibility.relative_square() + toward_camera * (camera_altitude - z);
+                    let wall_frame_matches = field_of_view
+                        .resolved_visibility(wall_relative)
+                        .map(|topmost| {
+                            topmost.absolute_fov_center_square()
+                                == visibility.absolute_fov_center_square()
+                        })
+                        .unwrap_or(true);
+                    if wall_frame_matches && within_frame(wall_square) {
+                        let color = tint_color(
+                            lerp_rgb(
+                                TERRAIN_WALL_BASE,
+                                terrain_tint(material),
+                                wall_gradient_t(z, top_voxel),
+                            ),
+                            RED,
+                            tint_strength,
+                        );
+                        let wall = [
+                            Glyph::new(TERRAIN_WALL_CHAR, color, color),
+                            Glyph::new(TERRAIN_WALL_CHAR, color, color),
+                        ];
+                        self.screen
+                            .draw_glyphs_straight_to_screen_square(wall, wall_square);
+                        drawn.insert(wall_square);
+                    }
                 }
 
                 if !terrain.is_solid_at(square.x, square.y, z + 1) {
-                    let top_square = self
-                        .screen
-                        .world_square_and_altitude_to_screen_buffer_square(square, z + 1);
-                    let relative = square - field_of_view.root_square();
+                    let top_square = apparent_cell + vec2(0, -(z + 1 - camera_altitude));
+                    if !within_frame(top_square) {
+                        continue;
+                    }
                     let maybe_top = field_of_view.drawable_at_relative_square(
-                        relative,
+                        visibility.relative_square(),
                         Some(&self.draw_buffer),
                         self.tint_portals,
                         self.render_portals_with_line_of_sight,
@@ -450,24 +543,35 @@ impl Graphics {
                         let rotated: DrawableEnum = top.rotated(-rotation);
                         let mut glyphs = rotated.to_glyphs();
                         if !is_partial {
-                            // Material recolors the background only; the glyph
-                            // (block, piece, player) is untouched.
-                            let color = self.terrain_top_color(square, z, material);
-                            glyphs[0].bg_color = color;
-                            glyphs[1].bg_color = color;
-                            // Rim the top face's far (screen-up) drop-off edge
-                            // so the cube silhouette reads. Only plain tops
-                            // (no glyph of their own) get the rim.
-                            if !glyphs[0].has_fg() && !glyphs[1].has_fg() {
-                                let far_neighbor = square - toward_camera;
-                                let far_is_lower = terrain
-                                    .height_at(far_neighbor)
-                                    .map_or(true, |height| height < z + 1);
-                                if far_is_lower {
-                                    let rim = terrain_rim_color(color);
-                                    for glyph in glyphs.iter_mut() {
-                                        glyph.character = UPPER_HALF_BLOCK;
-                                        glyph.fg_color = rim;
+                            // Material recolors the *background* of a plain top
+                            // face or of an entity sitting on it. A conveyor
+                            // belt is its own pattern (white glyphs on black),
+                            // so composite it over a material base rather than
+                            // clobbering its background.
+                            let color = tint_color(
+                                self.terrain_top_color(square, z, material),
+                                RED,
+                                tint_strength,
+                            );
+                            if matches!(top, DrawableEnum::ConveyorBelt(_)) {
+                                glyphs = glyphs.drawn_over(DoubleGlyph::solid_color(color));
+                            } else {
+                                glyphs[0].bg_color = color;
+                                glyphs[1].bg_color = color;
+                                // Rim the top face's far (screen-up) drop-off
+                                // edge so the cube silhouette reads. Only plain
+                                // tops (no glyph of their own) get the rim.
+                                if !glyphs[0].has_fg() && !glyphs[1].has_fg() {
+                                    let far_neighbor = square - toward_camera_abs;
+                                    let far_is_lower = terrain
+                                        .height_at(far_neighbor)
+                                        .map_or(true, |height| height < z + 1);
+                                    if far_is_lower {
+                                        let rim = terrain_rim_color(color);
+                                        for glyph in glyphs.iter_mut() {
+                                            glyph.character = UPPER_HALF_BLOCK;
+                                            glyph.fg_color = rim;
+                                        }
                                     }
                                 }
                             }

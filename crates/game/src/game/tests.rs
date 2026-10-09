@@ -19,7 +19,7 @@
     use crate::utils_for_tests::*;
     use terminal_rendering::glyph::glyph_constants::{
         BLACK, BLOCK_FG, BLUE, FULL_BLOCK, GREY, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, PLAYER_COLOR,
-        RED, RIGHT_HALF_BLOCK, THICK_ARROWS, UPPER_HALF_BLOCK,
+        RED, RIGHT_HALF_BLOCK, THICK_ARROWS, UPPER_HALF_BLOCK, WHITE,
     };
 
     use super::*;
@@ -3342,6 +3342,129 @@
         assert_ne!(
             glyphs[0].character, '▒',
             "the nearer column top must overwrite the farther wall"
+        );
+    }
+
+    #[test]
+    fn raised_terrain_is_clipped_to_the_fov_frame() {
+        // Issue 0007: the camera follows the player's surface, so a nearby wall
+        // is projected *down* by `camera_altitude - z` rows and used to spill
+        // below the FOV frame. No terrain glyph may land outside the frame.
+        let mut game = set_up_nxn_game(14);
+        let column = point2(7, 7);
+        game.place_solid_column(column, 40);
+        game.place_player(column);
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let center = screen.screen_center_as_screen_buffer_square();
+        let frame_extent = game.player_sight_radius as i32 + 1;
+        for cell in screen.all_screen_squares() {
+            let offset = cell - center;
+            if offset.x.abs() > frame_extent || offset.y.abs() > frame_extent {
+                assert_ne!(
+                    screen.get_glyphs_at_screen_square(cell)[0].character,
+                    '▒',
+                    "terrain wall drawn outside the FOV frame at {cell:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn conveyor_belt_on_a_raised_column_keeps_its_own_colors() {
+        // Issue 0012: the forward terrain pass recolored every top face's
+        // background to the cube material, wiping the black half of a conveyor
+        // belt (colors [WHITE, BLACK]) that had been moved onto a raised cube.
+        let mut game = set_up_nxn_game(14);
+        game.place_player(point2(5, 7));
+        let column = point2(7, 7);
+        game.place_solid_column(column, 3);
+        game.place_conveyor_belt(column, STEP_RIGHT);
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let top = screen.world_square_and_altitude_to_screen_buffer_square(column, 3);
+        let glyphs = screen.get_glyphs_at_screen_square(top);
+        assert_eq!(glyphs[0].fg_color, WHITE, "belt glyph keeps its foreground");
+        assert_eq!(
+            glyphs[1].bg_color, BLACK,
+            "the belt's black background must not be recolored to the cube material"
+        );
+    }
+
+    #[test]
+    fn terrain_walls_do_not_paint_through_a_portal_view() {
+        use euclid::vec2;
+        // Issue 0011: on the cubes map, the z-shifted wall of a directly visible
+        // cube used to be written into cells the FOV resolves through the portal
+        // to off-board void, making the cube side appear/disappear as the player
+        // stepped. A wall may only be drawn where the cell resolves to the same
+        // view frame as the column.
+        let mut game = Game::new(225, 35, LogicalTime::ZERO);
+        crate::set_up_map_by_name(&mut game, None);
+        game.move_player_to(point2(4, 18));
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let center = screen.screen_center_as_screen_buffer_square();
+        for offset in [vec2(10, -2), vec2(12, -1), vec2(15, 1)] {
+            assert_ne!(
+                screen.get_glyphs_at_screen_square(center + offset)[0].character,
+                '▒',
+                "spurious cube side through the portal at offset {offset:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn raised_column_seen_only_through_a_portal_is_drawn_at_the_apparent_cell() {
+        // Issue 0009: a raised column visible only through a portal must be
+        // raised at the portal's apparent cell, not at its absolute projection
+        // (which is hidden behind the wall here). Issues 0008/0009 share this
+        // root cause: the forward pass projected columns by absolute position.
+        let mut game = set_up_nxn_game(20);
+        let player = point2(5, 10);
+        game.place_player(player);
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(player, STEP_RIGHT.into());
+        let exit = SquareWithOrthogonalDir::from_square_and_step(point2(9, 10), STEP_RIGHT.into());
+        game.place_double_sided_two_way_portal(entrance, exit);
+        // A wall blocks the direct view east; the portal exits beyond it.
+        for dy in -3..=3 {
+            game.place_block(point2(6, 10 + dy));
+        }
+        let column = point2(10, 10);
+        game.place_solid_column(column, 4);
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let fov = game.player_field_of_view();
+        let apparent_relative = fov
+            .at_least_partially_visible_relative_squares_including_subviews()
+            .into_iter()
+            .find(|&relative| {
+                fov.resolved_visibility(relative).map(|v| v.absolute_square()) == Some(column)
+            })
+            .expect("the raised column should be visible through the portal");
+        let altitude_shift = -(4 - game.player_altitude());
+        let apparent_top = screen
+            .world_square_to_screen_buffer_square(fov.root_square() + apparent_relative)
+            + ScreenBufferStep::new(0, altitude_shift);
+        assert_eq!(
+            screen.get_glyphs_at_screen_square(apparent_top)[0].character,
+            UPPER_HALF_BLOCK,
+            "the raised top should carry its rim at the portal's apparent cell"
+        );
+
+        let absolute_top = screen.world_square_and_altitude_to_screen_buffer_square(column, 4);
+        assert_ne!(
+            absolute_top, apparent_top,
+            "the portal shifts the column off its absolute projection"
+        );
+        assert_ne!(
+            screen.get_glyphs_at_screen_square(absolute_top)[0].character,
+            UPPER_HALF_BLOCK,
+            "the column must not be raised at its (hidden) absolute cell"
         );
     }
 

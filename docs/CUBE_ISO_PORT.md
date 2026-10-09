@@ -95,7 +95,8 @@ effort):
    byte-for-byte. On a raised board the legacy inverse composite still runs
    *underneath* the pass, so portal views of the floor and entities (including
    its per-cell `drawn_over` compositing) are preserved; only the raised
-   geometry itself is not yet re-projected through portals. Materials and real
+   geometry itself is not yet re-projected through portals (made portal-aware
+   on 2026-10-08 — see the post-port note below). Materials and real
    wall colors are Phase 3.
 3. **Materials** — cool cube vs warm ledge, standoff hue, 3-square block
    checker, bright rim, depth fog, emitting explicit `Glyph` colors.
@@ -234,3 +235,25 @@ See `ROADMAP.md` for deferred gravity/falling.
 
 The execution status of this work (and its follow-ups) is tracked in
 [`VOXEL_WORLD_PLAN.md`](VOXEL_WORLD_PLAN.md).
+
+## Post-port: portal-aware raised terrain (2026-10-08)
+
+The Phase 2 caveat — "only the raised geometry is not yet re-projected through
+portals" — is closed. `Graphics::load_screen_buffer_from_terrain` no longer
+projects columns by their absolute world→screen square; it builds, per absolute
+column, the shallowest-portal `PositionedSquareVisibilityInFov` from the FOV and
+draws the top face and camera-facing wall at that visibility's *relative* screen
+cell. Portal views therefore get the column's material, the `0.1 * depth` red
+tint, and the correct camera-facing side (the wall direction is rotated by
+`portal_rotation_from_relative_to_absolute`). Writes are clamped to the
+`sight_radius + 1` FOV frame, so the camera's `camera_altitude` shift can no
+longer push a wall below the frame. Fixes issues 0007, 0008, and 0009.
+
+Two gaps in that first pass were closed on 2026-10-09 (issues 0010/0011/0012).
+The occlusion check ran only at a column's *top* cell, while the wall is written
+up to `camera_altitude - z` rows below it; a wall write now also requires the
+wall cell itself to resolve to the same view frame
+(`absolute_fov_center_square`) as the column, so a directly visible cube's wall
+cannot paint into cells the portal resolves to void/another region. And the
+top-face background recolor now skips a `ConveyorBelt`, compositing it over a
+material base so its own black background survives.

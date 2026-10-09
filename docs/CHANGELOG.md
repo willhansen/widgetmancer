@@ -9,6 +9,104 @@ Newest first.
 
 ---
 
+## 2026-10-09 — Terrain walls gate on their own cell's view frame; belts keep their colors (fixes 0010/0011/0012)
+
+### game: gate terrain walls by the wall cell's view frame; don't clobber a belt's background
+
+Issues 0010/0011 (cubes map) reported a cube side visible through the portal
+that vanished abruptly when the player stepped toward it; 0012 added that the
+conveyor belts' non-white parts were missing. Both came from the forward terrain
+column pass (`Graphics::load_screen_buffer_from_terrain`) added in `c3ba607`
+(the 0007/0008/0009 fix), which was still incomplete in two ways:
+
+- **Wall cells were unchecked.** A column's occlusion was validated only at its
+  *top* relative cell (`resolved_visibility(visibility.relative_square())`), but
+  the camera-facing wall is written up to `camera_altitude - z` rows below that
+  cell (`apparent_cell + vec2(0, -(z - camera_altitude))`). On the raised cubes
+  map those shifted cells can resolve through the portal to off-board void, so a
+  directly visible cube's wall painted there anyway — the 0009 artifact class,
+  surviving because the check never looked at the wall's own cell. Stepping
+  toward the portal flipped the cells' resolution and the patch winked out.
+  Each wall write now also requires the wall cell's topmost visibility to be in
+  the *same view frame* as the column
+  (`resolved_visibility(relative + toward_camera * (camera_altitude - z))`
+  compared by `absolute_fov_center_square()`); a cell resolved to `None`
+  (void/off-board) or to the same frame is still allowed, so a wall over the
+  void beyond the board keeps rendering.
+- **Belt backgrounds were clobbered.** The top-face branch set `bg_color = cube
+  material` on every non-partial drawable, wiping a conveyor belt's intentional
+  black background (`ConveyorBeltDrawable` colors `[WHITE, BLACK]`). A
+  `ConveyorBelt` is now composited over a solid material base
+  (`DoubleGlyph::drawn_over`) so its own colors win; plain tops and entities are
+  unchanged.
+
+- Tests: `terrain_walls_do_not_paint_through_a_portal_view` (loads the cubes
+  recipe at player `(4,18)`, asserts the formerly-spurious portal cells carry no
+  wall) and `conveyor_belt_on_a_raised_column_keeps_its_own_colors` (belt cell
+  keeps `fg WHITE`/`bg BLACK`). Both fail against `c3ba607`.
+- Captures: `issues/0010` (duplicate of 0011), `0011`, `0012` moved to
+  `issues/solved/` with `screen.pre-fix.txt` and a re-blessed `screen.txt`;
+  `solved/0007`, `0008`, `0009` re-blessed (the wall frame gate removes a few
+  more spurious walls). Flat `snapshot/`, `solved/0003`, `0005`, `0006` are
+  byte-identical.
+- Docs: `CUBE_ISO_PORT.md` post-port note and `RENDERING.md` FOV-compositing
+  section updated.
+
+Verified: `cargo test --workspace` green (324 game lib tests); `snapshot_tool
+diff` OK for `snapshot/` and every `solved/` capture.
+
+---
+
+## 2026-10-08 — Portal-aware raised terrain (fixes 0007/0008/0009)
+
+### game: re-project raised terrain through portals and clip it to the FOV frame
+
+The forward terrain column pass assumed flat, portal-free geometry in two ways,
+both newly exposed once the default `cubes` map got portals (`ff23cf9`):
+
+- **Not portal-aware.** `Graphics::load_screen_buffer_from_terrain` projected
+  every column at its *absolute* `world_square_and_altitude_to_screen_buffer_square`
+  and gated walls with `can_see_relative_square(column - root)`, which the
+  portal recursion also satisfies. Raised geometry was thus painted at its true
+  location even when that cell resolves through the portal to a different
+  square — overwriting the red-tinted portal composite with untinted material
+  and near-black walls (0008: "no red tint", "untinted blue floor", the
+  white↔black edge diagonal) and showing nearby cube sides where the portal
+  resolves to off-board void (0009).
+- **Not frame-bounded.** The camera follows the player's surface (issue 0003),
+  so a wall voxel at `z` is projected down by `camera_altitude - z` rows. The
+  pass wrote those cells regardless, pushing walls up to 11 rows below the FOV
+  frame (0007).
+
+`load_screen_buffer_from_terrain` now takes `sight_radius` and, in
+`graphics.rs`:
+
+- builds `absolute square -> shallowest-portal PositionedSquareVisibilityInFov`
+  from `at_least_partially_visible_relative_squares_including_subviews` (sorted
+  for determinism) and draws each column's top and camera-facing wall at that
+  visibility's *relative* screen cell, skipping a column that another
+  (shallower) view wins at the same cell, matching the flat composite;
+- applies the `0.1 * portal_depth` red tint (`tint_color`) to tops and walls,
+  matching the flat composite; the wall's camera-facing direction is rotated by
+  `portal_rotation_from_relative_to_absolute`;
+- drops any write outside the `sight_radius + 1` FOV frame, leaving it to the
+  starfield.
+
+Call site (`game/mod.rs`) passes `self.player_sight_radius`.
+
+- Tests: `raised_column_seen_only_through_a_portal_is_drawn_at_the_apparent_cell`
+  (fails on the old absolute projection), `raised_terrain_is_clipped_to_the_fov_frame`.
+  The existing raised-terrain/painter-order/frame-centre tests still pass.
+- Captures: `issues/0007`, `0008`, `0009` moved to `issues/solved/` with
+  `screen.pre-fix.txt` (original) and a re-blessed `screen.txt`;
+  `issues/solved/0003/snapshot/screen.txt` re-blessed (portal-free board; only
+  the frame clip changes it). Repo-root `snapshot/` is flat (`voxels == 0`) and
+  stays byte-identical.
+- Docs: `CUBE_ISO_PORT.md` Phase 2 caveat closed with a post-port note;
+  `RENDERING.md` FOV-compositing section updated.
+
+---
+
 ## 2026-10-08 — Portals and a belt-through-portal on the default cubes map
 
 ### game: three portal pairs on `cubes`; belt transport through a portal

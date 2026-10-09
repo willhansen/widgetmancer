@@ -139,6 +139,22 @@ The resulting `DrawableEnum` is rotated once more by the screen's own
 rotation, converted `to_glyphs()`, and written straight into the screen
 buffer.
 
+On a raised board, the forward terrain column pass
+(`Graphics::load_screen_buffer_from_terrain`) uses the same resolved
+visibilities: each column is drawn at the relative cell its shallowest-portal
+visibility resolves it to, with the portal rotation and tint applied and the
+camera-facing wall direction rotated through the portal, so raised geometry is
+re-projected through portals just like flat floor and entities. Writes are
+clamped to the FOV frame (`sight_radius + 1`).
+
+A wall voxel is written up to `camera_altitude - z` rows below the column's
+occlusion-checked top cell, so that wall cell is checked separately: it must
+resolve to the *same view frame* as the column (`absolute_fov_center_square`)
+before the wall is drawn, otherwise a directly visible cube's wall would paint
+into cells a portal resolves to void or another region (issues 0010/0011). A
+`ConveyorBelt` top face is composited over the material base rather than
+background-recolored, so its own black background is preserved (issue 0012).
+
 ## The Drawable abstraction
 
 `crates/game/src/graphics/drawable.rs` defines:

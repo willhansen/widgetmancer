@@ -746,7 +746,7 @@ impl Game {
                 }
                 drawn.extend(
                     self.graphics
-                        .load_screen_buffer_from_terrain(&fov, &self.terrain),
+                        .load_screen_buffer_from_terrain(&fov, &self.terrain, self.player_sight_radius),
                 );
                 drawn
             } else {
