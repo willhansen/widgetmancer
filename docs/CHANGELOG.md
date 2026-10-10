@@ -9,6 +9,37 @@ Newest first.
 
 ---
 
+## 2026-10-09 — Sync architecture docs with the current tree
+
+### docs: refresh ARCHITECTURE/COORDINATE_FRAMES/RENDERING/ROADMAP
+
+The architecture docs had drifted behind recent structural work (the god-module
+split, the voxel world, `LogicalTime`, and the debug tooling). Refreshed the
+stale claims:
+
+- `ARCHITECTURE.md`: documented the `floating-square-debug` workspace member;
+  corrected crate LOC (utility ~4.6k, terminal_rendering ~9.6k, game ~22.8k) and
+  the module inventory (the `game/` split modules plus `terrain.rs`,
+  `map_file.rs`, `snapshot.rs`, `logical_time.rs`, `graphics/starfield.rs`,
+  `graphics/fov_border.rs`); listed all five `game` bins; documented the
+  `debug-tools` feature, the repo-root `./snapshot-tool` wrapper, and the
+  `issues/` capture workflow; added the newer dependencies.
+- `COORDINATE_FRAMES.md`: deleted the obsolete `CharacterGridInWorldFrame`
+  (frame 5) — zero `WorldCharacterSquare`/`CharacterGridInWorldFrame` references
+  remain since roadmap item 8 — renumbered the local-character frame, and
+  replaced the stale gotcha with a "world character grid is gone" note.
+- `RENDERING.md`: fixed the `Animation` trait snippet (`LogicalTime`,
+  `set_start_time`, `double_glyphs_at_time -> HashMap<WorldSquare, DoubleGlyph>`)
+  to match `graphics/animations.rs`.
+- `ROADMAP.md`: item 2 now records that `#![allow(warnings)]` is removed and
+  enumerates the ~25 remaining straggler warnings (it stays Open until the
+  workspace is warning-free); items 3–5 evidence refreshed.
+
+Verified: `cargo build --workspace` (27 warnings, 0 deprecation); docs only, no
+code changes.
+
+---
+
 ## 2026-10-09 — Debug-tooling hardening from the 0013–0016 session
 
 ### tooling: reproducible captures, snapshot-tool wrapper, and review commands

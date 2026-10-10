@@ -220,16 +220,18 @@ the same per-square machinery as everything else.
 
 ```rust
 pub trait Animation: Clone {
-    fn start_time(&self) -> Instant;
+    fn start_time(&self) -> LogicalTime;
+    fn set_start_time(&mut self, time: LogicalTime);
     fn duration(&self) -> Duration;
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
-    // + default: double_glyphs_at_time, fraction_done_at_time, finished_at_time, ...
+    fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph>;
+    // + default: double_glyphs_with_transparency_at_time, fraction_done_at_time, finished_at_time, ...
 }
 ```
 
-Animations are pure functions of time — same `Instant` in, same glyphs out —
-which makes them deterministic and testable
-(`draw_headless_at_duration_from_start`). `AnimationEnum` delegates over
+Animations are pure functions of logical time — same `LogicalTime` in, same
+glyphs out — which makes them deterministic and testable
+(`draw_headless_at_duration_from_start`; the injectable clock is
+`game/src/logical_time.rs`, roadmap W.A). `AnimationEnum` delegates over
 lasers (simple/floaty), explosions, smites, blink teleports, spear/circle
 attacks, piece deaths, selectors, and the two **board animations**
 (`RecoilingBoardAnimation`, `RadialShockwave`) stored separately in

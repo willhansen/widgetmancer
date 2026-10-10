@@ -78,19 +78,7 @@ which that pairing is one element.
   re-anchor at the center in the target frame
   (`world_square_to_screen_buffer_square` and inverse).
 
-### 5. `CharacterGridInWorldFrame` — **deprecated**
-
-World-space character grid (`WorldCharacterSquare`, `WorldCharacterPoint`,
-…): a fixed "2 characters per world square, x' = 2x + 0.5" world-space
-character frame. **Obsolete since screen rotation** — with a rotated screen
-there is no rotation-invariant world character grid, so world→character
-mapping must go through the screen (frames 3–4) instead. The aliases and
-conversion fns remain (deprecated) while call sites are migrated; this is
-the bulk of roadmap item 2's warning cleanup. Character-level maps
-(`WorldCharacterSquareGlyphMap`) still appear in the `Animation` trait
-interface for the same legacy reason.
-
-### 6. `CharacterGridInLocalCharacterFrame` — half-square-local
+### 5. `CharacterGridInLocalCharacterFrame` — half-square-local
 
 `LocalCharacterSquare` / `LocalCharacterPoint`: character-cell coordinates
 relative to one character half of one square. Used to split a square's
@@ -135,6 +123,11 @@ also drives `Screen::rotation` (camera rotation).
 
 ## Gotchas
 
+- **The world character grid is gone.** The old `CharacterGridInWorldFrame`
+  (`WorldCharacterSquare`/`WorldCharacterPoint`/… and the character-level glyph
+  maps) was a fixed "2 characters per world square" world-space frame; it was
+  obsolete once the screen could rotate and has been deleted (roadmap item 8).
+  World→character mapping now always goes through the screen (frames 3–4).
 - **Two `IPoint`/`FPoint` families.** `utility/src/lib.rs` aliases them to
   euclid `default::Point2D` (unit-less); `utility/src/geometry2.rs` aliases
   them to plain `[i32; 2]` / `[f32; 2]` arrays. `terminal_rendering`
@@ -146,5 +139,5 @@ also drives `Screen::rotation` (camera rotation).
   only because the numeric transform was done explicitly first.
 - **y-axis flips at the screen boundary only.** World and local frames are
   y-up; both screen-buffer frames are y-down. If a sign bug appears only
-  when the camera rotates, suspect a missing `flip_y` or a deprecated
-  `WorldCharacter*` conversion bypassing the screen transform.
+  when the camera rotates, suspect a missing `flip_y` or a conversion that
+  bypasses the screen transform.

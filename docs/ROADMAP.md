@@ -369,14 +369,34 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
     game crate are now resolved — next: remove `#![allow(warnings)]` from
     `game/src/lib.rs`, fix stragglers, add clippy to CI.
     Suite: 459 passed / 11 ignored.
+  - ALLOW REMOVED; STRAGGLERS ENUMERATED (2026-10-09): `#![allow(warnings)]`
+    has been removed from `game/src/lib.rs` (only `#![allow(non_snake_case)]`
+    remains, and there is no crate-root `allow(warnings)` anywhere). A clean
+    `cargo build --workspace` now surfaces 27 warnings: 2 are the intentional
+    `private item shadows public glob re-export` at
+    `terminal_rendering/src/lib.rs:12,14` (item 4), and ~25 are stragglers the
+    allow had hidden — dead code (never-used fns/methods/fields in
+    `fov_stuff.rs`, `game/mod.rs`, `piece.rs`, `coverage.rs`,
+    `radial_shockwave.rs`, `spawning.rs`, `ai.rs`, `graphics.rs`), 2 unused
+    imports (`spawning.rs`), an unused variable in
+    `floating-square-debug/src/main.rs`, a `PixelStats` visibility leak
+    (`coverage.rs`), and 5 unused `Cargo.toml` deps (`approx`, `dyn-clone`,
+    `enum-as-inner`, `unordered-pair`, `backtrace-on-stack-overflow`). Zero
+    deprecation warnings remain.
+  - NEXT: clear the stragglers (dead-code removal / `#[cfg]`-gating, unused
+    deps/imports, `PixelStats` visibility), after which the workspace meets the
+    Done criterion; `bacon.toml` already has a `clippy` job to gate on.
 - **Done when:** workspace builds warning-free on stable, no crate-root
   `#![allow(warnings)]` remains.
 
 ### 3. Resolve ignored tests on core mechanics
-- **Evidence:** at least 5 `#[ignore = "TODO"]` tests in `crates/game/src/game.rs`
-  (lines ~3882, 3977, 4725, 4893, 4912), plus open correctness TODOs in
-  `fov_stuff.rs` (sorting ambiguity at line ~702) and `portal_geometry.rs`
-  (second-portal handling at line ~242).
+- **Evidence:** 10 `#[ignore]`d tests across the tree: 3 `#[ignore = "TODO"]`
+  in `crates/game/src/game/tests.rs` (lines ~1480, 1575, 2611), 2 more with
+  other justifications (tests.rs ~1367; `fov_stuff.rs` ~3038), and one each in
+  `terminal_rendering/src/frame.rs`, `angle_interval.rs` ("moving away from
+  angle sets"), `graphics/animations.rs` (visual debugging), and
+  `portal_playground.rs`. Open correctness TODOs remain in `fov_stuff.rs` and
+  `portal_geometry.rs` (second-portal handling at line ~246).
 - **Plan:** for each ignored test: either fix the underlying behavior, fix the
   test's assumptions, or delete it with a comment explaining why it's not
   testable. Priority order: portal FOV > pathfinding determinism > the rest.
@@ -399,8 +419,11 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   tests (or only ignored tests with documented justification).
 
 ### 4. Replace glob imports across crate boundaries
-- **Evidence:** `use utility::*` in `crates/game/src/lib.rs` and
-  `crates/game/src/game.rs`; `terminal_rendering` re-exports `utility::*`
+- **Evidence:** `use utility::*` in `crates/game/src/lib.rs`,
+  `crates/game/src/piece.rs`, `crates/game/src/game/blocks.rs`, and
+  `crates/game/src/game/floating_entities.rs`; `use terminal_rendering::*` in
+  `crates/game/src/fov_stuff.rs` and `crates/game/src/game/mod.rs`;
+  `terminal_rendering` re-exports `utility::*`
   (`crates/terminal_rendering/src/lib.rs`), blurring the crate layering.
 - **Plan:** switch to explicit imports, then remove the `pub use utility::*`
   re-export from `terminal_rendering` so `game` depends on `utility` directly
@@ -409,8 +432,9 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   remain outside test code; layering is visible from imports alone.
 
 ### 5. Harden hot paths against panics
-- **Evidence:** ~180 `unwrap()` calls in non-test source, concentrated in
-  `game.rs` (59), `fov_stuff.rs` (48), `drawable_glyph.rs` (32).
+- **Evidence:** several hundred `unwrap()` calls across the crates' source
+  (311 including test code), concentrated in `fov_stuff.rs` (45) and
+  `terminal_rendering/src/drawable_glyph.rs` (28).
   The panic hook restores the terminal, but the game still crashes.
 - **Plan:** audit `unwrap()`s in FOV and rendering first. Replace with
   `Result` propagation where recovery is possible; where the invariant is

@@ -17,7 +17,8 @@ sub-square floating-entity renderer in
 ## Workspace Layout
 
 The project is a Cargo workspace (`resolver = "3"`) with three crates under `crates/`,
-ordered from lowest-level to highest-level:
+ordered from lowest-level to highest-level, plus a top-level
+`floating-square-debug` bin for the sub-square renderer:
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -33,21 +34,23 @@ ordered from lowest-level to highest-level:
 
 Dependencies flow strictly downward: `game` → `terminal_rendering` → `utility`.
 
-### 1. `utility` (~4.5k LOC)
+Line counts below are approximate source lines (tests included).
+
+### 1. `utility` (~4.6k LOC)
 
 Foundation math and geometry helpers, built on top of `euclid` typed 2D points/vectors.
 
-- `lib.rs` — core type aliases (`IPoint`/`FPoint`/`IVector`/`FVector`, plus
+- `lib.rs` (~2.7k LOC) — core type aliases (`IPoint`/`FPoint`/`IVector`/`FVector`, plus
   game-domain aliases like `WorldPoint`/`WorldStep`), orthogonal/diagonal step
   constants, line-of-sight and grid helpers, trait extensions.
-- `geometry2.rs` — extension traits over euclid types (`IPointExt`, `FPointExt`,
-  `IRectExt`): rotations, king moves, quadrant handling, etc.
 - `angle_interval.rs` (~1.1k LOC) — circular angle intervals: containment,
   intersection, union; heavily used by the FOV system.
+- `geometry2.rs` (~0.7k LOC) — extension traits over euclid types (`IPointExt`,
+  `FPointExt`, `IRectExt`): rotations, king moves, quadrant handling, etc.
 - `coordinate_frame_conversions.rs` — conversions between coordinate frames
   (world ↔ local/square-relative), essential for portal-transformed geometry.
 
-### 2. `terminal_rendering` (~5.2k LOC)
+### 2. `terminal_rendering` (~9.6k LOC)
 
 A terminal "graphics engine": a double-glyph-per-character framebuffer with
 sub-cell resolution.
@@ -58,14 +61,21 @@ sub-cell resolution.
   positioned glyph batches.
 - `frame.rs` — a framebuffer of glyphs with a `Drawable` trait for compositing.
 - `screen.rs` — screen buffer management, diffing, and output via `termion`.
+- `ui_layer.rs` — the screen-space `UiLayer` (UI drawn in terminal space, so it
+  does not rotate with the camera).
+- `coverage.rs` (~2.1k LOC) — the sub-square coverage oracle used by the
+  floating-square tests and debug tool.
+- `family_map.rs` + `family_map_table.rs` — baked snap-family selection for the
+  floating-square renderer.
 - Sub-character renderers for high-resolution effects:
   - `braille.rs` — 2×4 dot braille rendering
   - `hextant_blocks.rs` — 2×3 block rendering
   - `angled_blocks.rs` — half-block triangles for angled lines
   - `floating_square.rs` — sub-cell positioned solid squares
-- `glyph_constants.rs` — named characters and a named-color palette.
+- `glyph_constants.rs` — named characters and a named-color palette;
+  `emoji_presentation.rs` — emoji-variation handling.
 
-### 3. `game` (~10.5k LOC)
+### 3. `game` (~22.8k LOC)
 
 The actual game. Modules:
 
@@ -73,30 +83,49 @@ The actual game. Modules:
   alternate screen, mouse), a panic hook that restores the main screen, and a
   dedicated input thread that streams timestamped `termion` events over an
   mpsc channel. Runs the main loop.
-- `main.rs` — thin binary calling `game::do_everything()`. A second binary,
-  `bin/portal_playground.rs`, exists for experimenting with portal rendering.
-- `game.rs` (~4.9k LOC) — the `Game` state and rules engine: board, turn
-  handling, piece placement/movement/combat, block types (walls, conveyors,
-  upgrades), enemy AI, and **floating entities** (`DeathCube`,
-  `FloatingHunterDrone`) unified via a `FloatingEntityTrait` delegated with
-  `ambassador`.
+- `main.rs` — thin binary calling `game::do_everything()`. Further binaries:
+  `bin/portal_playground.rs` (portal-rendering experiments),
+  `bin/map_diagram.rs` (ASCII map/height dumps), and the `debug-tools`-gated
+  `bin/snapshot_tool.rs` (headless render/diff/explain) and
+  `bin/glyph_vocabulary.rs`.
+- `game/mod.rs` (~1.8k LOC) — the `Game` state, core accessors, map
+  construction, board geometry, and rendering glue. The rules engine was split
+  into the modules below (roadmap item 1).
+- `game/blocks.rs`, `game/turns.rs`, `game/combat.rs`, `game/ai.rs`,
+  `game/spawning.rs`, `game/floating_entities.rs`, `game/realtime.rs` — block
+  types (walls, conveyors, upgrades), turn handling, piece
+  placement/movement/combat, enemy AI, spawning, floating entities
+  (`DeathCube`, `FloatingHunterDrone` unified via a `FloatingEntityTrait`
+  delegated with `ambassador`), and the realtime/tick effects.
+- `game/terrain.rs` — the voxel set (per-column tops, floor slab, void).
+- `game/map_file.rs` — JSON map recipes (`maps/<name>.json`).
+- `game/map_diagram.rs` — ASCII map/height rendering used by the
+  `map_diagram` bin.
+- `game/snapshot.rs` — game-state serialization/loading and the `debug-tools`
+  snapshot helpers (render/diff/explain/minimize).
+- `game/tests.rs` — the game-logic test suite.
 - `piece.rs` — pieces on the board: player, pawns, other enemies; `PieceType`
   and an `Upgrade` system.
-- `fov_stuff.rs` (~2.5k LOC) — **portal-aware field of view**, the technical
+- `logical_time.rs` — the injectable `LogicalTime(Duration)` clock (roadmap W.A)
+  used by the sim and render paths instead of `std::time::Instant`.
+- `fov_stuff.rs` (~3.2k LOC) — **portal-aware field of view**, the technical
   heart of the project. Produces `FieldOfViewResult` with per-square
   `SquareVisibility` (including partial visibility), casting sight through
   portals using angle intervals from `utility`.
 - `portal_geometry.rs` — portal placement/orientation and the transforms
   mapping squares/rays across portal pairs.
-- `graphics.rs` (~0.8k LOC) — bridges game state to `terminal_rendering`:
+- `graphics.rs` (~1.3k LOC) — bridges game state to `terminal_rendering`:
   builds drawables for the board, pieces, FOV shading, HUD, and animations.
 - `graphics/drawable.rs` — game-side drawable implementations
   (`ArrowDrawable`, `BrailleDrawable`, `ConveyorBeltDrawable`,
-  `PartialVisibilityDrawable`, `TextDrawable`, …) behind a `DrawableEnum`.
+  `PartialVisibilityDrawable`, `LayeredDrawable`, `TextDrawable`, …) behind a
+  `DrawableEnum`.
+- `graphics/starfield.rs` — the off-board procedural starfield.
+- `graphics/fov_border.rs` — the screen-space FOV border (a `UiLayer` client).
 - `graphics/animations.rs` + `graphics/animations/*` — time-based animation
   system: lasers (simple/floaty), explosions, blinking, radial shockwaves,
-  smites, spear/circle attacks, death animations, selector, and a recoiling
-  board.
+  smites, spear/circle attacks, falling boxes, death animations, selector, and
+  a recoiling board.
 - `inputmap.rs` — maps `termion` key/mouse events to game commands.
 - `utils_for_tests.rs` — test helpers (board setup, assertions).
 
@@ -113,8 +142,9 @@ The actual game. Modules:
 - **Input** is asynchronous: a spawned thread forwards timestamped events over a
   channel so the loop can animate at a fixed cadence regardless of input.
 - **Rendering** is pull-based each tick: `Graphics` converts game state into
-  drawables composited into a `Frame`, which the `Screen` writes to the
-  terminal, minimizing escape-sequence output.
+  drawables composited into the `Screen`'s glyph buffer, which `Screen` diffs
+  against the previous frame and writes to the terminal, minimizing
+  escape-sequence output.
 - **Panic safety**: a custom hook exits the alternate screen and prints the
   panic info so crashes don't corrupt the terminal.
 
@@ -129,6 +159,10 @@ The actual game. Modules:
 | `ordered-float`, `num`, `approx` | numeric helpers                  |
 | `line_drawing` | supercover/Bresenham lines for grid ray casting  |
 | `rand`         | spawning and procedural behavior                 |
+| `rand_chacha`  | seeded, serializable gameplay RNG (roadmap W.A)  |
+| `serde`, `serde_json` | map recipes and snapshot serialization    |
+| `libc`         | raw-fd input polling (`poll`/`read`)             |
+| `itertools`    | collection helpers in the rules engine           |
 | `priority-queue` | pathfinding/AI                                 |
 | `rgb`, `color-hex` | color handling                               |
 
@@ -142,8 +176,19 @@ The actual game. Modules:
   slow after 60s and terminated after 120s, so a runaway test fails fast
   instead of hanging the suite. Override per test with
   `[[profile.default.overrides]]` if something is legitimately slower.
-- `bacon.toml` — bacon watch config; `flake.nix` — Nix dev shell;
-  `scripts/` — test recording/printing helpers.
+- `game` has a default-off `debug-tools` feature gating the headless
+  `snapshot_tool` / `glyph_vocabulary` bins and `game/snapshot.rs`'s
+  introspection helpers. Run it through the repo-root `./snapshot-tool` wrapper
+  (which does `cargo run -p game --features debug-tools --bin snapshot_tool --`)
+  so the binary always matches the sources; `snapshot_tool` can `diff`/`bless`
+  captures, `explain` a cell, dump `fov-trace`, `heights`, `invariants`, and
+  `minimize` a repro.
+- Live bug captures are the numbered `issues/NNNN/` directories (solved ones
+  under `issues/solved/`), each a snapshot plus a note; the `verify-issues`
+  subcommand checks every solved capture against its blessed `screen.txt` and
+  pre-fix render.
+- `bacon.toml` — bacon watch config (incl. a `clippy` job); `flake.nix` — Nix
+  dev shell; `scripts/` — test recording/printing and profiling helpers.
 
 ### Profiling (what actually runs in this sandbox)
 
