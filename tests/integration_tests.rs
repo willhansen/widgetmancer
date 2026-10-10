@@ -57,7 +57,7 @@ fn test_player_can_not_move_off_high_edge() {
 
     game.draw_headless_now();
 
-    let bottom_right = point2((game.board_size().width - 1) as i32, 0);
+    let bottom_right = point2((game.grid_extent().width - 1) as i32, 0);
 
     game.try_set_player_position(bottom_right)
         .expect("Failed to set player pos");

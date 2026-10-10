@@ -13,7 +13,10 @@ pub struct SquareGridInLocalSquareFrame;
 pub type WorldSquare = Point2D<i32, SquareGridInWorldFrame>;
 pub type WorldPoint = Point2D<f32, SquareGridInWorldFrame>;
 pub type WorldSquareRect = Box2D<i32, SquareGridInWorldFrame>;
-pub type BoardSize = Size2D<u32, SquareGridInWorldFrame>;
+
+// Horizontal extent of the voxel grid, in squares. The grid's own bounds; the
+// only thing that defines "on the map" now that no separate board exists.
+pub type GridExtent = Size2D<u32, SquareGridInWorldFrame>;
 
 // Altitude-bearing frames. `z` is altitude in voxels; a solid voxel at index
 // `z` occupies `[z, z+1)`, so its top surface is at altitude `z + 1`. `x`/`y`

@@ -28,10 +28,10 @@ Example: `WorldSquare`, `WorldPoint`, `WorldStep`, `WorldMove` all live in
 ### 1. `SquareGridInWorldFrame` — the world
 
 Defined in `crates/utility/src/coordinate_frame_conversions.rs`. The one
-"real" frame: board squares, piece positions, FOV, portals, animations.
+"real" frame: grid squares, piece positions, FOV, portals, animations.
 
 - `WorldSquare` / `WorldPoint` / `WorldStep` / `WorldMove`,
-  `WorldSquareRect`, `BoardSize`
+  `WorldSquareRect`, `GridExtent`
 - **y-axis points up** (`STEP_UP = vec2(0, 1)`), matching math convention.
 - A square's center is at its integer coordinates, and its extent is ±0.5;
   `world_point_to_world_square` is therefore `round()`, not `floor()`.

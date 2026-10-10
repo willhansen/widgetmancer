@@ -9,6 +9,49 @@ Newest first.
 
 ---
 
+## 2026-10-10 — Reorganize the model around a single voxel grid
+
+### refactor: voxel-grid vocabulary; the grid owns its extent
+
+The game already stored geometry as a voxel set (`Terrain`) but still spoke of a
+separate "board" (a rectangular `board_size`) with a `z = -1` "slab" and
+per-square "columns" leaking into the API. Reworked the abstractions so the
+voxel grid is the single source of truth.
+
+- `VoxelGrid` (was `Terrain`, file `voxel_grid.rs`) owns the solid `voxels`, the
+  horizontal `extent` (was `BoardSize`), the per-square surface cache, and
+  materials. `Game` no longer carries a `board_size`; `Game::grid_extent()`
+  delegates to the grid.
+- Vocabulary: `BoardSize`→`GridExtent`, `square_is_on_board`→`square_in_extent`,
+  `squares_on_board`→`squares_in_extent`, `seed_board_slab`→`seed_floor`,
+  `slab_voxels`→`floor_voxels`, `height_at`→`surface_at`,
+  `place_solid_column`→`fill_column`, `single_height_block_squares`→
+  `single_layer_squares`, `SLAB_TOP`/`SLAB_VOXEL_Z`→`FLOOR_TOP`/`FLOOR_LAYER_Z`,
+  `TerrainMaterial`→`VoxelMaterial`, `columns()`→`surface_heights()`.
+- `Blocks` (non-solid floor features) → `FloorFeatures` (file
+  `floor_features.rs`); the field is `floor_features`. Solid blocks stay voxels.
+- Board-named render/animation helpers renamed: `draw_static_board`→
+  `draw_floor_pattern`, `board_animation`→`floor_animation`,
+  `set_empty_board_animation`→`clear_floor_animation`,
+  `RecoilingBoardAnimation`→`RecoilingFloorAnimation`, `StaticBoard`→
+  `StaticFloor`, `static_board.rs`/`recoiling_board.rs`→
+  `static_floor.rs`/`recoiling_floor.rs`.
+- Formats unchanged: snapshot `board_width`/`board_height`/`floor_cells` and the
+  map-file `board` key keep their names, derived from the grid extent.
+
+Behavior is byte-identical: the flat-board FOV path, the
+`max_top_altitude() > 1` forward-pass gate, portal FOV, and partial visibility
+are untouched.
+
+Verified: `cargo nextest run --workspace` (640 passed, 9 skipped);
+`./snapshot-tool diff snapshot/` → OK; `./snapshot-tool verify-issues` → all 15
+fixtures OK.
+
+Docs: ARCHITECTURE, RENDERING, COORDINATE_FRAMES, VOXEL_WORLD_PLAN updated;
+CUBE_ISO_PORT got a vocabulary note.
+
+---
+
 ## 2026-10-09 — Sync architecture docs with the current tree
 
 ### docs: refresh ARCHITECTURE/COORDINATE_FRAMES/RENDERING/ROADMAP

@@ -7,14 +7,14 @@ use euclid::Length;
 use crate::graphics::*;
 
 #[derive(Clone)]
-pub struct RecoilingBoardAnimation {
-    board_size: BoardSize,
+pub struct RecoilingFloorAnimation {
+    extent: GridExtent,
     orthogonal_shot_direction: OrthogonalWorldStep,
     start_time: LogicalTime,
     floor_color_enum: FloorColorEnum,
 }
 
-impl RecoilingBoardAnimation {
+impl RecoilingFloorAnimation {
     pub(crate) const TIME_TO_PEAK: Duration = Duration::from_millis(100);
     const RECOIL_RELAX_DURATION: Duration = Self::TIME_TO_PEAK.saturating_mul(3);
     pub(crate) const RECOIL_DURATION: Duration =
@@ -22,17 +22,17 @@ impl RecoilingBoardAnimation {
     pub(crate) const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(1.0);
 
     pub fn new(
-        board_size: BoardSize,
+        extent: GridExtent,
         shot_direction: WorldStep,
         floor_color_enum: FloorColorEnum,
-    ) -> RecoilingBoardAnimation {
+    ) -> RecoilingFloorAnimation {
         let mut orthogonalized_step = round_to_king_step(shot_direction);
         if is_diagonal_king_step(orthogonalized_step) {
             orthogonalized_step.y = 0;
         }
 
-        RecoilingBoardAnimation {
-            board_size,
+        RecoilingFloorAnimation {
+            extent,
             orthogonal_shot_direction: orthogonalized_step.into(),
             start_time: LogicalTime::ZERO,
             floor_color_enum,
@@ -67,25 +67,25 @@ impl RecoilingBoardAnimation {
     pub(crate) fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
-        let _fraction_done = age / RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32();
-        if age < RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32() {
-            RecoilingBoardAnimation::recoil_start(
+        let _fraction_done = age / RecoilingFloorAnimation::RECOIL_DURATION.as_secs_f32();
+        if age < RecoilingFloorAnimation::TIME_TO_PEAK.as_secs_f32() {
+            RecoilingFloorAnimation::recoil_start(
                 age,
-                RecoilingBoardAnimation::RECOIL_DISTANCE.0,
-                RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32(),
+                RecoilingFloorAnimation::RECOIL_DISTANCE.0,
+                RecoilingFloorAnimation::TIME_TO_PEAK.as_secs_f32(),
             )
         } else {
-            RecoilingBoardAnimation::recoil_end(
+            RecoilingFloorAnimation::recoil_end(
                 age,
-                RecoilingBoardAnimation::RECOIL_DISTANCE.0,
-                RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32(),
-                RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
+                RecoilingFloorAnimation::RECOIL_DISTANCE.0,
+                RecoilingFloorAnimation::TIME_TO_PEAK.as_secs_f32(),
+                RecoilingFloorAnimation::RECOIL_DURATION.as_secs_f32(),
             )
         }
     }
 }
 
-impl Animation for RecoilingBoardAnimation {
+impl Animation for RecoilingFloorAnimation {
     fn start_time(&self) -> LogicalTime {
         self.start_time
     }
@@ -93,22 +93,22 @@ impl Animation for RecoilingBoardAnimation {
         self.start_time = time;
     }
     fn duration(&self) -> Duration {
-        RecoilingBoardAnimation::RECOIL_DURATION
+        RecoilingFloorAnimation::RECOIL_DURATION
     }
 
     fn double_glyphs_at_time(&self, time: LogicalTime) -> HashMap<WorldSquare, DoubleGlyph> {
         let age = time.duration_since(self.start_time);
 
         let offset_distance_in_squares: f32 =
-            RecoilingBoardAnimation::recoil_distance_in_squares_at_age(age.as_secs_f32());
+            RecoilingFloorAnimation::recoil_distance_in_squares_at_age(age.as_secs_f32());
 
         let mut glyph_map = HashMap::new();
 
         let offset_vector: WorldMove =
             self.orthogonal_shot_direction.step().to_f32() * offset_distance_in_squares;
 
-        for x in 0..self.board_size.width {
-            for y in 0..self.board_size.height {
+        for x in 0..self.extent.width {
+            for y in 0..self.extent.height {
                 let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
                 let square_color = self.floor_color_enum.color_at(world_square);
                 let other_square_color = self

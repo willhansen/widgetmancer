@@ -153,7 +153,7 @@ impl Game {
                         capture_squares.insert(next_square);
                     }
                     if !self.is_block_at(next_square)
-                        && self.square_is_on_board(next_square)
+                        && self.square_in_extent(next_square)
                         && !arrow_midair_collisions.contains(&next_square)
                     {
                         let is_new_midair_collision = next_arrows.contains_key(&next_square);

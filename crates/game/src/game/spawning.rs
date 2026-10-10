@@ -70,7 +70,7 @@ impl Game {
     }
 
     pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) {
-        if !self.square_is_on_board(square) {
+        if !self.square_in_extent(square) {
             panic!(
                 "Tried to place piece off board at {}",
                 point_to_string(square)
@@ -106,7 +106,7 @@ impl Game {
 
     pub fn place_upgrade(&mut self, upgrade_type: Upgrade, square: WorldSquare) {
         assert!(self.square_is_empty(square));
-        self.blocks.place_upgrade(upgrade_type, square);
+        self.floor_features.place_upgrade(upgrade_type, square);
     }
 
     pub fn tick_pawn_incubation(&mut self) {
@@ -161,8 +161,8 @@ impl Game {
         let num_attempts = 40;
         for _ in 0..num_attempts {
             let rand_pos = WorldSquare::new(
-                rng.gen_range(0..self.board_size().width as i32),
-                rng.gen_range(0..self.board_size().height as i32),
+                rng.gen_range(0..self.grid_extent().width as i32),
+                rng.gen_range(0..self.grid_extent().height as i32),
             );
             if self.square_is_empty(rand_pos) {
                 return Ok(rand_pos);

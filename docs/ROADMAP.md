@@ -63,8 +63,8 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   `draw_death_cube` calls `technicolor_at_time(Instant::now())`
   (`graphics.rs:399`, defeating the `time` argument at `:435`); animations
   anchor `start_time: Instant::now()` at construction (~9 files,
-  `piece_death_animation.rs:18`), and `static_board::start_time()` returns
-  `Instant::now()` per call (`static_board.rs:23`); `--load` rebases to
+  `piece_death_animation.rs:18`), and `static_floor::start_time()` returns
+  `Instant::now()` per call (`static_floor.rs:23`); `--load` rebases to
   `Instant::now()` (`game/snapshot.rs:553`).
 - **Ideal:** `LogicalTime(Duration)` newtype (serializable/constructible, unlike
   `std::time::Instant`) for `world_time`, `Graphics::start_time`, and animation
@@ -170,7 +170,7 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
   and 19 of 21 portals removed → **player + 2 portals**, artifact intact.
   Tests: crop geometry, anchor-derivation error, review-step formatting,
   no-artifact error.
-  **Remaining:** board/coordinate shrink (deliberately deferred — translation
+  **Remaining:** extent/coordinate shrink (deliberately deferred — translation
   is near a visual no-op, floor pattern is mod-6, and it risks `place_piece`
   panics), and a chunked (delta-debugging) search for large maps.
 

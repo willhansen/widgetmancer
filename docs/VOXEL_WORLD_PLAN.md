@@ -11,18 +11,19 @@ not blockers.
 
 ## Locked decisions
 
-- **Board = explicit voxel grid.** `Terrain`'s voxel set is the source of
-  truth; the `z = -1` floor is a convenience a map opts into. Void is real
-  (renders as starfield, blocks movement).
+- **The world is an explicit voxel grid.** `VoxelGrid`'s voxel set is the
+  source of truth and owns the horizontal `extent` that defines "on the map";
+  the `z = -1` floor layer is a convenience a map opts into. Void is real
+  (renders as starfield, blocks movement). There is no separate board.
 - **Walkability follows surface altitude.** A square is enterable iff it has
   ground and is not *higher* than the player's current surface (derived from the
-  column). Level and step **down** allowed; step **up** and void blocked. This
-  keeps single-voxel blocks as walls on floor maps and lets the player descend a
-  staircase.
-- **Altitude-aware sight.** A column blocks only when its top rises above the
+  voxel stack). Level and step **down** allowed; step **up** and void blocked.
+  This keeps single-voxel blocks as walls on floor maps and lets the player
+  descend a staircase.
+- **Altitude-aware sight.** A square blocks only when its top rises above the
   player (`Game::fov_blockers`).
-- **Maps own their size.** Board size and player start come from the map, not
-  the terminal. `Game::new`'s terminal-derived board is only a fallback for
+- **Maps own their extent.** Grid extent and player start come from the map, not
+  the terminal. `Game::new`'s terminal-derived extent is only a fallback for
   map-less/test games.
 - **Maps are data.** `maps/<name>.json` is a recipe of setup ops; the built-in
   maps remain as a fallback.
@@ -33,41 +34,49 @@ not blockers.
 
 - [x] **0. Reconcile refactor.** `Player.altitude` dropped (altitude is derived);
   `snapshot` player-altitude field reverted; starfield/floor call sites fixed.
-- [x] **1. Terrain floor model.** `terrain.rs`: `fill_floor_rect`,
-  `clear_floor`, `floor_squares`, `occupied_squares`, `slab_voxels`;
-  `seed_board_slab` = clear + full-rect fill.
-- [x] **2. Rendering gaps.** Floor drawn per occupied column
-  (`draw_static_board`), starfield keyed on occupancy
+- [x] **1. Voxel-grid floor model.** `voxel_grid.rs`: `fill_floor_rect`,
+  `clear_floor`, `floor_squares`, `occupied_squares`, `floor_voxels`;
+  `seed_floor` = clear + full-rect fill.
+- [x] **2. Rendering gaps.** Floor drawn per occupied square
+  (`draw_floor_pattern`), starfield keyed on occupancy
   (`starfield::draw(occupied, …)`), walls FOV-gated in
   `load_screen_buffer_from_terrain`.
 - [x] **3. Walkability.** `player_altitude` / `player_can_stand_at`;
   `try_set_player_position` uses them instead of `is_block_at`.
-- [x] **4. Snapshot floor.** `floor_cells` written only when the slab differs
-  from the full board rect; loader clears + re-lays it. Legacy snapshots keep
-  the default full floor.
+- [x] **4. Snapshot floor.** `floor_cells` written only when the floor layer
+  differs from the full extent rect; loader clears + re-lays it. Legacy
+  snapshots keep the default full floor.
 - [x] **5. JSON map recipes.** `game/map_file.rs` (`MapFile`, `MapOp`,
   `load_map_file`, `maps_dir`, `Game::apply_map_file`); `set_up_map_by_name`
   prefers a recipe; ops: `fill_floor_rect`, `clear_floor`, `cuboid`, `column`,
   `voxel`, `cube_side_platforms`.
-- [x] **6. `space-cubes` map.** `maps/space-cubes.json` (board 42×38,
+- [x] **6. `space-cubes` map.** `maps/space-cubes.json` (extent 42×38,
   `clear_floor`, four 10×10×10 cubes, side platforms, player `[9,9]`,
   `sight_radius 24`), `maps/space-cubes.sh`, `main.rs` usage.
 - [x] **7. Terminal-independent built-ins.** `demo` (40×24 @ 20,12), `racetrack`
   (48×26 @ 24,13), `hallways` (48×26 @ 24,13); `numbered-boxes` already fixed.
   `do_everything` clamp removed; `map_diagram` no longer sizes to a map.
-- [x] **8. Tests.** Terrain floor/void; walkability (down ok, up/void blocked);
+- [x] **8. Tests.** Voxel floor/void; walkability (down ok, up/void blocked);
   map-file parse/apply; snapshot `floor_cells` round-trip; `space-cubes`
   invariants; added to the frame-reproducibility loop.
 - [x] **9. Docs.** `CUBE_ISO_PORT.md` post-port section; `ROADMAP.md` gravity
   entry; `CHANGELOG.md`.
+- [x] **10. Grid vocabulary.** Board/slab/column vocabulary removed in favor of
+  the voxel grid (2026-10-10): `BoardSize`→`GridExtent`, `Terrain`→`VoxelGrid`
+  (file `voxel_grid.rs`), `Blocks`→`FloorFeatures` (file `floor_features.rs`),
+  `seed_board_slab`→`seed_floor`, `height_at`→`surface_at`,
+  `place_solid_column`→`fill_column`, `SLAB_*`→`FLOOR_*`, `TerrainMaterial`→
+  `VoxelMaterial`. The grid now owns the extent; `Game` no longer has a
+  `board_size`. Serialized/JSON names (`board_width`, `floor_cells`, the
+  `board` map key) are unchanged.
 
 ## Where things live
 
 | Concern | Location |
 |---|---|
-| Floor / void / voxels | `crates/game/src/game/terrain.rs` |
+| Floor / void / voxels / extent | `crates/game/src/game/voxel_grid.rs` |
 | Walkability, FOV blockers, player | `crates/game/src/game/mod.rs` |
-| Forward terrain pass, starfield, walls | `crates/game/src/graphics.rs`, `graphics/starfield.rs` |
+| Forward voxel pass, starfield, walls | `crates/game/src/graphics.rs`, `graphics/starfield.rs` |
 | Snapshot floor + player | `crates/game/src/game/snapshot.rs` |
 | Map recipes | `crates/game/src/game/map_file.rs`, `maps/*.json` |
 | Map dispatch / launch | `crates/game/src/lib.rs`, `crates/game/src/main.rs` |

@@ -13,14 +13,14 @@ use euclid::Angle;
 use serde::Deserialize;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
-use crate::game::{ConveyorBelt, DeathCube, FloatingEntityId, FloatingHunterDrone, Game, IncubatingPawn, Player, TerrainMaterial, Widget, CONVEYOR_BELT_MOVEMENT_PERIOD, SLAB_VOXEL_Z};
+use crate::game::{ConveyorBelt, DeathCube, FloatingEntityId, FloatingHunterDrone, Game, IncubatingPawn, Player, VoxelMaterial, Widget, CONVEYOR_BELT_MOVEMENT_PERIOD, FLOOR_LAYER_Z};
 use crate::piece::{Faction, Piece, PieceType, Upgrade};
 use rgb::RGB8;
 use terminal_rendering::glyph::Glyph;
 use utility::coordinate_frame_conversions::{
-    BoardSize, WorldMove, WorldPoint, WorldSquare, WorldStep, WorldVoxel,
+    GridExtent, WorldMove, WorldPoint, WorldSquare, WorldStep, WorldVoxel,
 };
-use utility::{squares_on_board, KingWorldStep, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir};
+use utility::{squares_in_extent, KingWorldStep, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir};
 
 pub const SNAPSHOT_KEY: Key = Key::Ctrl('p');
 
@@ -173,8 +173,8 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
     let mut fields = vec![
         ("map", opt_string_json(map_name)),
         ("running", game.running.to_string()),
-        ("board_width", game.board_size.width.to_string()),
-        ("board_height", game.board_size.height.to_string()),
+        ("board_width", game.grid_extent().width.to_string()),
+        ("board_height", game.grid_extent().height.to_string()),
         ("turn_count", game.turn_count.to_string()),
         (
             "world_time_seconds",
@@ -212,7 +212,7 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
         ),
         (
             "upgrades",
-            json_sorted_array(game.blocks.upgrades.iter().map(|(&square, &upgrade)| {
+            json_sorted_array(game.floor_features.upgrades.iter().map(|(&square, &upgrade)| {
                 json_object([
                     ("square", square_json(square)),
                     ("type", string_json(&upgrade.to_string())),
@@ -222,7 +222,7 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
         (
             "conveyor_belts",
             json_sorted_array(
-                game.blocks
+                game.floor_features
                     .conveyor_belts
                     .iter()
                     .map(|(&square, &belt)| conveyor_belt_json(square, belt)),
@@ -280,19 +280,19 @@ fn game_state_json(game: &Game, map_name: Option<&str>) -> String {
 /// The `z = -1` slab cells, as `[x, y]`, when they differ from the full board
 /// rect; `None` means "the default full floor".
 fn non_default_floor_cells(game: &Game) -> Option<Vec<[i32; 2]>> {
-    let slab: Vec<[i32; 2]> = game
+    let floor: Vec<[i32; 2]> = game
         .terrain
-        .slab_voxels()
+        .floor_voxels()
         .into_iter()
         .map(|voxel| [voxel.x, voxel.y])
         .collect();
-    let full = squares_on_board(game.board_size);
-    if slab.len() == full.len()
-        && slab.iter().all(|&[x, y]| full.contains(&square_from_array([x, y])))
+    let full = squares_in_extent(game.grid_extent());
+    if floor.len() == full.len()
+        && floor.iter().all(|&[x, y]| full.contains(&square_from_array([x, y])))
     {
         return None;
     }
-    Some(slab)
+    Some(floor)
 }
 
 fn player_json(game: &Game) -> String {
@@ -497,13 +497,13 @@ fn voxel_json(voxel: WorldVoxel) -> String {
 }
 
 /// Material overrides encode `Floor` as `-1` in the color slots.
-fn material_json(square: WorldSquare, material: TerrainMaterial) -> String {
+fn material_json(square: WorldSquare, material: VoxelMaterial) -> String {
     match material {
-        TerrainMaterial::Tint(color) => format!(
+        VoxelMaterial::Tint(color) => format!(
             "[{}, {}, {}, {}, {}]",
             square.x, square.y, color.r, color.g, color.b
         ),
-        TerrainMaterial::Floor => format!("[{}, {}, -1, -1, -1]", square.x, square.y),
+        VoxelMaterial::Floor => format!("[{}, {}, -1, -1, -1]", square.x, square.y),
     }
 }
 
@@ -798,16 +798,15 @@ impl Game {
         let mut game =
             Game::new(data.screen.terminal_width, data.screen.terminal_height, start_time);
 
-        // The terminal-derived board size can differ from the captured one
+        // The terminal-derived extent can differ from the captured one
         // (maps like `racetrack` clamp the terminal), so trust the snapshot.
-        game.board_size = BoardSize::new(data.board_width, data.board_height);
-        // The slab floor is derived from the board size, so it is re-laid for
-        // the captured board rather than serialized.
-        game.terrain.seed_board_slab(game.board_size);
+        // The floor layer is derived from the grid extent, so it is re-laid for
+        // the captured extent rather than serialized.
+        game.seed_floor_for_extent(GridExtent::new(data.board_width, data.board_height));
         if let Some(floor_cells) = &data.floor_cells {
             game.terrain.clear_floor();
             for &[x, y] in floor_cells {
-                game.place_voxel(WorldVoxel::new(x, y, SLAB_VOXEL_Z));
+                game.place_voxel(WorldVoxel::new(x, y, FLOOR_LAYER_Z));
             }
         }
         game.running = data.running;
@@ -852,15 +851,15 @@ impl Game {
         for material in &data.materials {
             let square = square_from_array([material[0], material[1]]);
             let value = if material[2] < 0 {
-                TerrainMaterial::Floor
+                VoxelMaterial::Floor
             } else {
-                TerrainMaterial::Tint(RGB8::new(
+                VoxelMaterial::Tint(RGB8::new(
                     material[2] as u8,
                     material[3] as u8,
                     material[4] as u8,
                 ))
             };
-            game.set_terrain_material(square, value);
+            game.set_voxel_material(square, value);
         }
         for upgrade in &data.upgrades {
             let upgrade_type = Upgrade::from_str(&upgrade.upgrade_type)
@@ -885,7 +884,7 @@ impl Game {
                 }
                 None => ConveyorBelt::with_default_period(direction.into()),
             };
-            game.blocks.conveyor_belts.insert(square, belt);
+            game.floor_features.conveyor_belts.insert(square, belt);
         }
         for arrow in &data.floor_push_arrows {
             game.place_floor_push_arrow(
@@ -1086,11 +1085,11 @@ mod tests {
         game.place_piece(Piece::pawn(), base + STEP_RIGHT);
         game.place_piece(Piece::arrow(STEP_UP.into()), base + STEP_LEFT);
         game.place_block(base + STEP_DOWN);
-        game.place_solid_column(base + STEP_UP * 2, 3);
-        game.place_solid_column_with_material(
+        game.fill_column(base + STEP_UP * 2, 3);
+        game.fill_column_with_material(
             base + STEP_UP * 3,
             2,
-            TerrainMaterial::Tint(RGB8::new(200, 80, 40)),
+            VoxelMaterial::Tint(RGB8::new(200, 80, 40)),
         );
         game.place_voxel(WorldVoxel::new(base.x + 4, base.y, 5));
         game.place_upgrade(Upgrade::BlinkRange, base + STEP_DOWN * 2);
@@ -1163,11 +1162,11 @@ mod tests {
     }
 
     #[test]
-    fn legacy_blocks_only_snapshot_loads_as_single_height_columns() {
+    fn legacy_blocks_only_snapshot_loads_as_one_voxel_stacks() {
         let mut game = set_up_game_with_player();
         let base = game.player_square();
         game.place_block(base + STEP_RIGHT);
-        game.place_solid_column(base + STEP_UP, 3);
+        game.fill_column(base + STEP_UP, 3);
         game.world_time = game.world_start_time;
 
         let json = game_state_json(&game, Some("test"));
@@ -1188,15 +1187,15 @@ mod tests {
 
         assert!(loaded.is_block_at(base + STEP_RIGHT));
         assert!(loaded.is_block_at(base + STEP_UP));
-        assert_eq!(loaded.height_at(base + STEP_UP), Some(1), "legacy blocks are one tall");
-        assert_eq!(loaded.height_at(base), Some(crate::game::SLAB_TOP), "board slab is intact");
+        assert_eq!(loaded.surface_at(base + STEP_UP), Some(1), "legacy blocks are one tall");
+        assert_eq!(loaded.surface_at(base), Some(crate::game::FLOOR_TOP), "floor layer is intact");
     }
 
     #[test]
     fn snapshot_round_trips_a_void_floor() {
         let mut game = set_up_game_with_player();
         game.terrain.clear_floor();
-        game.place_solid_column(point2(5, 5), 3);
+        game.fill_column(point2(5, 5), 3);
         game.place_player(point2(5, 5));
         game.world_time = game.world_start_time;
 
@@ -1209,8 +1208,8 @@ mod tests {
         let loaded = Game::from_snapshot(data, game.graphics().start_time());
 
         assert_eq!(game_state_json(&loaded, Some("test")), json);
-        assert_eq!(loaded.height_at(point2(5, 5)), Some(3));
-        assert_eq!(loaded.height_at(point2(0, 1)), None, "void stayed void");
+        assert_eq!(loaded.surface_at(point2(5, 5)), Some(3));
+        assert_eq!(loaded.surface_at(point2(0, 1)), None, "void stayed void");
     }
 
     #[test]
@@ -1292,8 +1291,7 @@ mod tests {
         // cells whose *apparent* square is on-board but whose *resolved* square
         // is off-board (reached through the portal) were culled.
         let mut game = crate::utils_for_tests::set_up_nxm_game(24, 40);
-        game.board_size = BoardSize::new(20, 12);
-        game.seed_board_floor_for_current_board();
+        game.seed_floor_for_extent(GridExtent::new(20, 12));
         game.place_player(point2(10, 6));
         game.place_double_sided_two_way_portal(
             SquareWithOrthogonalDir::from_square_and_worldstep(point2(10, 2), STEP_DOWN),
@@ -1303,12 +1301,12 @@ mod tests {
 
         let fov = game.player_field_of_view();
         let root = fov.root_square();
-        let board = game.board_size();
-        let on_board = |square: WorldSquare| {
+        let extent = game.grid_extent();
+        let in_extent = |square: WorldSquare| {
             square.x >= 0
-                && square.x < board.width as i32
+                && square.x < extent.width as i32
                 && square.y >= 0
-                && square.y < board.height as i32
+                && square.y < extent.height as i32
         };
         let screen = &game.graphics.screen;
 
@@ -1322,7 +1320,7 @@ mod tests {
             let Some(seen) = fov.resolved_absolute_square(relative) else {
                 continue;
             };
-            if !on_board(naive) || on_board(seen) {
+            if !in_extent(naive) || in_extent(seen) {
                 continue;
             }
             let glyphs = screen.get_glyphs_at_screen_square(square);
@@ -1398,13 +1396,13 @@ pub mod debug {
     /// terrain load right?".
     pub fn height_view(dir: &Path) -> Result<String, String> {
         let game = load_snapshot_game(dir)?;
-        let board = game.board_size();
+        let board = game.grid_extent();
         let mut out = String::from(
-            "Terrain top altitude per column: '.' = bare board/void, digit = height\n",
+            "VoxelGrid top altitude per column: '.' = bare board/void, digit = height\n",
         );
         for y in (0..board.height as i32).rev() {
             for x in 0..board.width as i32 {
-                let glyph = match game.height_at(WorldSquare::new(x, y)) {
+                let glyph = match game.surface_at(WorldSquare::new(x, y)) {
                     Some(h) if h > 0 => char::from_digit((h as u32) % 10, 10).unwrap_or('#'),
                     _ => '.',
                 };

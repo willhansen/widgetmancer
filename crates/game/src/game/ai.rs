@@ -123,7 +123,7 @@ impl Game {
             } else {
                 start_square + repeating_step.stepp() * distance as i32
             };
-            if !self.square_is_on_board(square) {
+            if !self.square_in_extent(square) {
                 break;
             }
             valid_squares.push(square);
@@ -150,7 +150,7 @@ impl Game {
         let closest_move_option_to_player = self
             .move_options_for_piece_at(piece_square)
             .into_iter()
-            .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
+            .filter(|&square| self.square_is_empty(square) && self.square_in_extent(square))
             .min_by_key(|&square| (square - self.player_square()).square_length());
         if let Some(end_square) = closest_move_option_to_player {
             let possible_square_distance = (end_square - self.player_square()).square_length();

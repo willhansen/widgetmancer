@@ -89,22 +89,24 @@ The actual game. Modules:
   `bin/snapshot_tool.rs` (headless render/diff/explain) and
   `bin/glyph_vocabulary.rs`.
 - `game/mod.rs` (~1.8k LOC) — the `Game` state, core accessors, map
-  construction, board geometry, and rendering glue. The rules engine was split
+  construction, grid geometry, and rendering glue. The rules engine was split
   into the modules below (roadmap item 1).
-- `game/blocks.rs`, `game/turns.rs`, `game/combat.rs`, `game/ai.rs`,
-  `game/spawning.rs`, `game/floating_entities.rs`, `game/realtime.rs` — block
-  types (walls, conveyors, upgrades), turn handling, piece
+- `game/floor_features.rs`, `game/turns.rs`, `game/combat.rs`, `game/ai.rs`,
+  `game/spawning.rs`, `game/floating_entities.rs`, `game/realtime.rs` —
+  non-solid floor features (conveyors, upgrades), turn handling, piece
   placement/movement/combat, enemy AI, spawning, floating entities
   (`DeathCube`, `FloatingHunterDrone` unified via a `FloatingEntityTrait`
   delegated with `ambassador`), and the realtime/tick effects.
-- `game/terrain.rs` — the voxel set (per-column tops, floor slab, void).
+- `game/voxel_grid.rs` — the voxel grid: solid voxels, their horizontal
+  `extent`, per-square surface heights, and materials. The single source of
+  truth for geometry (safe floor, walls/stacks, void).
 - `game/map_file.rs` — JSON map recipes (`maps/<name>.json`).
 - `game/map_diagram.rs` — ASCII map/height rendering used by the
   `map_diagram` bin.
 - `game/snapshot.rs` — game-state serialization/loading and the `debug-tools`
   snapshot helpers (render/diff/explain/minimize).
 - `game/tests.rs` — the game-logic test suite.
-- `piece.rs` — pieces on the board: player, pawns, other enemies; `PieceType`
+- `piece.rs` — pieces on the grid: player, pawns, other enemies; `PieceType`
   and an `Upgrade` system.
 - `logical_time.rs` — the injectable `LogicalTime(Duration)` clock (roadmap W.A)
   used by the sim and render paths instead of `std::time::Instant`.
@@ -115,19 +117,19 @@ The actual game. Modules:
 - `portal_geometry.rs` — portal placement/orientation and the transforms
   mapping squares/rays across portal pairs.
 - `graphics.rs` (~1.3k LOC) — bridges game state to `terminal_rendering`:
-  builds drawables for the board, pieces, FOV shading, HUD, and animations.
+  builds drawables for the floor, pieces, FOV shading, HUD, and animations.
 - `graphics/drawable.rs` — game-side drawable implementations
   (`ArrowDrawable`, `BrailleDrawable`, `ConveyorBeltDrawable`,
   `PartialVisibilityDrawable`, `LayeredDrawable`, `TextDrawable`, …) behind a
   `DrawableEnum`.
-- `graphics/starfield.rs` — the off-board procedural starfield.
+- `graphics/starfield.rs` — the off-grid procedural starfield.
 - `graphics/fov_border.rs` — the screen-space FOV border (a `UiLayer` client).
 - `graphics/animations.rs` + `graphics/animations/*` — time-based animation
   system: lasers (simple/floaty), explosions, blinking, radial shockwaves,
   smites, spear/circle attacks, falling boxes, death animations, selector, and
-  a recoiling board.
+  a recoiling floor.
 - `inputmap.rs` — maps `termion` key/mouse events to game commands.
-- `utils_for_tests.rs` — test helpers (board setup, assertions).
+- `utils_for_tests.rs` — test helpers (grid setup, assertions).
 
 ## Runtime Model
 

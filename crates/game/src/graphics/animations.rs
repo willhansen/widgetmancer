@@ -17,12 +17,12 @@ pub_mod_and_use!(
     floaty_laser,
     piece_death_animation,
     radial_shockwave,
-    recoiling_board,
+    recoiling_floor,
     selector_animation,
     simple_laser,
     smite_from_above,
     spear_attack_animation,
-    static_board
+    static_floor
 );
 
 pub type AnimationList = Vec<AnimationEnum>;
@@ -82,7 +82,7 @@ pub enum AnimationEnum {
     FloatyLaser(FloatyLaserAnimation),
     PieceDeath(PieceDeathAnimation),
     RadialShockwave(RadialShockwave),
-    RecoilingBoard(RecoilingBoardAnimation),
+    RecoilingFloor(RecoilingFloorAnimation),
     Selector(SelectorAnimation),
     SimpleLaser(SimpleLaserAnimation),
     Smite(SmiteAnimation),
@@ -119,11 +119,11 @@ mod tests {
 
     #[test]
     fn test_recoil_distance_function_increasing_for_first_half() {
-        let peak_time = RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32();
+        let peak_time = RecoilingFloorAnimation::TIME_TO_PEAK.as_secs_f32();
         let mut prev_d = 0.0;
         let mut t = 0.0;
         loop {
-            let d = RecoilingBoardAnimation::recoil_distance_in_squares_at_age(t).abs();
+            let d = RecoilingFloorAnimation::recoil_distance_in_squares_at_age(t).abs();
             if t >= peak_time {
                 break;
             }
@@ -141,8 +141,8 @@ mod tests {
     #[test]
     fn test_recoil_animation_has_smooth_animation_at_start_of_recoil_left() {
         let board_length = 5;
-        let animation = RecoilingBoardAnimation::new(
-            BoardSize::new(board_length, board_length),
+        let animation = RecoilingFloorAnimation::new(
+            GridExtent::new(board_length, board_length),
             LEFT_I.cast_unit(),
             FloorColorEnum::Function(Graphics::big_chess_pattern),
         );
@@ -174,8 +174,8 @@ mod tests {
     #[ignore = "More for visual debugging than an actual test"]
     fn test_draw_tiny_board_recoil() {
         let board_length = 3;
-        let animation = RecoilingBoardAnimation::new(
-            BoardSize::new(board_length, board_length),
+        let animation = RecoilingFloorAnimation::new(
+            GridExtent::new(board_length, board_length),
             RIGHT_I.cast_unit(),
             FloorColorEnum::Function(Graphics::big_chess_pattern),
         );
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn test_recoil_function_start_at_zero() {
         assert_eq!(
-            RecoilingBoardAnimation::recoil_distance_in_squares_at_age(0.0),
+            RecoilingFloorAnimation::recoil_distance_in_squares_at_age(0.0),
             0.0
         );
     }
@@ -224,7 +224,7 @@ mod tests {
     fn test_recoil_function_start_fast() {
         assert!(
             derivative(
-                RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
+                RecoilingFloorAnimation::recoil_distance_in_squares_at_age,
                 0.0,
                 0.0001,
             ) > 0.0
@@ -234,18 +234,18 @@ mod tests {
     #[test]
     fn test_recoil_function_hit_peak() {
         assert_eq!(
-            RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
-                RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32()
+            RecoilingFloorAnimation::recoil_distance_in_squares_at_age(
+                RecoilingFloorAnimation::TIME_TO_PEAK.as_secs_f32()
             ),
-            RecoilingBoardAnimation::RECOIL_DISTANCE.0
+            RecoilingFloorAnimation::RECOIL_DISTANCE.0
         );
     }
 
     #[test]
     fn test_recoil_function_flat_peak() {
         let slope = derivative(
-            RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
-            RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32(),
+            RecoilingFloorAnimation::recoil_distance_in_squares_at_age,
+            RecoilingFloorAnimation::TIME_TO_PEAK.as_secs_f32(),
             0.0001,
         );
         assert!(slope.abs() < 0.01, "slope: {slope}");
@@ -253,8 +253,8 @@ mod tests {
 
     #[test]
     fn test_recoil_function_fully_relax() {
-        let height = RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
-            RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
+        let height = RecoilingFloorAnimation::recoil_distance_in_squares_at_age(
+            RecoilingFloorAnimation::RECOIL_DURATION.as_secs_f32(),
         );
         assert!(height.abs() < 0.01, "height: {}", height);
     }
@@ -262,8 +262,8 @@ mod tests {
     #[test]
     fn test_recoil_function_relax_flat() {
         let slope = derivative(
-            RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
-            RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
+            RecoilingFloorAnimation::recoil_distance_in_squares_at_age,
+            RecoilingFloorAnimation::RECOIL_DURATION.as_secs_f32(),
             0.0001,
         );
         assert!(slope.abs() < 0.01, "slope: {}", slope);

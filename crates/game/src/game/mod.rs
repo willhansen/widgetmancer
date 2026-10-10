@@ -25,7 +25,7 @@ use glyph_constants::named_colors::*;
 use crate::graphics::game_colors::*;
 
 mod ai;
-mod blocks;
+mod floor_features;
 mod combat;
 mod floating_entities;
 pub mod map_file;
@@ -33,12 +33,12 @@ mod map_diagram;
 mod realtime;
 pub mod snapshot;
 mod spawning;
-mod terrain;
 mod turns;
+mod voxel_grid;
 pub use spawning::IncubatingPawn;
 pub use floating_entities::{DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
-pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, ConveyorBelt, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
-pub use terrain::{Terrain, TerrainMaterial, DEFAULT_TERRAIN_TINT, SLAB_TOP, SLAB_VOXEL_Z};
+pub use floor_features::{conveyor_belt_speed, conveyor_period_just_elapsed, FloorFeatures, ConveyorBelt, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
+pub use voxel_grid::{VoxelGrid, VoxelMaterial, DEFAULT_VOXEL_TINT, FLOOR_TOP, FLOOR_LAYER_Z};
 
 pub const PLAYER_SIGHT_RADIUS: u32 = 16;
 
@@ -105,7 +105,6 @@ impl Widget {
 }
 
 pub struct Game {
-    board_size: BoardSize,
     // (x,y), left to right, top to bottom
     //step_foes: Vec<StepFoe>,
     running: bool,
@@ -113,8 +112,8 @@ pub struct Game {
     player_optional: Option<Player>,
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
-    blocks: Blocks,
-    terrain: Terrain,
+    terrain: VoxelGrid,
+    floor_features: FloorFeatures,
     widgets: HashMap<WorldSquare, Widget>,
     floor_push_arrows: HashMap<WorldSquare, OrthogonalWorldStep>,
     turn_count: u32,
@@ -140,7 +139,7 @@ pub struct Game {
     player_sight_radius: u32,
     fov_cache_enabled: bool,
     // The cache key is only the player square, valid because the FOV is a pure
-    // function of the player square plus the static map. Blocks/portals are
+    // function of the player square plus the static map. Grid/portals are
     // immutable after map setup, but the placement methods invalidate the
     // cache so mid-game map mutation can't render a stale view.
     fov_cache: Option<(WorldSquare, FieldOfViewResult)>,
@@ -152,17 +151,16 @@ pub const GAME_RNG_SEED: u64 = 5;
 
 impl Game {
     pub fn new(terminal_width: u16, terminal_height: u16, start_time: LogicalTime) -> Game {
-        let board_size = BoardSize::new(terminal_width as u32 / 2, terminal_height as u32);
-        let mut terrain = Terrain::new();
-        terrain.seed_board_slab(board_size);
+        let extent = GridExtent::new(terminal_width as u32 / 2, terminal_height as u32);
+        let mut terrain = VoxelGrid::new();
+        terrain.seed_floor(extent);
         let mut game = Game {
-            board_size,
             running: true,
             player_optional: None,
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
-            blocks: Blocks::new(),
             terrain,
+            floor_features: FloorFeatures::new(),
             widgets: HashMap::new(),
             floor_push_arrows: HashMap::new(),
             turn_count: 0,
@@ -187,19 +185,23 @@ impl Game {
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
 
-        game.graphics.set_empty_board_animation();
+        game.graphics.clear_floor_animation();
         game
     }
-    pub fn board_size(&self) -> BoardSize {
-        self.board_size
+
+    /// The horizontal bounds of the voxel grid. Replaces the old standalone
+    /// board: the grid is the source of truth for what is on the map.
+    pub fn grid_extent(&self) -> GridExtent {
+        self.terrain.extent()
     }
 
-    /// Re-derive the floor slab for the current `board_size`. Built-in maps set
-    /// a fixed board independent of the terminal, so they must call this after
-    /// changing it; otherwise the slab keeps the terminal-sized rect from
-    /// `Game::new` and renders as walkable floor (or void) past the board edge.
-    fn seed_board_floor_for_current_board(&mut self) {
-        self.terrain.seed_board_slab(self.board_size);
+    /// Set the grid's horizontal bounds and lay the default floor for them.
+    /// Built-in maps set a fixed extent independent of the terminal, so they
+    /// must call this after construction; otherwise the floor keeps the
+    /// terminal-sized rect from `Game::new` and renders as walkable floor (or
+    /// void) past the map edge.
+    fn seed_floor_for_extent(&mut self, extent: GridExtent) {
+        self.terrain.seed_floor(extent);
     }
 
     pub fn player_is_alive(&self) -> bool {
@@ -231,31 +233,31 @@ impl Game {
     fn player_altitude(&self) -> i32 {
         self.player_optional
             .as_ref()
-            .and_then(|player| self.height_at(player.position))
-            .unwrap_or(SLAB_TOP)
+            .and_then(|player| self.surface_at(player.position))
+            .unwrap_or(FLOOR_TOP)
     }
 
     pub fn mid_square(&self) -> WorldSquare {
         point2(
-            self.board_size().width as i32 / 2,
-            self.board_size().height as i32 / 2,
+            self.grid_extent().width as i32 / 2,
+            self.grid_extent().height as i32 / 2,
         )
     }
 
-    fn square_is_on_board(&self, pos: WorldSquare) -> bool {
+    fn square_in_extent(&self, pos: WorldSquare) -> bool {
         pos.x >= 0
-            && pos.x < self.board_size().width as i32
+            && pos.x < self.grid_extent().width as i32
             && pos.y >= 0
-            && pos.y < self.board_size().height as i32
+            && pos.y < self.grid_extent().height as i32
     }
 
     // TODO: test
 
-    fn point_is_on_board(&self, point: WorldPoint) -> bool {
+    fn point_in_extent(&self, point: WorldPoint) -> bool {
         point.x >= -0.5
-            && point.x < self.board_size().width as f32 - 0.5
+            && point.x < self.grid_extent().width as f32 - 0.5
             && point.y >= -0.5
-            && point.y < self.board_size().height as f32 - 0.5
+            && point.y < self.grid_extent().height as f32 - 0.5
     }
 
     pub fn try_slide_player(&mut self, movement: WorldStep) -> Result<(), ()> {
@@ -358,7 +360,7 @@ impl Game {
             self.portal_aware_single_step(SquareWithKingDir::new(start_square, push_direction))?;
         let (end_square, end_dir) = end_pose.tuple();
 
-        if !self.square_is_on_board(end_square) {
+        if !self.square_in_extent(end_square) {
             // Only widgets may leave the board; anything else (notably the
             // player) refuses to take the step. A widget falls: it vanishes
             // from its edge square and a shrinking-circle animation plays on
@@ -477,7 +479,7 @@ impl Game {
             let next_square = point2(x, y);
             if next_square == start_square {
                 continue;
-            } else if !self.square_is_on_board(next_square) || !self.square_is_empty(next_square) {
+            } else if !self.square_in_extent(next_square) || !self.square_is_empty(next_square) {
                 break;
             }
             candidate_square = next_square;
@@ -523,13 +525,13 @@ impl Game {
         }
 
         let altitude = self.player_altitude();
-        if !self.square_is_on_board(square) || !self.player_can_stand_at(square, altitude) {
+        if !self.square_in_extent(square) || !self.player_can_stand_at(square, altitude) {
             return Err(());
         }
 
-        if let Some(&upgrade) = self.blocks.upgrades.get(&square) {
+        if let Some(&upgrade) = self.floor_features.upgrades.get(&square) {
             self.apply_upgrade(upgrade);
-            self.blocks.upgrades.remove(&square);
+            self.floor_features.upgrades.remove(&square);
         }
 
         self.raw_set_player_position(square);
@@ -544,7 +546,7 @@ impl Game {
     /// before on floor maps. At the default floor altitude this reduces to the
     /// old `!is_block_at`.
     fn player_can_stand_at(&self, square: WorldSquare, current_altitude: i32) -> bool {
-        match self.height_at(square) {
+        match self.surface_at(square) {
             Some(surface) => surface <= current_altitude,
             None => false,
         }
@@ -553,7 +555,7 @@ impl Game {
     /// The player-relative form of `is_block_at`: a column blocks the player
     /// when its top rises above the player's current surface (void included).
     /// On a raised board the column underfoot is not a wall, so entity/empty
-    /// checks must use this rather than `is_block_at`'s flat `z = SLAB_TOP`
+    /// checks must use this rather than `is_block_at`'s flat `z = FLOOR_TOP`
     /// solidity, which is true for every cube column.
     fn square_blocks_player(&self, square: WorldSquare) -> bool {
         !self.player_can_stand_at(square, self.player_altitude())
@@ -645,8 +647,8 @@ impl Game {
         // (the forward pass recolors raised tops); real void gets nothing, so
         // the FOV composite skips it and the starfield paints it.
         let occupied = self.terrain.occupied_squares();
-        self.graphics.draw_static_board(&occupied);
-        self.graphics.draw_board_animation(time);
+        self.graphics.draw_floor_pattern(&occupied);
+        self.graphics.draw_floor_animation(time);
 
         // TODO: fix redundant calculation
         // TODO: make redundant calculation actually produce the same path every time
@@ -659,7 +661,7 @@ impl Game {
             .draw_floor_push_arrows(&self.floor_push_arrows);
 
         self.graphics.draw_conveyor_belts(
-            &self.blocks.conveyor_belts,
+            &self.floor_features.conveyor_belts,
             self.world_time_since_start().as_secs_f32(),
         );
 
@@ -670,7 +672,7 @@ impl Game {
             self.squares_threatened_by_any_piece(true),
         );
 
-        let block_squares = self.terrain.single_height_block_squares();
+        let block_squares = self.terrain.single_layer_squares();
         self.graphics.draw_blocks(&block_squares);
         for (&square, &piece) in &self.pieces {
             if piece.piece_type == Arrow {
@@ -685,7 +687,7 @@ impl Game {
             self.graphics
                 .draw_piece_with_color(square, piece.piece_type, color)
         }
-        self.blocks
+        self.floor_features
             .upgrades
             .iter()
             .for_each(|(&square, &upgrade)| self.graphics.draw_upgrade(square, upgrade));
@@ -710,7 +712,7 @@ impl Game {
                 .draw_drawable_to_draw_buffer(square, &pushable.drawable())
         });
         self.graphics.remove_finished_animations(time);
-        self.graphics.draw_non_board_animations(time);
+        self.graphics.draw_non_floor_animations(time);
         if self.player_is_alive() {
             self.graphics
                 .draw_player(self.player_square(), self.player_faced_direction());
@@ -861,7 +863,7 @@ impl Game {
     }
 
     pub fn is_upgrade_at(&self, square: WorldSquare) -> bool {
-        self.blocks.is_upgrade_at(square)
+        self.floor_features.is_upgrade_at(square)
     }
     pub fn is_arrow_at(&self, square: WorldSquare) -> bool {
         self.pieces
@@ -1023,7 +1025,7 @@ impl Game {
         self.floor_push_arrows.insert(square, dir.into());
     }
     pub fn place_conveyor_belt(&mut self, square: WorldSquare, dir: WorldStep) {
-        self.blocks.place_conveyor_belt(square, dir);
+        self.floor_features.place_conveyor_belt(square, dir);
     }
     /// Place a conveyor belt at `speed_multiplier` times the default speed.
     pub fn place_conveyor_belt_with_speed(
@@ -1032,7 +1034,7 @@ impl Game {
         dir: WorldStep,
         speed_multiplier: f32,
     ) {
-        self.blocks
+        self.floor_features
             .place_conveyor_belt_with_speed(square, dir, speed_multiplier);
     }
     pub fn conveyor_belt_speed() -> f32 {
@@ -1042,54 +1044,54 @@ impl Game {
     /// Place a one-voxel-tall solid column: the gameplay "block" and the
     /// trivial case of placed terrain.
     pub fn place_block(&mut self, square: WorldSquare) {
-        self.terrain.place_solid_column(square, 1);
+        self.terrain.fill_column(square, 1);
         // Blocks keep their legacy look (the block glyph's own background).
         self.terrain
-            .set_material(square, TerrainMaterial::Tint(glyph_constants::BLOCK_BG));
+            .set_material(square, VoxelMaterial::Tint(glyph_constants::BLOCK_BG));
         self.invalidate_fov_cache();
     }
     pub fn place_voxel(&mut self, voxel: WorldVoxel) {
         self.terrain.place_voxel(voxel);
-        if voxel.z >= SLAB_TOP {
+        if voxel.z >= FLOOR_TOP {
             self.invalidate_fov_cache();
         }
     }
     /// Fill a solid column of `top_height` voxels sitting on the slab.
-    pub fn place_solid_column(&mut self, square: WorldSquare, top_height: u32) {
-        self.terrain.place_solid_column(square, top_height);
+    pub fn fill_column(&mut self, square: WorldSquare, top_height: u32) {
+        self.terrain.fill_column(square, top_height);
         self.invalidate_fov_cache();
     }
     /// Fill a solid column with an explicit material tint.
-    pub fn place_solid_column_with_material(
+    pub fn fill_column_with_material(
         &mut self,
         square: WorldSquare,
         top_height: u32,
-        material: TerrainMaterial,
+        material: VoxelMaterial,
     ) {
         self.terrain
-            .place_solid_column_with_material(square, top_height, material);
+            .fill_column_with_material(square, top_height, material);
         self.invalidate_fov_cache();
     }
-    pub fn set_terrain_material(&mut self, square: WorldSquare, material: TerrainMaterial) {
+    pub fn set_voxel_material(&mut self, square: WorldSquare, material: VoxelMaterial) {
         self.terrain.set_material(square, material);
     }
-    pub fn terrain_material_at(&self, square: WorldSquare) -> TerrainMaterial {
+    pub fn voxel_material_at(&self, square: WorldSquare) -> VoxelMaterial {
         self.terrain.material_at(square)
     }
     pub fn is_solid_at(&self, x: i32, y: i32, z: i32) -> bool {
         self.terrain.is_solid_at(x, y, z)
     }
-    pub fn height_at(&self, square: WorldSquare) -> Option<i32> {
-        self.terrain.height_at(square)
+    pub fn surface_at(&self, square: WorldSquare) -> Option<i32> {
+        self.terrain.surface_at(square)
     }
     /// Every square solid at the gameplay block altitude (`0`), i.e. the sight
     /// blockers and the flat "block" glyphs. The slab is at `-1`, so bare board
     /// is excluded.
     pub fn block_squares(&self) -> SquareSet {
-        self.terrain.solid_squares_at_altitude(SLAB_TOP)
+        self.terrain.solid_squares_at_altitude(FLOOR_TOP)
     }
     pub fn is_block_at(&self, square: WorldSquare) -> bool {
-        self.is_solid_at(square.x, square.y, SLAB_TOP)
+        self.is_solid_at(square.x, square.y, FLOOR_TOP)
     }
     pub fn set_up_vs_arrows(&mut self) {
         (0..10).for_each(|i| {
@@ -1174,10 +1176,10 @@ impl Game {
             RGB8::new(176, 82, 96),
         ];
         for (i, (height, tint)) in [1u32, 3, 2, 4].into_iter().zip(tints).enumerate() {
-            self.place_solid_column_with_material(
+            self.fill_column_with_material(
                 base + STEP_RIGHT * i as i32,
                 height,
-                TerrainMaterial::Tint(tint),
+                VoxelMaterial::Tint(tint),
             );
         }
     }
@@ -1325,8 +1327,7 @@ impl Game {
     /// The exhibits span ~30x19 squares around the player, so the game
     /// clamps the terminal to at least 96x26 characters for this map.
     pub fn set_up_portal_cube_racetrack_map(&mut self) {
-        self.board_size = BoardSize::new(48, 26);
-        self.seed_board_floor_for_current_board();
+        self.seed_floor_for_extent(GridExtent::new(48, 26));
         self.place_player(point2(24, 13));
         let base = self.player_square();
 
@@ -1457,8 +1458,7 @@ impl Game {
     /// - bottom: two-way, double-sided — also registers the backs of both
     ///   windows, giving the guard more faces to skip at each emergence.
     pub fn set_up_portal_pair_hallways_map(&mut self) {
-        self.board_size = BoardSize::new(48, 26);
-        self.seed_board_floor_for_current_board();
+        self.seed_floor_for_extent(GridExtent::new(48, 26));
         self.place_player(point2(24, 13));
         let base = self.player_square();
 
@@ -1494,8 +1494,7 @@ impl Game {
     /// the longest chain the player can shove. Widgets near the edges can be
     /// pushed off the board, where they fall with a shrinking-square animation.
     pub fn set_up_numbered_boxes_map(&mut self) {
-        self.board_size = BoardSize::new(20, 20);
-        self.seed_board_floor_for_current_board();
+        self.seed_floor_for_extent(GridExtent::new(20, 20));
         self.place_player(point2(10, 10));
 
         let box_positions = [
@@ -1618,7 +1617,7 @@ impl Game {
     }
 
     pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {
-        let board_squares_total = self.board_size().width * self.board_size().height;
+        let board_squares_total = self.grid_extent().width * self.grid_extent().height;
         let num_blocks = board_squares_total / 3;
         for _ in 0..num_blocks {
             self.place_block_randomly(rng);
@@ -1676,7 +1675,7 @@ impl Game {
         let altitude = self.player_altitude();
         self.block_squares()
             .into_iter()
-            .filter(|&square| self.height_at(square).is_some_and(|top| top > altitude))
+            .filter(|&square| self.surface_at(square).is_some_and(|top| top > altitude))
             .collect()
     }
 

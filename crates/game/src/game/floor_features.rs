@@ -71,12 +71,12 @@ pub fn conveyor_period_just_elapsed(
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct Blocks {
+pub struct FloorFeatures {
     pub upgrades: HashMap<WorldSquare, Upgrade>,
     pub conveyor_belts: HashMap<WorldSquare, ConveyorBelt>,
 }
 
-impl Blocks {
+impl FloorFeatures {
     pub fn new() -> Self {
         Self::default()
     }

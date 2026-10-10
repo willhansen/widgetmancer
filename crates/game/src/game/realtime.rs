@@ -178,9 +178,9 @@ impl Game {
         let mut out_vel = vel;
 
         let xmin = -0.5;
-        let xmax = self.board_size().width as f32 - 0.5;
+        let xmax = self.grid_extent().width as f32 - 0.5;
         let ymin = -0.5;
-        let ymax = self.board_size().height as f32 - 0.5;
+        let ymax = self.grid_extent().height as f32 - 0.5;
 
         if (pos.x < xmin && vel.x < 0.0) || (pos.x > xmax && vel.x > 0.0) {
             out_vel.x *= -1.0;
@@ -198,7 +198,7 @@ impl Game {
         // period boundary is crossed, so different belts can run at different
         // speeds (issue 0016).
         let push_this_tick: HashMap<WorldSquare, KingWorldStep> = self
-            .blocks
+            .floor_features
             .conveyor_belts
             .iter()
             .filter(|(_, belt)| {
@@ -212,13 +212,13 @@ impl Game {
 
         // Floating entities move continuously, each square at its belt's speed.
         let push_directions: HashMap<WorldSquare, KingWorldStep> = self
-            .blocks
+            .floor_features
             .conveyor_belts
             .iter()
             .map(|(&start_square, belt)| (start_square, belt.direction.into()))
             .collect();
         let push_distances: HashMap<WorldSquare, f32> = self
-            .blocks
+            .floor_features
             .conveyor_belts
             .iter()
             .map(|(&start_square, belt)| (start_square, belt.speed() * delta.as_secs_f32()))
@@ -236,7 +236,7 @@ impl Game {
             .cloned()
             .filter(|death_cube: &DeathCube| {
                 let square = world_point_to_world_square(death_cube.position);
-                self.square_is_on_board(square)
+                self.square_in_extent(square)
             })
             .collect();
         self.death_cubes = cubes_on_board;

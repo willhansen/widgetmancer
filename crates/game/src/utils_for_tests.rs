@@ -10,8 +10,8 @@ pub fn set_up_nxm_game(rows: u32, cols: u32) -> Game {
     Game::new(cols as u16 * 2, rows as u16, LogicalTime::ZERO)
 }
 
-pub fn set_up_nxn_game(board_size: u32) -> Game {
-    set_up_nxm_game(board_size, board_size)
+pub fn set_up_nxn_game(extent: u32) -> Game {
+    set_up_nxm_game(extent, extent)
 }
 
 pub fn set_up_10x10_game() -> Game {

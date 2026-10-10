@@ -1433,9 +1433,9 @@ where
 }
 
 // TODO: turn into iter
-pub fn squares_on_board(size: BoardSize) -> SquareSet {
-    (0..size.width)
-        .cartesian_product((0..size.height).into_iter())
+pub fn squares_in_extent(extent: GridExtent) -> SquareSet {
+    (0..extent.width)
+        .cartesian_product((0..extent.height).into_iter())
         .map(|(x, y)| WorldSquare::new(x as i32, y as i32))
         .collect()
 }
@@ -2243,9 +2243,9 @@ mod tests {
     }
 
     #[test]
-    fn test_squares_on_board() {
-        let size = BoardSize::new(5, 40);
-        let squares = squares_on_board(size);
+    fn test_squares_in_extent() {
+        let extent = GridExtent::new(5, 40);
+        let squares = squares_in_extent(extent);
         assert!(squares.contains(&point2(4, 20)));
         assert_false!(squares.contains(&point2(14, 2)));
     }

@@ -12,7 +12,7 @@
 //! the frame). This keeps the sky continuous when the player steps through a
 //! portal; a portal-free scene has a single frame rooted at the player.
 //!
-//! Everything is a pure function of `(screen, fov, board_size, time)`: there is
+//! Everything is a pure function of `(screen, fov, extent, time)`: there is
 //! no per-frame state, so repeated draws of the same moment produce
 //! byte-identical buffers (see `test_headless_frames_are_byte_identical`). The
 //! star lattice is conceptually infinite — moving or drifting just reveals new
@@ -305,11 +305,11 @@ fn char_offset_to_world_offset(screen: &Screen, char_offset: Vec2) -> Vec2 {
 }
 
 #[cfg(test)]
-fn is_on_board(square: WorldSquare, board_size: BoardSize) -> bool {
+fn is_in_extent(square: WorldSquare, extent: GridExtent) -> bool {
     square.x >= 0
-        && square.x < board_size.width as i32
+        && square.x < extent.width as i32
         && square.y >= 0
-        && square.y < board_size.height as i32
+        && square.y < extent.height as i32
 }
 
 fn scale_color(color: RGB8, factor: f32) -> RGB8 {
@@ -356,8 +356,8 @@ mod tests {
         Screen::new(80, 24)
     }
 
-    fn board_with_visible_void() -> BoardSize {
-        BoardSize::new(10, 10)
+    fn extent_with_visible_void() -> GridExtent {
+        GridExtent::new(10, 10)
     }
 
     fn count_star_cells(screen: &Screen) -> usize {
@@ -375,7 +375,7 @@ mod tests {
         screen.set_screen_center_by_world_square(point2(5, 5));
         let before = screen.screen_buffer.clone();
 
-        Starfield::new().draw(&mut screen, &squares_on_board(BoardSize::new(20, 20)), LogicalTime::ZERO, None, &HashSet::new());
+        Starfield::new().draw(&mut screen, &squares_in_extent(GridExtent::new(20, 20)), LogicalTime::ZERO, None, &HashSet::new());
 
         assert_eq!(screen.screen_buffer, before);
     }
@@ -384,9 +384,9 @@ mod tests {
     fn draws_stars_in_the_void_and_only_there() {
         let mut screen = test_screen();
         screen.set_screen_center_by_world_square(point2(5, 5));
-        let board_size = board_with_visible_void();
+        let extent = extent_with_visible_void();
 
-        Starfield::new().draw(&mut screen, &squares_on_board(board_size), LogicalTime::ZERO, None, &HashSet::new());
+        Starfield::new().draw(&mut screen, &squares_in_extent(extent), LogicalTime::ZERO, None, &HashSet::new());
 
         assert!(count_star_cells(&screen) > 0, "expected some stars");
         for x in 0..screen.terminal_width() {
@@ -399,7 +399,7 @@ mod tests {
                     ScreenBufferCharacterSquare::new(x, y),
                 );
                 assert!(
-                    !is_on_board(square, board_size),
+                    !is_in_extent(square, extent),
                     "star drawn on board square {square:?}"
                 );
             }
@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn stars_only_inside_the_fov_over_undrawn_void() {
         // A small board so plenty of off-board squares fall inside the FOV.
-        let board_size = BoardSize::new(4, 4);
+        let extent = GridExtent::new(4, 4);
         let center = point2(2, 2);
         let mut screen = test_screen();
         screen.set_screen_center_by_world_square(center);
@@ -422,7 +422,7 @@ mod tests {
 
         Starfield::new().draw(
             &mut screen,
-            &squares_on_board(board_size),
+            &squares_in_extent(extent),
             LogicalTime::ZERO,
             Some(&fov),
             &HashSet::new(),
@@ -439,7 +439,7 @@ mod tests {
                     ScreenBufferCharacterSquare::new(x, y),
                 );
                 assert!(
-                    !is_on_board(square, board_size),
+                    !is_in_extent(square, extent),
                     "star drawn on board square {square:?}"
                 );
                 let relative = square - fov.root_square();
@@ -455,7 +455,7 @@ mod tests {
     fn stars_are_not_drawn_where_the_fov_composite_drew() {
         // The portal-view floor occupies off-board screen cells; the starfield
         // must not overwrite it even though those cells are FOV-visible.
-        let board_size = BoardSize::new(4, 4);
+        let extent = GridExtent::new(4, 4);
         let center = point2(2, 2);
         let mut screen = test_screen();
         screen.set_screen_center_by_world_square(center);
@@ -471,7 +471,7 @@ mod tests {
         let before = screen.screen_buffer.clone();
         Starfield::new().draw(
             &mut screen,
-            &squares_on_board(board_size),
+            &squares_in_extent(extent),
             LogicalTime::ZERO,
             Some(&fov),
             &everything_drawn,
@@ -481,12 +481,12 @@ mod tests {
 
     #[test]
     fn same_time_and_camera_are_byte_identical() {
-        let board_size = board_with_visible_void();
+        let extent = extent_with_visible_void();
 
         let render = || {
             let mut screen = test_screen();
             screen.set_screen_center_by_world_square(point2(5, 5));
-            Starfield::new().draw(&mut screen, &squares_on_board(board_size), LogicalTime::from_secs_f32(3.0), None, &HashSet::new());
+            Starfield::new().draw(&mut screen, &squares_in_extent(extent), LogicalTime::from_secs_f32(3.0), None, &HashSet::new());
             screen.screen_buffer
         };
 
@@ -495,12 +495,12 @@ mod tests {
 
     #[test]
     fn time_drift_moves_the_stars() {
-        let board_size = board_with_visible_void();
+        let extent = extent_with_visible_void();
 
         let render = |time| {
             let mut screen = test_screen();
             screen.set_screen_center_by_world_square(point2(5, 5));
-            Starfield::new().draw(&mut screen, &squares_on_board(board_size), LogicalTime::from_secs_f32(time), None, &HashSet::new());
+            Starfield::new().draw(&mut screen, &squares_in_extent(extent), LogicalTime::from_secs_f32(time), None, &HashSet::new());
             screen.screen_buffer
         };
 

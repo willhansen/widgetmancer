@@ -12,10 +12,10 @@ use euclid::point2;
 use rgb::RGB8;
 use serde::Deserialize;
 
-use utility::coordinate_frame_conversions::{BoardSize, WorldSquare, WorldStep, WorldVoxel};
+use utility::coordinate_frame_conversions::{GridExtent, WorldSquare, WorldStep, WorldVoxel};
 use utility::{SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
 
-use super::{Game, TerrainMaterial, Widget, SLAB_VOXEL_Z};
+use super::{Game, VoxelMaterial, Widget, FLOOR_LAYER_Z};
 
 /// Side length of a `space-cubes` cube, in world squares (the demo's constant).
 const CUBE_SIZE: i32 = 10;
@@ -125,14 +125,13 @@ fn tint_of(tint: Option<[u8; 3]>) -> Option<RGB8> {
 }
 
 impl Game {
-    /// Apply a map recipe: set the board, optionally clear the default floor,
-    /// run the ops in order, then place the player.
+    /// Apply a map recipe: set the grid extent, optionally clear the default
+    /// floor, run the ops in order, then place the player.
     pub fn apply_map_file(&mut self, map: &MapFile) {
         if let Some([width, height]) = map.board {
-            self.board_size = BoardSize::new(width, height);
-            // Recipes own their board; derive the default floor from it rather
-            // than inheriting the terminal-sized slab from `Game::new`.
-            self.seed_board_floor_for_current_board();
+            // Recipes own their extent; derive the default floor from it rather
+            // than inheriting the terminal-sized floor from `Game::new`.
+            self.seed_floor_for_extent(GridExtent::new(width, height));
         }
         if map.clear_floor {
             self.terrain.clear_floor();
@@ -153,7 +152,7 @@ impl Game {
             MapOp::FillFloorRect { x, y, width, height } => {
                 for yy in y..y + height {
                     for xx in x..x + width {
-                        self.place_voxel(WorldVoxel::new(xx, yy, SLAB_VOXEL_Z));
+                        self.place_voxel(WorldVoxel::new(xx, yy, FLOOR_LAYER_Z));
                     }
                 }
             }
@@ -169,9 +168,9 @@ impl Game {
                 if let Some(tint) = tint_of(tint) {
                     for yy in y..y + depth {
                         for xx in x..x + width {
-                            self.set_terrain_material(
+                            self.set_voxel_material(
                                 point2(xx, yy),
-                                TerrainMaterial::Tint(tint),
+                                VoxelMaterial::Tint(tint),
                             );
                         }
                     }
@@ -180,18 +179,18 @@ impl Game {
             MapOp::Column { x, y, height, tint } => {
                 let square = point2(x, y);
                 match tint_of(tint) {
-                    Some(tint) => self.place_solid_column_with_material(
+                    Some(tint) => self.fill_column_with_material(
                         square,
                         height,
-                        TerrainMaterial::Tint(tint),
+                        VoxelMaterial::Tint(tint),
                     ),
-                    None => self.place_solid_column(square, height),
+                    None => self.fill_column(square, height),
                 }
             }
             MapOp::Voxel { x, y, z, tint } => {
                 self.place_voxel(WorldVoxel::new(x, y, z));
                 if let Some(tint) = tint_of(tint) {
-                    self.set_terrain_material(point2(x, y), TerrainMaterial::Tint(tint));
+                    self.set_voxel_material(point2(x, y), VoxelMaterial::Tint(tint));
                 }
             }
             MapOp::CubeSidePlatforms { x, y } => self.place_cube_side_platforms(point2(x, y)),
@@ -236,7 +235,7 @@ impl Game {
             let y = cy - dy;
             for x in cx + x_start..cx + x_start + 3 {
                 self.place_voxel(WorldVoxel::new(x, y, z));
-                self.set_terrain_material(point2(x, y), TerrainMaterial::Tint(tint));
+                self.set_voxel_material(point2(x, y), VoxelMaterial::Tint(tint));
             }
         }
         // East and west pairs: (offset from the face, y start, slab z, x length).
@@ -248,7 +247,7 @@ impl Game {
                 for y in cy + y_start..cy + y_start + 5 {
                     for x in [east_start + step, west_start + step] {
                         self.place_voxel(WorldVoxel::new(x, y, z));
-                        self.set_terrain_material(point2(x, y), TerrainMaterial::Tint(tint));
+                        self.set_voxel_material(point2(x, y), VoxelMaterial::Tint(tint));
                     }
                 }
             }
@@ -280,19 +279,19 @@ mod tests {
         let mut game = Game::new(20, 10, crate::LogicalTime::ZERO);
         game.apply_map_file(&map);
 
-        assert_eq!(game.board_size(), BoardSize::new(10, 10));
-        assert_eq!(game.height_at(point2(2, 2)), Some(3));
-        assert_eq!(game.height_at(point2(4, 4)), Some(7), "floating voxel");
-        assert_eq!(game.height_at(point2(0, 0)), None, "floor cleared");
+        assert_eq!(game.grid_extent(), GridExtent::new(10, 10));
+        assert_eq!(game.surface_at(point2(2, 2)), Some(3));
+        assert_eq!(game.surface_at(point2(4, 4)), Some(7), "floating voxel");
+        assert_eq!(game.surface_at(point2(0, 0)), None, "floor cleared");
         assert_eq!(game.player_square(), point2(2, 2));
         assert!(game.widgets.contains_key(&point2(5, 5)), "widget placed");
         assert_eq!(
-            game.blocks.conveyor_belts.get(&point2(6, 5)),
+            game.floor_features.conveyor_belts.get(&point2(6, 5)),
             Some(&ConveyorBelt::with_default_period(STEP_RIGHT.into())),
             "default-speed belt placed"
         );
         assert_eq!(
-            game.blocks.conveyor_belts.get(&point2(7, 5)),
+            game.floor_features.conveyor_belts.get(&point2(7, 5)),
             Some(&ConveyorBelt::new(
                 STEP_UP.into(),
                 CONVEYOR_BELT_MOVEMENT_PERIOD.div_f32(2.0)

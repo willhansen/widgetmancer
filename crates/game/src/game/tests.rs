@@ -564,9 +564,9 @@
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_piece(Piece::new(King, game.default_enemy_faction), square);
-        assert!(game.blocks.upgrades.is_empty());
+        assert!(game.floor_features.upgrades.is_empty());
         game.capture_piece_at(square);
-        assert_eq!(game.blocks.upgrades.get(&square).unwrap(), &BlinkRange);
+        assert_eq!(game.floor_features.upgrades.get(&square).unwrap(), &BlinkRange);
     }
 
     #[test]
@@ -1481,7 +1481,7 @@
     #[test]
     fn test_horizontal_wide_portal_has_smooth_edge() {
         let mut game = set_up_nxm_game(16, 10);
-        let player_square: WorldSquare = point2(3, game.board_size.height as i32 / 2);
+        let player_square: WorldSquare = point2(3, game.grid_extent().height as i32 / 2);
         game.place_player(player_square);
 
         let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
@@ -2076,8 +2076,8 @@
         let mut game = set_up_10x10_game();
         game.set_up_numbered_boxes_map();
 
-        assert_eq!(game.board_size().width, 20);
-        assert_eq!(game.board_size().height, 20);
+        assert_eq!(game.grid_extent().width, 20);
+        assert_eq!(game.grid_extent().height, 20);
         assert_eq!(game.player_square(), point2(10, 10));
         assert_eq!(game.widgets.len(), 10);
         let mut values: Vec<u32> = game.widgets.values().map(|widget| widget.val()).collect();
@@ -3281,7 +3281,7 @@
         let mut game = set_up_nxn_game(14);
         let column = point2(7, 7);
         game.place_player(point2(5, 7));
-        game.place_solid_column(column, 3);
+        game.fill_column(column, 3);
         game.draw_headless_now();
 
         let screen = &game.graphics().screen;
@@ -3312,7 +3312,7 @@
         // above it (which pushed tall cubes out of the top of the frame).
         let mut game = set_up_nxn_game(14);
         let column = point2(7, 7);
-        game.place_solid_column(column, 3);
+        game.fill_column(column, 3);
         game.place_player(column);
         game.draw_headless_now();
 
@@ -3328,7 +3328,7 @@
     }
 
     #[test]
-    fn single_height_blocks_keep_the_flat_projection() {
+    fn single_layer_blocks_keep_the_flat_projection() {
         use terminal_rendering::glyph::Glyph;
 
         // The forward pass is gated to boards taller than one voxel, so a plain
@@ -3361,10 +3361,10 @@
         let mut game = set_up_nxn_game(14);
         game.place_player(point2(5, 7));
         let column = point2(7, 7);
-        game.place_solid_column_with_material(
+        game.fill_column_with_material(
             column,
             3,
-            TerrainMaterial::Tint(RGB8::new(200, 40, 40)),
+            VoxelMaterial::Tint(RGB8::new(200, 40, 40)),
         );
         game.draw_headless_now();
 
@@ -3417,8 +3417,8 @@
         // south (y=7, height 2) share a screen row one above the south base.
         let mut game = set_up_nxn_game(14);
         game.place_player(point2(5, 7));
-        game.place_solid_column(point2(7, 9), 4);
-        game.place_solid_column(point2(7, 7), 2);
+        game.fill_column(point2(7, 9), 4);
+        game.fill_column(point2(7, 7), 2);
         game.draw_headless_now();
 
         let screen = &game.graphics().screen;
@@ -3437,7 +3437,7 @@
         // below the FOV frame. No terrain glyph may land outside the frame.
         let mut game = set_up_nxn_game(14);
         let column = point2(7, 7);
-        game.place_solid_column(column, 40);
+        game.fill_column(column, 40);
         game.place_player(column);
         game.draw_headless_now();
 
@@ -3464,7 +3464,7 @@
         let mut game = set_up_nxn_game(14);
         game.place_player(point2(5, 7));
         let column = point2(7, 7);
-        game.place_solid_column(column, 3);
+        game.fill_column(column, 3);
         game.place_conveyor_belt(column, STEP_RIGHT);
         game.draw_headless_now();
 
@@ -3486,7 +3486,7 @@
         let mut game = set_up_nxn_game(14);
         let run = [point2(5, 7), point2(5, 9)];
         for &square in &run {
-            game.place_solid_column(square, 3);
+            game.fill_column(square, 3);
             game.place_conveyor_belt(square, STEP_UP);
         }
         game.place_player(run[0]);
@@ -3550,7 +3550,7 @@
             game.place_block(point2(6, 10 + dy));
         }
         let column = point2(10, 10);
-        game.place_solid_column(column, 4);
+        game.fill_column(column, 4);
         game.draw_headless_now();
 
         let screen = &game.graphics().screen;
@@ -3604,7 +3604,7 @@
         let exit = SquareWithOrthogonalDir::from_square_and_step(point2(14, 18), STEP_UP.into());
         game.place_double_sided_two_way_portal(entrance, exit);
         let column = point2(14, 19);
-        game.place_solid_column(column, 4);
+        game.fill_column(column, 4);
         game.draw_headless_now();
 
         let screen = &game.graphics().screen;
@@ -3647,8 +3647,8 @@
     fn player_walks_down_terrain_but_not_up_or_into_void() {
         let mut game = set_up_nxn_game(12);
         game.terrain.clear_floor();
-        game.place_solid_column(point2(5, 5), 3);
-        game.place_solid_column(point2(5, 6), 2);
+        game.fill_column(point2(5, 5), 3);
+        game.fill_column(point2(5, 6), 2);
         game.place_player(point2(5, 5));
 
         assert!(
@@ -3671,18 +3671,18 @@
         let mut game = Game::new(84, 38, LogicalTime::ZERO);
         crate::set_up_map_by_name(&mut game, Some("space-cubes"));
 
-        assert_eq!(game.board_size(), BoardSize::new(42, 38));
+        assert_eq!(game.grid_extent(), GridExtent::new(42, 38));
         // Four 10x10x10 cubes at (4,4), (28,4), (4,28), (28,28).
         for (cx, cy) in [(4, 4), (28, 4), (4, 28), (28, 28)] {
-            assert_eq!(game.height_at(point2(cx, cy)), Some(10));
-            assert_eq!(game.height_at(point2(cx + 9, cy + 9)), Some(10));
+            assert_eq!(game.surface_at(point2(cx, cy)), Some(10));
+            assert_eq!(game.surface_at(point2(cx + 9, cy + 9)), Some(10));
         }
-        assert_eq!(game.height_at(point2(14, 14)), None, "gap is real void");
+        assert_eq!(game.surface_at(point2(14, 14)), None, "gap is real void");
         // South staircase first step: thin slab at z=7 (surface 8).
-        assert_eq!(game.height_at(point2(7, 3)), Some(8));
+        assert_eq!(game.surface_at(point2(7, 3)), Some(8));
         assert!(game.is_solid_at(7, 3, 7) && !game.is_solid_at(7, 3, 6), "thin");
         // East ledge at z=6 (surface 7).
-        assert_eq!(game.height_at(point2(14, 6)), Some(7));
+        assert_eq!(game.surface_at(point2(14, 6)), Some(7));
         // Player starts on the first cube top.
         assert_eq!(game.player_square(), point2(9, 9));
         game.draw_headless_now();
@@ -3694,29 +3694,29 @@
         // floor slab must be re-derived from that board. Regression for issues
         // 0001/0002: a wide terminal left a terminal-sized slab that rendered
         // as walkable floor past the board edge, which movement then refused.
-        let cases: [(&str, fn(&mut Game), BoardSize); 3] = [
+        let cases: [(&str, fn(&mut Game), GridExtent); 3] = [
             (
                 "racetrack",
                 Game::set_up_portal_cube_racetrack_map,
-                BoardSize::new(48, 26),
+                GridExtent::new(48, 26),
             ),
             (
                 "hallways",
                 Game::set_up_portal_pair_hallways_map,
-                BoardSize::new(48, 26),
+                GridExtent::new(48, 26),
             ),
             (
                 "numbered-boxes",
                 Game::set_up_numbered_boxes_map,
-                BoardSize::new(20, 20),
+                GridExtent::new(20, 20),
             ),
         ];
         for (name, set_up, board) in cases {
             // A terminal-derived board that does not match the map's board.
             let mut game = Game::new(400, 120, LogicalTime::ZERO);
-            assert_ne!(game.board_size(), board, "{name}: terminal board must differ");
+            assert_ne!(game.grid_extent(), board, "{name}: terminal board must differ");
             set_up(&mut game);
-            assert_eq!(game.board_size(), board, "{name}: board");
+            assert_eq!(game.grid_extent(), board, "{name}: board");
             let occupied = game.terrain.occupied_squares();
             assert_eq!(
                 occupied.len(),
@@ -3725,7 +3725,7 @@
             );
             for &square in &occupied {
                 assert!(
-                    game.square_is_on_board(square),
+                    game.square_in_extent(square),
                     "{name}: floor off the board at {square:?}"
                 );
             }
@@ -3737,12 +3737,12 @@
         let mut game = Game::new(400, 120, LogicalTime::ZERO);
         crate::set_up_map_by_name(&mut game, Some("portals-and-death-cubes-demo"));
         // Issue 0001: floor used to be drawn above the top edge at (19, 24).
-        assert_eq!(game.height_at(point2(19, 24)), None, "void above the top edge");
+        assert_eq!(game.surface_at(point2(19, 24)), None, "void above the top edge");
         // Issue 0002: ...and right of the right edge at (40, 13).
-        assert_eq!(game.height_at(point2(40, 13)), None, "void right of the right edge");
+        assert_eq!(game.surface_at(point2(40, 13)), None, "void right of the right edge");
         // The board itself is still bare floor.
-        assert_eq!(game.height_at(point2(19, 23)), Some(SLAB_TOP));
-        assert_eq!(game.height_at(point2(39, 13)), Some(SLAB_TOP));
+        assert_eq!(game.surface_at(point2(19, 23)), Some(FLOOR_TOP));
+        assert_eq!(game.surface_at(point2(39, 13)), Some(FLOOR_TOP));
     }
 
     #[test]
@@ -3754,7 +3754,7 @@
         // its death turret.
         let mut game = Game::new(400, 120, LogicalTime::ZERO);
         crate::set_up_map_by_name(&mut game, Some("portals-and-death-cubes-demo"));
-        assert_eq!(game.board_size(), BoardSize::new(40, 24));
+        assert_eq!(game.grid_extent(), GridExtent::new(40, 24));
         let mut keys: Vec<_> = game
             .portal_geometry
             .iter_portals()
@@ -3820,15 +3820,15 @@
     fn default_map_is_the_cubes_recipe() {
         let mut game = Game::new(400, 120, LogicalTime::ZERO);
         crate::set_up_map_by_name(&mut game, None);
-        assert_eq!(game.board_size(), BoardSize::new(38, 38));
+        assert_eq!(game.grid_extent(), GridExtent::new(38, 38));
         // The player stands on the middle cube's top face (10 voxels tall).
         assert_eq!(game.player_square(), point2(19, 19));
-        assert_eq!(game.height_at(point2(19, 19)), Some(10));
+        assert_eq!(game.surface_at(point2(19, 19)), Some(10));
         // 3-wide bridges join the nine tops across the 2-square gaps; the
         // corners between gaps stay void.
-        assert_eq!(game.height_at(point2(12, 18)), Some(10), "x-gap bridge");
-        assert_eq!(game.height_at(point2(6, 12)), Some(10), "y-gap bridge");
-        assert_eq!(game.height_at(point2(12, 12)), None, "gap corner is void");
+        assert_eq!(game.surface_at(point2(12, 18)), Some(10), "x-gap bridge");
+        assert_eq!(game.surface_at(point2(6, 12)), Some(10), "y-gap bridge");
+        assert_eq!(game.surface_at(point2(12, 12)), None, "gap corner is void");
         assert_eq!(game.terrain.occupied_squares().len(), 9 * 100 + 12 * 6);
         // Pushable widgets and conveyor belts are part of the default scene.
         assert_eq!(game.widgets.len(), 6, "widgets placed");
@@ -3836,16 +3836,16 @@
         // run's last square is its entrance, and the top-right cube run starts
         // at its exit.
         assert!(
-            game.blocks.conveyor_belts.contains_key(&point2(27, 18)),
+            game.floor_features.conveyor_belts.contains_key(&point2(27, 18)),
             "belt on the portal entrance"
         );
         assert!(
-            game.blocks.conveyor_belts.contains_key(&point2(33, 30)),
+            game.floor_features.conveyor_belts.contains_key(&point2(33, 30)),
             "belt continuing from the portal exit"
         );
         // Issue 0016: belts run at different speeds, and the vertical run ramps
         // slow at the ends to fastest at the middle.
-        let speed_at = |square| game.blocks.conveyor_belts.get(&square).unwrap().speed();
+        let speed_at = |square| game.floor_features.conveyor_belts.get(&square).unwrap().speed();
         assert!(speed_at(point2(20, 18)) > speed_at(point2(9, 18)));
         assert!(speed_at(point2(6, 12)) > speed_at(point2(6, 9)), "ramp speeds up");
         assert!(speed_at(point2(6, 12)) > speed_at(point2(6, 16)), "and back down");
@@ -3951,7 +3951,7 @@
                     if (-1..=1).any(|dx| {
                         (-1..=1).any(|dy| {
                             direct
-                                .height_at(direct_world + WorldStep::new(dx, dy))
+                                .surface_at(direct_world + WorldStep::new(dx, dy))
                                 .is_some()
                         })
                     }) {

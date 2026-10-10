@@ -32,9 +32,9 @@ ticks logic, then calls `Game::draw(writer, time)`
 `Graphics::draw_buffer: HashMap<WorldSquare, DrawableEnum>` in back-to-front
 order:
 
-1. Static board floor (`SolidColorDrawable`, from the floor-color function —
+1. Static floor (`SolidColorDrawable`, from the floor-color function —
    default is a 3×3-tile checkerboard, `Graphics::big_chess_pattern`)
-2. Board-wide animation if active (recoiling board, radial shockwave)
+2. Floor-wide animation if active (recoiling floor, radial shockwave)
 3. Floor push arrows, conveyor belts (each belt's own speed drives its phase,
    offset by square parity)
 4. Move/capture marker squares
@@ -43,7 +43,7 @@ order:
    `f32` world points and drawn with sub-square resolution:
    `OffsetSquareDrawable` for the body, braille lines for drone sight
 7. Widgets
-8. Non-board animations (lasers, explosions, smites, selectors, …) after
+8. Non-floor animations (lasers, explosions, smites, selectors, …) after
    `remove_finished_animations(time)`
 9. The player (an `ArrowDrawable` showing faced direction)
 
@@ -62,7 +62,7 @@ and transparency (`bg_transparent`) lets lower layers show through.
    Otherwise fall back to
    `load_screen_buffer_from_absolute_positions_in_draw_buffer` (direct
    world→screen mapping, no visibility shading — used on the death screen).
-3. `Graphics::draw_starfield` paints the off-board void (see below).
+3. `Graphics::draw_starfield` paints the off-grid void (see below).
 4. `Graphics::clear_ui`, then draw UI content into the screen-space
    `UiLayer` (the FOV border among it), then `Graphics::composite_ui` blends
    it over the screen buffer (see [UI layer](#ui-layer-screen-space)).
@@ -73,12 +73,12 @@ Headless variants (`draw_headless_now`, `display_headless`) run the same
 pipeline with `writer = None`; tests inspect the buffers instead of a
 terminal.
 
-## Off-board starfield
+## Off-grid starfield
 
-The black beyond the board edge is filled by a procedural starfield
+The black beyond the grid's extent is filled by a procedural starfield
 (`crates/game/src/graphics/starfield.rs`). It only writes cells whose world
-square is off-board, so it composes after the FOV pass without touching the
-board. There are three depth layers; each is anchored at a fraction
+square is off-grid, so it composes after the FOV pass without touching the
+grid. There are three depth layers; each is anchored at a fraction
 (`parallax`) of the **view frame's** motion, so near layers slide further than
 far ones as the player moves, plus a slow linear drift so the field keeps moving
 while standing still. Stars come from an infinite hashed lattice — moving or
@@ -91,11 +91,11 @@ player's absolute square: the field is painted once per `view_frames()` entry
 and projected back to primary space through the frame's inverse rotation
 (`frame_to_primary_offset`), so both the sky's *position* and the direction it
 parallaxes turn with the frame. This keeps the sky continuous when the player
-steps through a portal (the board view is already portal-continuous); a
+steps through a portal (the view is already portal-continuous); a
 portal-free scene has a single frame rooted at the player, so the output is
 byte-for-byte the pre-portal-aware render.
 
-`Starfield::draw` is a pure function of `(screen, fov, board_size, time)`: it
+`Starfield::draw` is a pure function of `(screen, fov, extent, time)`: it
 carries no per-frame state, which is what keeps repeated draws of the same
 moment byte-identical (`test_headless_frames_are_byte_identical`).
 
@@ -140,22 +140,22 @@ The resulting `DrawableEnum` is rotated once more by the screen's own
 rotation, converted `to_glyphs()`, and written straight into the screen
 buffer.
 
-On a raised board, the forward terrain column pass
+On a raised grid, the forward voxel pass
 (`Graphics::load_screen_buffer_from_terrain`) uses the same resolved
 visibilities, per relative cell: each cell's topmost view
 (`resolved_visibility`) names the absolute square it shows, and if that square
-is a terrain column it is drawn there, with the portal rotation and tint applied
+holds a voxel stack it is drawn there, with the portal rotation and tint applied
 and the camera-facing wall direction rotated through the portal, so raised
 geometry is re-projected through portals just like flat floor and entities.
-Drawing per cell (not per absolute column) keeps a column in *every* view it is
+Drawing per cell (not per absolute stack) keeps a stack in *every* view it is
 visible through — a cube seen both directly and through a portal is raised at
 both cells, instead of collapsing to the direct view and leaving the portal cell
 with the flat checkerboard (issue 0013). Writes are clamped to the FOV frame
 (`sight_radius + 1`).
 
-A wall voxel is written up to `camera_altitude - z` rows below the column's
+A wall voxel is written up to `camera_altitude - z` rows below the stack's
 occlusion-checked top cell, so that wall cell is checked separately: it must
-resolve to the *same view frame* as the column (`absolute_fov_center_square`)
+resolve to the *same view frame* as the stack (`absolute_fov_center_square`)
 before the wall is drawn, otherwise a directly visible cube's wall would paint
 into cells a portal resolves to void or another region (issues 0010/0011). A
 `ConveyorBelt` top face is composited over the material base rather than
@@ -233,9 +233,9 @@ glyphs out — which makes them deterministic and testable
 (`draw_headless_at_duration_from_start`; the injectable clock is
 `game/src/logical_time.rs`, roadmap W.A). `AnimationEnum` delegates over
 lasers (simple/floaty), explosions, smites, blink teleports, spear/circle
-attacks, piece deaths, selectors, and the two **board animations**
-(`RecoilingBoardAnimation`, `RadialShockwave`) stored separately in
-`Graphics::board_animation` because they replace the floor layer rather than
+attacks, piece deaths, selectors, and the two **floor animations**
+(`RecoilingFloorAnimation`, `RadialShockwave`) stored separately in
+`Graphics::floor_animation` because they replace the floor layer rather than
 drawing over it.
 
 ## Screen output and diffing

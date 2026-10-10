@@ -11,8 +11,8 @@ use glyph::glyph_constants::*;
 
 use crate::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov};
 use crate::game::{
-    ConveyorBelt, DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, Terrain,
-    TerrainMaterial, SLAB_VOXEL_Z,
+    ConveyorBelt, DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, VoxelGrid,
+    VoxelMaterial, FLOOR_LAYER_Z,
 };
 use crate::graphics::drawable::{
     ArrowDrawable, BrailleDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum,
@@ -63,35 +63,35 @@ pub type FloorColorFunction = fn(WorldSquare) -> RGB8;
 
 /// Character used for a terrain wall cell.
 const TERRAIN_WALL_CHAR: char = '▒';
-/// Dark base of the wall gradient (bottom of a column).
+/// Dark base of the wall gradient (bottom of a stack).
 const TERRAIN_WALL_BASE: RGB8 = RGB8::new(24, 24, 36);
-/// Checker block size, in world squares — matches the board's own 3-square
-/// pattern.
+/// Checker block size, in world squares — matches the floor pattern's own
+/// 3-square pattern.
 const CHECKER_BLOCK: i32 = 3;
 
-/// The base color a wall gradient runs toward for a column's material. Kept
+/// The base color a wall gradient runs toward for a square's material. Kept
 /// clearly darker than the top face so a cube's vertical side reads differently
 /// from its top and a step reads as a step rather than a walkable surface
 /// (issue 0015). For a tint it is a darkened shade of the material; the floor
-/// slab keeps a neutral slate.
-fn terrain_tint(material: TerrainMaterial) -> RGB8 {
+/// layer keeps a neutral slate.
+fn terrain_tint(material: VoxelMaterial) -> RGB8 {
     match material {
-        TerrainMaterial::Tint(color) => scale_rgb(color, WALL_TINT_SHADE),
-        TerrainMaterial::Floor => RGB8::new(64, 64, 82),
+        VoxelMaterial::Tint(color) => scale_rgb(color, WALL_TINT_SHADE),
+        VoxelMaterial::Floor => RGB8::new(64, 64, 82),
     }
 }
 
-/// How dark a tinted column's wall runs relative to its top. Below 1 so the
+/// How dark a tinted square's wall runs relative to its top. Below 1 so the
 /// wall never matches the top's light checker color.
 const WALL_TINT_SHADE: f32 = 0.5;
 
-/// Fraction up the column for a wall voxel, 0 at the slab base and 1 at the top.
+/// Fraction up the stack for a wall voxel, 0 at the floor layer and 1 at the top.
 fn wall_gradient_t(z: i32, top_voxel: i32) -> f32 {
-    if top_voxel <= SLAB_VOXEL_Z {
+    if top_voxel <= FLOOR_LAYER_Z {
         return 1.0;
     }
-    let span = (top_voxel - SLAB_VOXEL_Z) as f32;
-    (((z - SLAB_VOXEL_Z) as f32) / span).clamp(0.0, 1.0)
+    let span = (top_voxel - FLOOR_LAYER_Z) as f32;
+    (((z - FLOOR_LAYER_Z) as f32) / span).clamp(0.0, 1.0)
 }
 
 /// 3-square block checker parity; `true` selects the light shade.
@@ -138,7 +138,7 @@ pub struct Graphics {
     pub screen: Screen,
     draw_buffer: HashMap<WorldSquare, DrawableEnum>,
     active_animations: Vec<AnimationEnum>,
-    board_animation: Option<AnimationEnum>,
+    floor_animation: Option<AnimationEnum>,
     selectors: Vec<SelectorAnimation>,
     start_time: LogicalTime,
     /// Logical time of the frame currently being built. Animations spawned by
@@ -187,7 +187,7 @@ impl Graphics {
             screen: Screen::new(terminal_width, terminal_height),
             draw_buffer: HashMap::default(),
             active_animations: vec![],
-            board_animation: None,
+            floor_animation: None,
             selectors: vec![],
             start_time,
             current_time: LogicalTime::ZERO,
@@ -251,7 +251,7 @@ impl Graphics {
         self.draw_naive_braille_line(pos, pos, color);
     }
 
-    /// Animations draw after the board and pieces, so what's beneath them in
+    /// Animations draw after the floor and pieces, so what's beneath them in
     /// the draw buffer is final; alpha can be resolved immediately per square.
     fn draw_transparent_glyphs_at_squares(
         &mut self,
@@ -289,8 +289,8 @@ impl Graphics {
         self.draw_drawables_at_squares(drawables);
     }
 
-    pub fn set_empty_board_animation(&mut self) {
-        self.board_animation = None
+    pub fn clear_floor_animation(&mut self) {
+        self.floor_animation = None
     }
 
     /// Locally even `x+y` — the light squares of a checkerboard.
@@ -391,12 +391,12 @@ impl Graphics {
         drawn
     }
 
-    /// Forward terrain column pass: paint top faces, camera-facing walls, and
-    /// the board slab edge, far-to-near, instead of the flat inverse FOV map.
+    /// Forward voxel pass: paint top faces, camera-facing walls, and the floor
+    /// layer's exposed edge, far-to-near, instead of the flat inverse FOV map.
     ///
-    /// Only used when the terrain has more than one level (see
-    /// `Terrain::max_top_altitude`), so flat boards keep the legacy path
-    /// byte-for-byte. Column geometry is placed at the screen square it is
+    /// Only used when the grid has more than one level (see
+    /// `VoxelGrid::max_top_altitude`), so flat grids keep the legacy path
+    /// byte-for-byte. Stack geometry is placed at the screen square it is
     /// *seen* at through the portal-recursive FOV (not its absolute
     /// projection), and is red-tinted by portal depth like the flat composite,
     /// so a cube viewed through a portal is raised at the portal's apparent
@@ -405,7 +405,7 @@ impl Graphics {
     /// surface and pushes nearby walls below the frame otherwise.
     ///
     /// Top faces reuse the FOV/draw-buffer lookup, so visibility, partial
-    /// shadows, and entity overlays still apply; the column's material recolors
+    /// shadows, and entity overlays still apply; the square's material recolors
     /// the *background* only, leaving the glyph (`#`, piece, player) visible.
     /// Partially-visible top faces are left as-is (their fg/bg encode the
     /// shadow). The legacy inverse composite still runs underneath, so portal
@@ -413,7 +413,7 @@ impl Graphics {
     pub fn load_screen_buffer_from_terrain(
         &mut self,
         field_of_view: &FieldOfViewResult,
-        terrain: &Terrain,
+        terrain: &VoxelGrid,
         sight_radius: u32,
     ) -> HashSet<ScreenBufferSquare> {
         let mut drawn: HashSet<ScreenBufferSquare> = HashSet::new();
@@ -440,7 +440,7 @@ impl Graphics {
         // cell and making the terrain pop when the player stepped through
         // (issue 0013). Relative cells are sorted so painter-order ties are
         // deterministic (the FOV set is unordered).
-        let column_tops: HashMap<WorldSquare, i32> = terrain.columns().into_iter().collect();
+        let surface_heights: HashMap<WorldSquare, i32> = terrain.surface_heights().into_iter().collect();
         let mut relative_squares: Vec<WorldStep> = field_of_view
             .at_least_partially_visible_relative_squares_including_subviews()
             .into_iter()
@@ -451,7 +451,7 @@ impl Graphics {
             .filter_map(|relative| {
                 let visibility = field_of_view.resolved_visibility(relative)?;
                 let square = visibility.absolute_square();
-                let top_voxel = *column_tops.get(&square)?;
+                let top_voxel = *surface_heights.get(&square)?;
                 Some((square, top_voxel, visibility))
             })
             .collect();
@@ -482,7 +482,7 @@ impl Graphics {
                 .rotate_vector(toward_camera);
             let material = terrain.material_at(square);
 
-            for z in (SLAB_VOXEL_Z..=top_voxel).rev() {
+            for z in (FLOOR_LAYER_Z..=top_voxel).rev() {
                 if !terrain.is_solid_at(square.x, square.y, z) {
                     continue;
                 }
@@ -562,7 +562,7 @@ impl Graphics {
                                 if !glyphs[0].has_fg() && !glyphs[1].has_fg() {
                                     let far_neighbor = square - toward_camera_abs;
                                     let far_is_lower = terrain
-                                        .height_at(far_neighbor)
+                                        .surface_at(far_neighbor)
                                         .map_or(true, |height| height < z + 1);
                                     if far_is_lower {
                                         let rim = terrain_rim_color(color);
@@ -584,17 +584,17 @@ impl Graphics {
         drawn
     }
 
-    /// The background color of a fully-visible top face: the board's existing
+    /// The background color of a fully-visible top face: the floor pattern's existing
     /// floor pattern for `Floor`, a 3-square checker for a tint.
     fn terrain_top_color(
         &self,
         square: WorldSquare,
         voxel_z: i32,
-        material: TerrainMaterial,
+        material: VoxelMaterial,
     ) -> RGB8 {
         match material {
-            TerrainMaterial::Floor => self.floor_color_enum.color_at(square),
-            TerrainMaterial::Tint(color) => {
+            VoxelMaterial::Floor => self.floor_color_enum.color_at(square),
+            VoxelMaterial::Tint(color) => {
                 if checker_light(square.x, square.y, voxel_z) {
                     color
                 } else {
@@ -807,7 +807,7 @@ impl Graphics {
 
     /// Composite floating entities held at a non-zero altitude, shifted up by
     /// their altitude. Only squares the player's FOV can see are drawn, and the
-    /// entity is composited over whatever the board already put at the
+    /// entity is composited over whatever the grid already put at the
     /// destination cell. Returns the screen squares painted (for the starfield).
     pub fn overlay_floating_entities_at_altitude(
         &mut self,
@@ -892,10 +892,10 @@ impl Graphics {
         self.active_animations.push(animation);
     }
 
-    /// Set the board animation stamped with the current frame's logical time.
-    fn set_board_animation(&mut self, mut animation: AnimationEnum) {
+    /// Set the floor animation stamped with the current frame's logical time.
+    fn set_floor_animation(&mut self, mut animation: AnimationEnum) {
         animation.set_start_time(self.current_time);
-        self.board_animation = Some(animation);
+        self.floor_animation = Some(animation);
     }
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
@@ -923,7 +923,7 @@ impl Graphics {
             square.to_f32(),
             radius,
         )));
-        self.set_board_animation(AnimationEnum::RadialShockwave(RadialShockwave::new(
+        self.set_floor_animation(AnimationEnum::RadialShockwave(RadialShockwave::new(
             square,
             self.floor_color_enum.clone(),
         )));
@@ -967,9 +967,9 @@ impl Graphics {
         self.draw_same_glyphs_at_squares(path_glyphs(), &path_squares);
     }
 
-    pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {
-        self.set_board_animation(AnimationEnum::RecoilingBoard(RecoilingBoardAnimation::new(
-            board_size,
+    pub fn start_recoil_animation(&mut self, extent: GridExtent, shot_direction: WorldStep) {
+        self.set_floor_animation(AnimationEnum::RecoilingFloor(RecoilingFloorAnimation::new(
+            extent,
             shot_direction,
             self.floor_color_enum.clone(),
         )));
@@ -1039,9 +1039,9 @@ impl Graphics {
         }
     }
 
-    /// Draw the board floor pattern under the given squares. Squares without a
+    /// Draw the floor pattern under the given squares. Squares without a
     /// floor voxel are void and get no drawable.
-    pub fn draw_static_board(&mut self, floor_squares: &SquareSet) {
+    pub fn draw_floor_pattern(&mut self, floor_squares: &SquareSet) {
         floor_squares.iter().for_each(|&square| {
             let color = self.floor_color_enum.color_at(square);
             let drawable = SolidColorDrawable::new(color);
@@ -1049,9 +1049,9 @@ impl Graphics {
         })
     }
 
-    pub fn draw_board_animation(&mut self, time: LogicalTime) {
-        if let Some(board_animation) = &self.board_animation {
-            self.draw_animation(&board_animation.clone(), time);
+    pub fn draw_floor_animation(&mut self, time: LogicalTime) {
+        if let Some(floor_animation) = &self.floor_animation {
+            self.draw_animation(&floor_animation.clone(), time);
         }
     }
 
@@ -1070,7 +1070,7 @@ impl Graphics {
         in_order[i as usize % in_order.len()]
     }
 
-    pub fn draw_non_board_animations(&mut self, time: LogicalTime) {
+    pub fn draw_non_floor_animations(&mut self, time: LogicalTime) {
         let mut glyphs_to_draw = vec![];
         for animation in &self.active_animations {
             glyphs_to_draw.push(animation.double_glyphs_with_transparency_at_time(time));
@@ -1085,9 +1085,9 @@ impl Graphics {
     }
 
     pub fn remove_finished_animations(&mut self, time: LogicalTime) {
-        if let Some(board_animation) = &mut self.board_animation {
-            if board_animation.finished_at_time(time) {
-                self.board_animation = None;
+        if let Some(floor_animation) = &mut self.floor_animation {
+            if floor_animation.finished_at_time(time) {
+                self.floor_animation = None;
             }
         }
         // extract_if is lazy: elements are only removed as the iterator is
@@ -1248,7 +1248,7 @@ mod tests {
         g.load_screen_buffer_from_absolute_positions_in_draw_buffer();
         let glyph1 = g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0];
         g.add_simple_laser(point2(0.0, 0.0), point2(10.0, 0.0));
-        g.draw_non_board_animations(LogicalTime::ZERO);
+        g.draw_non_floor_animations(LogicalTime::ZERO);
         g.load_screen_buffer_from_absolute_positions_in_draw_buffer();
         //g.print_output_buffer();
         let glyph2 = g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0];
@@ -1261,7 +1261,7 @@ mod tests {
     fn test_draw_on_far_right_square_in_odd_width_terminal() {
         let mut g = Graphics::new(41, 20, LogicalTime::ZERO);
         g.add_simple_laser(point2(0.0, 0.0), point2(50.0, 0.0));
-        g.draw_non_board_animations(LogicalTime::ZERO);
+        g.draw_non_floor_animations(LogicalTime::ZERO);
     }
 
     #[test]
@@ -1301,8 +1301,8 @@ mod tests {
     fn test_draw_piece_on_board() {
         let mut g = set_up_graphics_with_nxn_world_squares(1);
         let the_square = WorldSquare::new(0, 0);
-        g.set_empty_board_animation();
-        g.draw_static_board(&squares_on_board(BoardSize::new(1, 1)));
+        g.clear_floor_animation();
+        g.draw_floor_pattern(&squares_in_extent(GridExtent::new(1, 1)));
         //g.print_output_buffer();
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
         //g.print_output_buffer();

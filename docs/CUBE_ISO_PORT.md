@@ -5,6 +5,12 @@ the game is absorbing. This doc records the plan and inventories everything the
 demo demonstrates, so the game can take it over incrementally and `cube_iso/`
 can be deleted once nothing is left to port.
 
+> **Vocabulary (2026-10-10):** the model was renamed around the voxel grid.
+> `Terrain`→`VoxelGrid` (`game/voxel_grid.rs`), `BoardSize`→`GridExtent`,
+> `place_solid_column`→`fill_column`, `height_at`→`surface_at`,
+> `SLAB_*`→`FLOOR_*`, `TerrainMaterial`→`VoxelMaterial`, `Blocks`→`FloorFeatures`.
+> The names below are the ones current when the port was written.
+
 **Rule:** flip a feature's status in the *same commit* that ports it (mirroring
 `ROADMAP.md`'s "check off in the same commit"). `docs/CHANGELOG.md` still gets
 the per-commit entry per `AGENTS.md`.

@@ -41,7 +41,7 @@ impl Game {
         for i in 1..=spear_length {
             if let Ok(target_pose) = self.multiple_portal_aware_steps(self.player_pose(), i) {
                 let target_square = target_pose.square();
-                if !self.square_is_on_board(target_square) || self.is_block_at(target_square) {
+                if !self.square_in_extent(target_square) || self.is_block_at(target_square) {
                     break;
                 }
                 self.try_capture_piece_at(target_square).ok();
@@ -97,7 +97,7 @@ impl Game {
                 .add_simple_laser(line_start.to_f32(), line_end);
         }
         self.graphics
-            .start_recoil_animation(self.board_size, self.player_faced_direction().step());
+            .start_recoil_animation(self.grid_extent(), self.player_faced_direction().step());
     }
 
     pub fn do_player_shoot_sniper(&mut self) {
@@ -147,7 +147,7 @@ impl Game {
     }
 
     pub fn try_capture_piece_at(&mut self, square: WorldSquare) -> Result<(), String> {
-        if !self.square_is_on_board(square) {
+        if !self.square_in_extent(square) {
             return Err(format!(
                 "Tried to capture piece off board at {}",
                 point_to_string(square)
