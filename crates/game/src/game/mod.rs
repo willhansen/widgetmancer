@@ -643,11 +643,13 @@ impl Game {
 
     pub fn populate_draw_buffer(&mut self, time: LogicalTime) {
         self.graphics.clear_draw_buffer();
-        // The floor pattern is the base drawable under every occupied column
-        // (the forward pass recolors raised tops); real void gets nothing, so
-        // the FOV composite skips it and the starfield paints it.
-        let occupied = self.terrain.occupied_squares();
-        self.graphics.draw_floor_pattern(&occupied);
+        // The base surface under every occupied column is that square's own
+        // material (the floor pattern on a flat map; the material checker for
+        // built-up squares on a raised map), so the FOV composite's portal
+        // views and partial shadows carry the right surface color. Real void
+        // gets nothing, so the FOV composite skips it and the starfield paints
+        // it.
+        self.graphics.draw_surface_base(&self.terrain);
         self.graphics.draw_floor_animation(time);
 
         // TODO: fix redundant calculation

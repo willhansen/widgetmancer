@@ -1049,6 +1049,28 @@ impl Graphics {
         })
     }
 
+    /// Draw the base surface under every occupied square, using each square's
+    /// own material rather than the flat floor pattern. On a raised map a
+    /// built-up square's surface is its material checker, so portal views and
+    /// partial-visibility shadows of raised terrain carry the material color
+    /// instead of the floor pattern (issues 0017/0018/0019). A flat map has no
+    /// surface above the floor layer, so it keeps the floor pattern
+    /// byte-for-byte. Squares with no voxel are void and get no drawable.
+    pub fn draw_surface_base(&mut self, terrain: &VoxelGrid) {
+        let raised = terrain.max_top_altitude() > 1;
+        terrain
+            .surface_heights()
+            .into_iter()
+            .for_each(|(square, top_voxel)| {
+                let color = if raised {
+                    self.terrain_top_color(square, top_voxel, terrain.material_at(square))
+                } else {
+                    self.floor_color_enum.color_at(square)
+                };
+                self.draw_above_square(&SolidColorDrawable::new(color), square)
+            })
+    }
+
     pub fn draw_floor_animation(&mut self, time: LogicalTime) {
         if let Some(floor_animation) = &self.floor_animation {
             self.draw_animation(&floor_animation.clone(), time);

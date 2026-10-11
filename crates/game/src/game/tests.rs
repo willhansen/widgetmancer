@@ -3379,6 +3379,37 @@
     }
 
     #[test]
+    fn partial_top_on_a_raised_column_uses_the_material_not_the_floor() {
+        // Issues 0017/0018/0019: a partially-visible top face of raised
+        // terrain was rendered from the flat floor draw buffer, so its visible
+        // half carried the floor pattern instead of the column's material. The
+        // surface base is now each square's own material.
+        use rgb::RGB8;
+        let mut game = set_up_nxn_game(14);
+        let player = point2(5, 5);
+        game.place_player(player);
+        // A block right of the player casts a shadow up-right.
+        game.place_block(player + STEP_RIGHT);
+        // A raised column sitting in that shadow is only partially visible.
+        let column = player + STEP_RIGHT + STEP_UP;
+        let material = RGB8::new(200, 40, 40);
+        game.fill_column_with_material(column, 3, VoxelMaterial::Tint(material));
+        game.draw_headless_now();
+
+        let screen = &game.graphics().screen;
+        let top = screen.world_square_and_altitude_to_screen_buffer_square(column, 3);
+        let glyphs = screen.get_glyphs_at_screen_square(top);
+        assert!(
+            glyphs.iter().any(|glyph| {
+                glyph.fg_color.r > glyph.fg_color.b + 40
+                    && glyph.fg_color.g < glyph.fg_color.r
+            }),
+            "the partial top's visible half must be material-colored, got {:?}",
+            glyphs.iter().map(|glyph| glyph.fg_color).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn floating_entity_altitude_lifts_its_glyph() {
         use euclid::vec2;
         let mut game = set_up_nxn_game(14);

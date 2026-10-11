@@ -216,6 +216,21 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
 
 ## Open
 
+### 14. Partial shadows over void suppress the starfield
+- **Evidence:** `issues/solved/0017/` (and its `screen.pre-fix.txt`): a portal
+  view of a raised cube partially covers an off-board void square. The
+  `PartialVisibilityDrawable` shadow half carries an opaque `OUT_OF_SIGHT`
+  background, and the cell is in the FOV pass's `drawn` set, so
+  `Starfield::draw` skips it — the void that should show stars renders black,
+  and stepping flips the cell to a direct/void resolution ("more outer space
+  abruptly visible").
+- **Scope:** sub-cell. The shadow half of a partial whose underlying square is
+  off-board void should let the starfield through (transparent shadow, or
+  exclude such cells from `drawn` and let the starfield paint the visible void
+  portion). The material-base fix (`draw_surface_base`) resolved the
+  floor-colored visible half; this is the remaining half.
+- **Related:** roadmap W.D (portal-depth partial-visibility artifact).
+
 ### 2. Remove globally suppressed warnings
 - **Evidence:** `#![allow(warnings)]` in `crates/game/src/lib.rs`;
   `#![allow(dead_code)]` + `#![allow(deprecated)]` in `crates/utility/src/lib.rs`.

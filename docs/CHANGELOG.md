@@ -9,6 +9,41 @@ Newest first.
 
 ---
 
+## 2026-10-10 — Base the draw buffer on each square's own surface material
+
+### fix: raised-terrain portal edges use the material, not the floor pattern
+
+Fixes issues 0017, 0018, 0019 (map `cubes`). The player stands on a 10-tall
+cube, so the cells along a portal edge are *partially* visible top faces. The
+draw buffer's base under every occupied square was the flat floor pattern, and
+the forward voxel pass recolors raised tops only when they are fully visible
+(`load_screen_buffer_from_terrain`, `if !is_partial`). A partially-visible top
+was therefore rendered from the flat composite's `PartialVisibilityDrawable`,
+whose colors come from the floor draw buffer: the visible half carried the floor
+pattern (0018/0019 "incorrect tinting on and off the big cube") and a shadow
+half over off-board void carried an opaque `OUT_OF_SIGHT` background that
+suppresses the starfield there (0017 "more outer space abruptly visible").
+
+- `Graphics::draw_surface_base(&VoxelGrid)` draws the base under every occupied
+  square from that square's own material: the floor pattern on a flat map
+  (`max_top_altitude() <= 1`, byte-for-byte unchanged), the material checker
+  (`terrain_top_color`) for built-up squares on a raised map. `Game::
+  populate_draw_buffer` now calls it instead of `draw_floor_pattern`.
+- The forward pass's full-top recolor is left in place (now redundant).
+- Regression test `partial_top_on_a_raised_column_uses_the_material_not_the_floor`
+  (shown to fail pre-fix: the partial's visible half read `(191,191,191)`, the
+  floor pattern).
+- Raised-terrain fixtures `solved/0007`–`0016` re-blessed; `solved/0017`–`0019`
+  added with `screen.pre-fix.txt` (the original captures). `./snapshot-tool
+  verify-issues` → all 18 OK; `./snapshot-tool diff snapshot/` → OK; full suite
+  641 passed / 9 skipped.
+
+Deferred (roadmap item 14): the remaining void-through-portal shadow half — a
+partial whose underlying square is off-board void still renders black instead of
+letting the starfield show.
+
+---
+
 ## 2026-10-10 — Reorganize the model around a single voxel grid
 
 ### refactor: voxel-grid vocabulary; the grid owns its extent
