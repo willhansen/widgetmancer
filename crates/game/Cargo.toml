@@ -30,10 +30,13 @@ path = "src/bin/glyph_vocabulary.rs"
 required-features = ["debug-tools"]
 
 [features]
-default = []
+default = ["report"]
 # Headless snapshot render/diff tooling (W.F) and the introspection helpers it
 # shares with later W.B/W.C work. Off by default; no release-surface change.
 debug-tools = []
+# In-game issue-report overlay (issue 0021). Default-on; implies `debug-tools`
+# for `Game::explain_screen_cell`.
+report = ["debug-tools"]
 
 [dependencies]
 # external

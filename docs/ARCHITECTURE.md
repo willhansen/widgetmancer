@@ -147,6 +147,11 @@ The actual game. Modules:
   drawables composited into the `Screen`'s glyph buffer, which `Screen` diffs
   against the previous frame and writes to the terminal, minimizing
   escape-sequence output.
+- **Issue reporting** (`report`, default-on): `Ctrl+P` freezes the loop and
+  opens an overlay (`report.rs`) that flags squares and types a description in
+  a small built-in editor. It draws straight to the terminal, never into
+  `screen_buffer`, so the filed snapshot's `screen.txt` is the un-altered game
+  render, and it only repaints when its state changed.
 - **Panic safety**: a custom hook exits the alternate screen and prints the
   panic info so crashes don't corrupt the terminal.
 
@@ -178,17 +183,21 @@ The actual game. Modules:
   slow after 60s and terminated after 120s, so a runaway test fails fast
   instead of hanging the suite. Override per test with
   `[[profile.default.overrides]]` if something is legitimately slower.
-- `game` has a default-off `debug-tools` feature gating the headless
-  `snapshot_tool` / `glyph_vocabulary` bins and `game/snapshot.rs`'s
-  introspection helpers. Run it through the repo-root `./snapshot-tool` wrapper
-  (which does `cargo run -p game --features debug-tools --bin snapshot_tool --`)
-  so the binary always matches the sources; `snapshot_tool` can `diff`/`bless`
+- `game` has a `report` feature (default-on) for the in-game issue-report
+  overlay; it implies `debug-tools`, which gates the headless `snapshot_tool` /
+  `glyph_vocabulary` bins and `game/snapshot.rs`'s introspection helpers. Run
+  `snapshot_tool` through the repo-root `./snapshot-tool` wrapper (which does
+  `cargo run -p game --features debug-tools --bin snapshot_tool --`) so the
+  binary always matches the sources; `snapshot_tool` can `diff`/`bless`
   captures, `explain` a cell, dump `fov-trace`, `heights`, `invariants`, and
   `minimize` a repro.
 - Live bug captures are the numbered `issues/NNNN/` directories (solved ones
   under `issues/solved/`), each a snapshot plus a note; the `verify-issues`
   subcommand checks every solved capture against its blessed `screen.txt` and
-  pre-fix render.
+  pre-fix render. In-game, `Ctrl+P` opens the report overlay: flag squares
+  (mouse or a keyboard cursor), type the description in the built-in editor
+  (`Tab` swaps focus), and press `Enter` to file `issue.md` + `flags.json` +
+  the snapshot.
 - `bacon.toml` — bacon watch config (incl. a `clippy` job); `flake.nix` — Nix
   dev shell; `scripts/` — test recording/printing and profiling helpers.
 

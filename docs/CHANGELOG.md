@@ -9,6 +9,136 @@ Newest first.
 
 ---
 
+## 2026-10-11 — Report overlay: drop the PTY pane for a built-in text editor
+
+### fix(report): replace the laggy embedded editor pane with a built-in line editor
+
+The phase-2 PTY editor pane caused severe lag and flicker: the overlay blitted
+the whole pane (up to a third of the screen) with per-cell `Goto` writes every
+frame, on top of the `vt100` emulation and the reader thread.
+
+Removed it entirely. The description is now typed in a small multi-line text
+editor built into the overlay (`report.rs`), in the same fixed region:
+printable chars / `Enter` (newline) / `Backspace` / `Delete` / arrows /
+`Home` / `End` while focused on the editor; `Tab` swaps focus; `Esc`/`Ctrl+P`
+cancel; `Enter` in marking focus files. The description is kept in memory and
+written straight into `issue.md` (no temp file, no external process).
+
+Also gated the overlay's terminal writes on a `dirty` flag set only when state
+changes, so an idle overlay emits nothing — no per-frame repaint.
+
+- Deleted `report/editor_pane.rs` and the `portable-pty` / `vt100` optional
+  deps; `edit_issue_note` (full-screen handoff) is gone.
+- Tests: text-buffer edits, editor-focus typing, and `session_draw_is_dirty_gated`
+  (an idle overlay emits nothing). `./run-tests` 660 passed / 9 skipped;
+  `./snapshot-tool diff snapshot/` OK; `verify-issues` all 18 OK.
+
+---
+
+## 2026-10-11 — Report PTY test: avoid a wall-clock read
+
+### test(report): poll a bounded count instead of Instant::now() in the PTY smoke test
+
+The `wall_clock_reads_are_confined_to_the_driver_seam` audit scans all of
+`src/`, so the new `editor_pane` PTY test's `Instant::now()` deadline failed it.
+Replaced with a bounded poll loop (300 × 10ms), which needs no clock.
+
+---
+
+## 2026-10-11 — Issue-report overlay, phase 3: docs
+
+### docs: document the issue-report overlay and feature gating
+
+`ARCHITECTURE.md`: the runtime model now notes the report overlay (drawn
+straight to the terminal, so `screen.txt` stays un-altered), the dependency
+table lists `portable-pty`/`vt100`, and the tooling section documents the
+default-on `report` feature (implying `debug-tools`) and the `Ctrl+P` flow.
+`issues/0021/issue.md` records phase 1/2 done and the quick in-game line editor
+deferred (the embedded editor covers the need).
+
+---
+
+## 2026-10-11 — Issue-report overlay, phase 2: embedded editor pane
+
+### feat(report): embed the external editor in a PTY-backed screen pane (issue 0021, phase 2)
+
+The report overlay now runs the reporter's `$VISUAL`/`$EDITOR`/`vi` in its own
+pseudo-terminal, in a fixed screen region, so the overlay stays visible while
+typing. `Tab` swaps focus between marking and the editor; `Ctrl+P` still
+cancels from either pane, and keys/mouse are forwarded to the PTY while the
+editor is focused.
+
+- `report/editor_pane.rs`: `PaneLayout` splits the terminal by aspect ratio
+  (side-by-side on wide terminals, stacked on tall ones). `EditorPane` spawns
+  the editor on a `portable-pty` PTY sized to the pane, pumps its output
+  through a `vt100` emulator on a reader thread, blits the emulator cells into
+  the pane with a border + cursor, and maps termion keys/mouse to terminal
+  bytes (SGR mouse included).
+- Deps `portable-pty` + `vt100`, optional and pulled in by the `report`
+  feature. `--no-default-features` still compiles the game.
+- Filing reads the note the editor wrote on the temp file; if the pane failed
+  to spawn, the driver falls back to the full-screen editor.
+
+Tests: pane layout (wide/tall/inner), key mapping, ANSI color mapping, and a
+PTY smoke test that spawns `sh -c 'printf hello'` and asserts the emulator
+renders it. `./run-tests` 663 passed / 9 skipped; `./snapshot-tool diff
+snapshot/` OK; `verify-issues` all 18 OK.
+
+---
+
+## 2026-10-11 — Issue-report overlay, phase 1: marking + filing
+
+### feat(report): in-game issue-report overlay with square flagging (issue 0021, phase 1)
+
+`Ctrl+P` now opens a frozen report overlay instead of immediately filing. The
+reporter flags squares (mouse click / drag, or a keyboard cursor) and presses
+`Enter` to file; `Esc`/`Ctrl+P` cancels. Each flag captures its world square and
+a concise `explain`-style summary.
+
+- New `report` module (`crates/game/src/report.rs`), gated behind a new
+  default-on `report` feature that implies `debug-tools` (for
+  `Game::explain_screen_cell`). `--no-default-features` compiles it out.
+- The overlay is drawn *directly* to the terminal, never into `screen_buffer`,
+  and restores the cells it touched each frame. So the frozen frame stays the
+  un-altered game render: `snapshot/screen.txt` is byte-identical to the game
+  and `verify-issues` is unaffected.
+- `begin_issue` creates the numbered `issues/NNNN/`, writes the snapshot, and
+  leaves a plain empty `note.tmp` for the editor. `finish_issue` wraps the
+  edited note with the template (header + description + a `## Flagged squares`
+  section) into `issue.md`, writes `flags.json`, and removes the temp note.
+  Phase 1 still uses the full-screen external editor; phase 2 moves it into an
+  embedded PTY pane.
+- Driver: while the overlay is open, gameplay is frozen (no realtime tick, no
+  re-render) and events are routed to the session (not recorded in
+  `input_history`).
+
+Tests: markdown wrapping (with/without description and flags), `flags.json`
+escaping, and session flag/unflag, cancel/file actions, and overlay draw.
+`./run-tests` 654 passed / 9 skipped; `./snapshot-tool diff snapshot/` OK;
+`verify-issues` all 18 OK.
+
+---
+
+## 2026-10-11 — Document the 0020 portal-leak hypothesis; file issue 0021
+
+### docs: record issue 0020 hypothesis; add issue 0021 (report overlay)
+
+Issue 0020 (cubes: "portal tint outside its edge / can't see the cube
+column") is deferred. Documented the leading hypothesis in its `issue.md`: the
+portal's depth-1 sub-view leaks onto the two squares behind the portal
+(`world(4,8)`, `(3,8)`), painting the tint and overwriting the direct cube,
+because the entrance face is taken on the wrong side (`visible_arc_of_portal`
+`[149.04, 168.69]` is the -x face at x=5.5, while the player at `(8,7)` sees
+the +x face at x=6.5). Also recorded that flipping the draw order in
+`drawable_at_relative_square` breaks all 18 portal fixtures, so the fix must
+target the portal's arc, not the global compositing order.
+
+Added `issues/0021/` for the in-game issue-report overlay (square flagging +
+auto explain summary + an external editor in its own PTY-backed screen pane).
+Requirements settled with the reporter; implementation follows.
+
+---
+
 ## 2026-10-10 — Base the draw buffer on each square's own surface material
 
 ### fix: raised-terrain portal edges use the material, not the floor pattern

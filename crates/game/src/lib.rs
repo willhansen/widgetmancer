@@ -12,7 +12,6 @@ extern crate termion;
 use std::io::{stdin, stdout, Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
@@ -29,9 +28,9 @@ use terminal_rendering::glyph::*;
 use utility::*;
 
 use crate::game::Game;
-use crate::game::snapshot::{
-    create_new_issue, load_snapshot_game, write_snapshot_to, InputRecord, SNAPSHOT_KEY,
-};
+use crate::game::snapshot::{load_snapshot_game, InputRecord};
+#[cfg(feature = "report")]
+use crate::game::snapshot::SNAPSHOT_KEY;
 use crate::inputmap::InputMap;
 use crate::piece::PieceType;
 
@@ -42,6 +41,9 @@ mod inputmap;
 pub mod logical_time;
 pub mod piece;
 pub mod portal_geometry;
+/// In-game issue-report overlay (issue 0021).
+#[cfg(feature = "report")]
+pub mod report;
 pub mod utils_for_tests;
 
 /// The complete glyph vocabulary, for font-fallback tooling (debug-tools only).
@@ -190,51 +192,6 @@ pub fn set_up_input_thread() -> (Receiver<(Instant, Event)>, InputPause) {
     (rx, pause)
 }
 
-/// Hand the terminal to the user's editor for `note_path`, then recreate the
-/// game terminal and release the input reader. Blocks until the editor exits.
-fn edit_issue_note(
-    note_path: &std::path::Path,
-    terminal: &mut Option<Box<dyn Write>>,
-    input_pause: &InputPause,
-) {
-    input_pause.pause();
-    // Dropping the raw-mode/alternate-screen writer restores the terminal.
-    *terminal = None;
-    let _ = stdout().flush();
-
-    let editor = std::env::var("VISUAL")
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .or_else(|| {
-            std::env::var("EDITOR")
-                .ok()
-                .filter(|value| !value.trim().is_empty())
-        })
-        .unwrap_or_else(|| "vi".to_string());
-    let mut parts = editor.split_whitespace();
-    let program = parts.next().unwrap_or("vi");
-    match Command::new(program).args(parts).arg(note_path).status() {
-        Ok(status) if !status.success() => eprintln!(
-            "Editor exited with {status}; note left at {}",
-            note_path.display()
-        ),
-        Ok(_) => {}
-        Err(error) => eprintln!(
-            "Could not launch editor '{editor}': {error}; note left at {}",
-            note_path.display()
-        ),
-    }
-
-    // Recreate the game terminal exactly as at startup.
-    let restored =
-        termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
-            .into_alternate_screen()
-            .unwrap();
-    *terminal = Some(Box::new(restored));
-    let _ = stdout().flush();
-    input_pause.resume();
-}
-
 pub const DEFAULT_MAP_NAME: &str = "cubes";
 
 pub fn set_up_map_by_name(game: &mut Game, map_name: Option<&str>) {
@@ -316,7 +273,7 @@ pub fn do_everything(
 
     // Separate thread for reading input; it can be parked while an external
     // editor owns the terminal.
-    let (event_receiver, input_pause) = set_up_input_thread();
+    let (event_receiver, _input_pause) = set_up_input_thread();
 
     let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(writable));
 
@@ -348,7 +305,10 @@ pub fn do_everything(
     let mut epoch = Instant::now();
     let mut prev_logical_time = LogicalTime::ZERO;
     let mut input_history: Vec<InputRecord> = Vec::new();
-    let mut snapshot_requested = false;
+    // The issue-report overlay, if open. While it is, gameplay is frozen and
+    // events are routed to it instead of the input map.
+    #[cfg(feature = "report")]
+    let mut report: Option<report::ReportSession> = None;
     while game.running() {
         let logical_now = LogicalTime::from_duration(epoch.elapsed());
         let delta = logical_now.saturating_duration_since(prev_logical_time);
@@ -356,47 +316,72 @@ pub fn do_everything(
         // Stamp animations spawned while handling this iteration's input.
         game.borrow_graphics_mut().set_current_time(logical_now);
 
+        #[cfg(feature = "report")]
+        let mut file_requested = false;
+
         while let Ok((event_time, event)) = event_receiver.try_recv() {
+            // While the report is open, it owns the input; report events are
+            // not gameplay input, so they are not recorded for replay.
+            #[cfg(feature = "report")]
+            if let Some(session) = report.as_mut() {
+                match session.handle_event(&game, event) {
+                    report::ReportAction::None => {}
+                    report::ReportAction::Cancel => {
+                        report = None;
+                        game.borrow_graphics_mut().screen.force_redraw();
+                    }
+                    report::ReportAction::File => file_requested = true,
+                }
+                continue;
+            }
+
+            #[cfg(feature = "report")]
+            if event == Event::Key(SNAPSHOT_KEY) {
+                report = Some(report::ReportSession::open(&game));
+                continue;
+            }
+
             input_history.push(InputRecord {
                 millis_from_start: event_time.duration_since(epoch).as_millis(),
                 event: event.clone(),
             });
-            if event == Event::Key(SNAPSHOT_KEY) {
-                snapshot_requested = true;
-            }
 
             input_map.handle_event(&mut game, event);
 
             game.tick_game_logic();
         }
-        game.tick_realtime_effects(delta);
-        game.draw(&mut wrapped_terminal, logical_now);
 
-        // Dump after drawing so the snapshot captures the frame the player saw,
-        // then file it as a new numbered issue with a typed description.
-        if snapshot_requested {
-            snapshot_requested = false;
-            match create_new_issue(map_name.as_deref()) {
-                Ok(issue_dir) => {
-                    write_snapshot_to(
-                        &issue_dir.join("snapshot"),
-                        &game,
-                        &input_history,
-                        map_name.as_deref(),
-                    );
-                    let editor_start = Instant::now();
-                    edit_issue_note(
-                        &issue_dir.join("issue.md"),
-                        &mut *wrapped_terminal,
-                        &input_pause,
-                    );
-                    // Treat the suspended wall time as paused, not as one giant
-                    // tick, so the world clock and animations stay continuous.
-                    epoch += editor_start.elapsed();
-                    prev_logical_time = LogicalTime::from_duration(epoch.elapsed());
-                    game.borrow_graphics_mut().screen.force_redraw();
+        // Freeze the world while the report is open: no realtime tick and no
+        // re-render, so `screen_buffer` keeps the un-altered frame the snapshot
+        // captures.
+        #[cfg(feature = "report")]
+        let report_open = report.is_some();
+        #[cfg(not(feature = "report"))]
+        let report_open = false;
+        if !report_open {
+            game.tick_realtime_effects(delta);
+            game.draw(&mut wrapped_terminal, logical_now);
+        }
+
+        // Filing: create the numbered dir + snapshot, then wrap the typed
+        // description and flags in.
+        #[cfg(feature = "report")]
+        if file_requested {
+            if let Some(session) = report.take() {
+                if let Err(error) =
+                    report::finish_issue(&game, &input_history, map_name.as_deref(), &session)
+                {
+                    eprintln!("{error}");
                 }
-                Err(error) => eprintln!("{error}"),
+                game.borrow_graphics_mut().screen.force_redraw();
+            }
+        }
+
+        // Draw the overlay straight to the terminal (not into `screen_buffer`).
+        #[cfg(feature = "report")]
+        if let Some(session) = report.as_mut() {
+            if let Some(terminal) = wrapped_terminal.as_mut() {
+                session.draw(&game, terminal.as_mut());
             }
         }
 

@@ -79,6 +79,19 @@ pub fn create_new_issue(map_name: Option<&str>) -> Result<PathBuf, String> {
     Ok(issue_dir)
 }
 
+/// Create a fresh, sequentially numbered issue directory with an empty
+/// `snapshot/` subdirectory but **no** `issue.md` yet. Used by the report
+/// overlay (issue 0021), which edits a plain note file first and only then
+/// wraps it with the template.
+pub fn create_issue_dir() -> Result<PathBuf, String> {
+    let issues = issues_dir();
+    let number = next_issue_number(issue_number_names(&issues));
+    let issue_dir = issues.join(format!("{number:04}"));
+    std::fs::create_dir_all(issue_dir.join("snapshot"))
+        .map_err(|error| format!("Could not create issue dir {}: {error}", issue_dir.display()))?;
+    Ok(issue_dir)
+}
+
 /// The stub written before the editor opens. A short header so the saved note
 /// is self-describing even if left mostly empty.
 fn issue_note_template(number: u32, map_name: Option<&str>) -> String {
@@ -93,7 +106,7 @@ fn issue_note_template(number: u32, map_name: Option<&str>) -> String {
 }
 
 /// Today's date as `YYYY-MM-DD` (UTC), so the template needs no date crate.
-fn today_utc() -> String {
+pub fn today_utc() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs())
