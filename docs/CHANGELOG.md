@@ -9,6 +9,20 @@ Newest first.
 
 ---
 
+## 2026-10-11 — Report-overlay resumption plan
+
+### docs: add REPORT_OVERLAY_PLAN.md
+
+Recorded the plan to rework the report overlay around the reporter's static-frame
+model (capture the rendered frame on `Ctrl+P`, reposition it into the game
+region, map mouse input back through the recorded offset). Covers the diagnosis
+(flicker from restore-then-redraw, no re-centering, no drag feedback, marks that
+replace the cell, no labels) and the fix plan (static frame + offset, cell-diff
+drawing, tinted marks, numbered labels, drag rectangle, motion coalescing), plus
+open questions and verification. Deferred for later resumption.
+
+---
+
 ## 2026-10-11 — Report overlay: drop the PTY pane for a built-in text editor
 
 ### fix(report): replace the laggy embedded editor pane with a built-in line editor
