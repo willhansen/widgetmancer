@@ -9,6 +9,40 @@ Newest first.
 
 ---
 
+## 2026-10-11 — Report overlay: static frame, tinted regions, diffed drawing
+
+### feat(report): static frame, tinted regions, cell-diff drawing
+
+Implement the report-overlay plan and remove `REPORT_OVERLAY_PLAN.md`.
+
+- **Static frame + reposition.** On `Ctrl+P` the rendered frame is captured
+  (`screen_buffer` clone) and blitted, translated and clipped, into the game
+  region so the player is centered there (shift by half the editor's width,
+  even in `x` to keep square alignment; half its height when stacked). Mouse
+  input maps back through the recorded offset, then to a world square.
+- **Regions.** Selection is now one numbered region per click/drag (a click is
+  a 1x1 region); each region is tinted magenta (~0.45) so the underlying glyph
+  shows through, carries a numbered label one row above it, and records a
+  per-square `explain` summary (Q1/Q2/Q4 resolved with the reporter).
+- **Diffed drawing.** `draw` builds the desired overlay and writes only cells
+  that differ from the last draw, so an idle overlay emits nothing and a
+  keystroke touches a handful of cells — no restore-then-redraw flash, no
+  full-pane rewrite.
+- **Drag feedback.** `Hold` now renders a cyan tentative region and its label
+  immediately. The driver drains the event queue and collapses consecutive
+  mouse-motion events to the latest, so a fast drag can't queue repaints.
+- `flags.json` now records each region's world/screen bounds plus its squares;
+  `issue.md` renders one section per region.
+
+Tests: frame-offset math, offset round-trip for mouse mapping, tint keeping the
+character, per-square region sizing, label placement, and diff-draw size (a mark
+diff is smaller than the opening full draw). The new tests exercise APIs that do
+not exist pre-fix, so they cannot pass against the parent revision. `./run-tests`
+666 passed / 9 skipped; `./snapshot-tool diff snapshot/` OK; `verify-issues` all
+18 OK.
+
+---
+
 ## 2026-10-11 — Report-overlay resumption plan
 
 ### docs: add REPORT_OVERLAY_PLAN.md

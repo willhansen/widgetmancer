@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 use euclid::point2;
 use rand::SeedableRng;
-use termion::event::Event;
+use termion::event::{Event, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
 use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
@@ -319,7 +319,24 @@ pub fn do_everything(
         #[cfg(feature = "report")]
         let mut file_requested = false;
 
-        while let Ok((event_time, event)) = event_receiver.try_recv() {
+        // Drain the queue first, collapsing consecutive mouse-motion events to
+        // the latest position. A fast drag otherwise queues a repaint per motion
+        // event and the overlay lags behind the cursor. Non-motion events (and
+        // key/click ordering) are preserved.
+        let mut events: Vec<(Instant, Event)> = Vec::new();
+        for (event_time, event) in event_receiver.try_iter() {
+            if matches!(event, Event::Mouse(MouseEvent::Hold(..))) {
+                if let Some(last) = events.last_mut() {
+                    if matches!(last.1, Event::Mouse(MouseEvent::Hold(..))) {
+                        *last = (event_time, event);
+                        continue;
+                    }
+                }
+            }
+            events.push((event_time, event));
+        }
+
+        for (event_time, event) in events {
             // While the report is open, it owns the input; report events are
             // not gameplay input, so they are not recorded for replay.
             #[cfg(feature = "report")]

@@ -51,3 +51,11 @@ workflow.
 - Phase 3 (2026-10-11): the note is now typed in a small built-in text editor
   in the overlay (`Tab` swaps focus), and the overlay repaints only when its
   state changes. Docs updated.
+- Phase 4 (2026-10-11): reworked around the reporter's static-frame model. On
+  `Ctrl+P` the rendered frame is captured and repositioned into the game region
+  (so the player is centered there) and mouse input maps back through the
+  recorded offset. Selection is now one numbered region per click/drag (a click
+  is a 1x1 region), tinted magenta so the underlying glyph shows through, with
+  per-square `explain` summaries and numbered labels. Drawing is cell-diffed
+  against the previous overlay and mouse motion is coalesced, so typing and
+  dragging no longer flicker or lag.

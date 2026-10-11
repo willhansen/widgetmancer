@@ -147,11 +147,16 @@ The actual game. Modules:
   drawables composited into the `Screen`'s glyph buffer, which `Screen` diffs
   against the previous frame and writes to the terminal, minimizing
   escape-sequence output.
-- **Issue reporting** (`report`, default-on): `Ctrl+P` freezes the loop and
-  opens an overlay (`report.rs`) that flags squares and types a description in
-  a small built-in editor. It draws straight to the terminal, never into
-  `screen_buffer`, so the filed snapshot's `screen.txt` is the un-altered game
-  render, and it only repaints when its state changed.
+- **Issue reporting** (`report`, default-on): `Ctrl+P` freezes the loop,
+  captures the rendered frame as a static image, and opens an overlay
+  (`report.rs`) that repositions that image into the game region (the player
+  stays centered there) and lets the reporter flag one numbered region per
+  click/drag, plus type a description in a small built-in editor. Marks are
+  tinted so the underlying glyph shows through. It draws straight to the
+  terminal, never into `screen_buffer`, so the filed snapshot's `screen.txt` is
+  the un-altered game render; drawing is cell-diffed against the previous
+  overlay, so an idle overlay emits nothing and a keystroke touches only a few
+  cells.
 - **Panic safety**: a custom hook exits the alternate screen and prints the
   panic info so crashes don't corrupt the terminal.
 
@@ -194,10 +199,10 @@ The actual game. Modules:
 - Live bug captures are the numbered `issues/NNNN/` directories (solved ones
   under `issues/solved/`), each a snapshot plus a note; the `verify-issues`
   subcommand checks every solved capture against its blessed `screen.txt` and
-  pre-fix render. In-game, `Ctrl+P` opens the report overlay: flag squares
-  (mouse or a keyboard cursor), type the description in the built-in editor
-  (`Tab` swaps focus), and press `Enter` to file `issue.md` + `flags.json` +
-  the snapshot.
+  pre-fix render. In-game, `Ctrl+P` opens the report overlay: flag regions
+  (mouse click/drag or a keyboard cursor), type the description in the built-in
+  editor (`Tab` swaps focus), and press `Enter` to file `issue.md` +
+  `flags.json` + the snapshot.
 - `bacon.toml` — bacon watch config (incl. a `clippy` job); `flake.nix` — Nix
   dev shell; `scripts/` — test recording/printing and profiling helpers.
 

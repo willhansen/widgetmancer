@@ -1,20 +1,22 @@
 //! In-game issue-report overlay (issue 0021).
 //!
-//! `Ctrl+P` opens a frozen overlay over the last drawn frame. The reporter
-//! flags squares (mouse click/drag, or a keyboard cursor) and types a
-//! description in a small built-in text editor (`Tab` swaps focus). Filing
-//! writes a numbered `issues/NNNN/` with the snapshot, the description, and a
-//! per-flag `explain` summary.
+//! `Ctrl+P` freezes the game and captures the last drawn frame as a static
+//! image. While the overlay is open that image is blitted straight to the
+//! terminal, repositioned so the player lands in the middle of the game region
+//! (the editor takes the rest), and the reposition is recorded so mouse input
+//! still maps back to the real frame cells / world squares. The live game is
+//! never re-rendered while the overlay is open, so `snapshot/screen.txt` stays
+//! the un-altered render and `verify-issues` is unaffected.
 //!
-//! The overlay is drawn *directly* to the terminal (never into
-//! `screen_buffer`), so `snapshot/screen.txt` stays the un-altered game render
-//! and `snapshot_tool verify-issues` is unaffected. Cells the overlay touched
-//! are restored from `screen_buffer` on the next draw, and the overlay only
-//! repaints when its state changed (`dirty`), so an idle overlay emits nothing.
+//! The reporter flags one *region* per click/drag (a click is a 1x1 region);
+//! each region is tinted magenta and numbered, and every square in it carries
+//! an `explain` summary. Drawing diffs the desired overlay against the last
+//! one, so typing touches only a few cells — no full-pane rewrite, no flicker.
 //!
 //! Gated behind the default-on `report` feature (which implies `debug-tools`
 //! for `Game::explain_screen_cell`).
 
+use std::collections::HashMap;
 use std::io::Write;
 
 use rgb::RGB8;
@@ -27,10 +29,18 @@ use terminal_rendering::*;
 use crate::game::snapshot::{create_issue_dir, write_snapshot_to, InputRecord};
 use crate::game::Game;
 
-/// Highlight color painted under a flagged square.
-const FLAG_BG: RGB8 = RGB8::new(96, 0, 96);
-/// Highlight color painted under the keyboard cursor.
-const CURSOR_BG: RGB8 = RGB8::new(120, 96, 0);
+/// Magenta tint blended into a flagged region, so the glyph shows through.
+const FLAG_TINT: RGB8 = RGB8::new(255, 0, 255);
+const FLAG_TINT_STRENGTH: f32 = 0.45;
+/// Cyan tint for the live drag preview.
+const DRAG_TINT: RGB8 = RGB8::new(0, 255, 255);
+const DRAG_TINT_STRENGTH: f32 = 0.45;
+/// Yellow tint for the keyboard marking cursor.
+const CURSOR_TINT: RGB8 = RGB8::new(255, 255, 0);
+const CURSOR_TINT_STRENGTH: f32 = 0.5;
+/// Colors of the numbered region labels.
+const LABEL_FG: RGB8 = RGB8::new(255, 255, 255);
+const LABEL_BG: RGB8 = RGB8::new(160, 0, 160);
 /// Background of the help/status line.
 const HELP_BG: RGB8 = RGB8::new(20, 20, 40);
 /// Foreground of the help/status line.
@@ -48,6 +58,37 @@ pub struct FlaggedSquare {
     pub screen_square: ScreenBufferSquare,
     /// Concise `explain`-style summary (draw-buffer detail stripped).
     pub summary: String,
+}
+
+/// One selected region: a click (1x1) or a mouse drag. Every square carries
+/// its own `explain` summary.
+#[derive(Clone, Debug)]
+pub struct Region {
+    pub world_min: WorldSquare,
+    pub world_max: WorldSquare,
+    pub squares: Vec<FlaggedSquare>,
+}
+
+impl Region {
+    fn contains(&self, square: WorldSquare) -> bool {
+        square.x >= self.world_min.x
+            && square.x <= self.world_max.x
+            && square.y >= self.world_min.y
+            && square.y <= self.world_max.y
+    }
+
+    /// The region's bounding box in screen-buffer squares.
+    fn screen_bounds(&self) -> (ScreenBufferSquare, ScreenBufferSquare) {
+        let first = self.squares[0].screen_square;
+        let (mut min, mut max) = (first, first);
+        for square in &self.squares {
+            min.x = min.x.min(square.screen_square.x);
+            min.y = min.y.min(square.screen_square.y);
+            max.x = max.x.max(square.screen_square.x);
+            max.y = max.y.max(square.screen_square.y);
+        }
+        (min, max)
+    }
 }
 
 /// Which pane owns keyboard/mouse input.
@@ -187,21 +228,27 @@ impl TextBuffer {
     }
 }
 
-/// A live report overlay. Owns the flagged squares, the description buffer,
-/// and the terminal-direct drawing state.
+/// A live report overlay. Owns the flagged regions, the description buffer,
+/// the frozen frame, and the terminal-direct drawing state.
 pub struct ReportSession {
-    flags: Vec<FlaggedSquare>,
+    regions: Vec<Region>,
     cursor: ScreenBufferSquare,
     focus: Focus,
-    /// Mouse drag anchor (world square) while the left button is held.
+    /// Mouse drag anchor/current (world square) while the left button is held.
     drag_anchor: Option<WorldSquare>,
-    /// Screen character cells the last overlay draw wrote, restored next draw.
-    drawn_cells: Vec<(u16, u16)>,
+    drag_current: Option<WorldSquare>,
+    /// The frozen frame captured on open (`screen_buffer` clone, indexed `[x][y]`).
+    frame: Vec<Vec<Glyph>>,
+    /// Where the frozen frame is repositioned, in terminal character cells.
+    offset_x: i32,
+    offset_y: i32,
     terminal_width: u16,
     terminal_height: u16,
     editor_rect: Rect,
     buffer: TextBuffer,
-    /// Repaint only when something changed, so an idle overlay emits nothing.
+    /// Overlay cells from the last draw, diffed against the next so an idle
+    /// overlay emits nothing and a keystroke touches only a few cells.
+    last: HashMap<(u16, u16), Glyph>,
     dirty: bool,
 }
 
@@ -212,23 +259,28 @@ impl ReportSession {
         let terminal_width = screen.terminal_width;
         let terminal_height = screen.terminal_height;
         let editor_rect = editor_rect(terminal_width, terminal_height);
+        let (offset_x, offset_y) = frame_offset(&editor_rect);
         let cursor = screen.world_square_to_screen_buffer_square(game.player_square());
         ReportSession {
-            flags: Vec::new(),
+            regions: Vec::new(),
             cursor,
             focus: Focus::Marking,
             drag_anchor: None,
-            drawn_cells: Vec::new(),
+            drag_current: None,
+            frame: screen.screen_buffer.clone(),
+            offset_x,
+            offset_y,
             terminal_width,
             terminal_height,
             editor_rect,
             buffer: TextBuffer::new(),
+            last: HashMap::new(),
             dirty: true,
         }
     }
 
-    pub fn flags(&self) -> &[FlaggedSquare] {
-        &self.flags
+    pub fn regions(&self) -> &[Region] {
+        &self.regions
     }
 
     pub fn focus(&self) -> Focus {
@@ -297,7 +349,7 @@ impl ReportSession {
             Key::Left | Key::Char('h') => self.move_cursor(-1, 0),
             Key::Right | Key::Char('l') => self.move_cursor(1, 0),
             Key::Char(' ') => self.toggle_flag_at_cursor(game),
-            Key::Char('c') => self.flags.clear(),
+            Key::Char('c') => self.regions.clear(),
             Key::Char('\n') | Key::Char('\r') => return ReportAction::File,
             _ => {}
         }
@@ -305,30 +357,34 @@ impl ReportSession {
     }
 
     fn handle_marking_mouse(&mut self, game: &Game, me: MouseEvent) -> ReportAction {
-        // A click inside the editor focuses it.
-        if let MouseEvent::Press(MouseButton::Left, x, y) = me {
-            if self.editor_rect.contains(x.saturating_sub(1), y.saturating_sub(1)) {
-                self.focus = Focus::Editor;
-                return ReportAction::None;
-            }
-        }
         match me {
             MouseEvent::Press(MouseButton::Left, term_x, term_y) => {
-                self.drag_anchor = Some(self.term_to_world(game, term_x, term_y));
+                // A click inside the editor focuses it instead of marking.
+                if !self.term_in_game_region(term_x, term_y) {
+                    self.focus = Focus::Editor;
+                    return ReportAction::None;
+                }
+                let world = self.term_to_world(game, term_x, term_y);
+                self.cursor = self.term_to_screen_square(term_x, term_y);
+                self.drag_anchor = Some(world);
+                self.drag_current = Some(world);
             }
             MouseEvent::Hold(term_x, term_y) => {
                 if self.drag_anchor.is_none() {
                     return ReportAction::None;
                 }
-                self.cursor = self.term_to_screen_square(term_x, term_y);
+                self.drag_current = Some(self.term_to_world(game, term_x, term_y));
             }
             MouseEvent::Release(term_x, term_y) => {
                 let end = self.term_to_world(game, term_x, term_y);
-                match self.drag_anchor.take() {
-                    Some(start) if start == end => self.toggle_flag(game, start),
-                    Some(start) => self.flag_box(game, start, end),
-                    None => {}
+                if let Some(start) = self.drag_anchor.take() {
+                    if start == end {
+                        self.toggle_square(game, start);
+                    } else {
+                        self.add_region(game, start, end);
+                    }
                 }
+                self.drag_current = None;
             }
             _ => {}
         }
@@ -344,10 +400,20 @@ impl ReportSession {
         );
     }
 
+    /// A terminal character cell (0-indexed) from a frame screen square.
+    fn screen_square_to_term(&self, square: ScreenBufferSquare) -> (i32, i32) {
+        (square.x * 2 + self.offset_x, square.y + self.offset_y)
+    }
+
+    /// The frame screen square under a terminal cell, clamped to the frame.
     fn term_to_screen_square(&self, term_x: u16, term_y: u16) -> ScreenBufferSquare {
+        let frame_x = term_x.saturating_sub(1) as i32 - self.offset_x;
+        let frame_y = term_y.saturating_sub(1) as i32 - self.offset_y;
+        let max_x = (self.terminal_width as i32 / 2 - 1).max(0);
+        let max_y = (self.terminal_height as i32 - 1).max(0);
         ScreenBufferSquare::new(
-            (term_x.saturating_sub(1) as i32) / 2,
-            term_y.saturating_sub(1) as i32,
+            frame_x.div_euclid(2).clamp(0, max_x),
+            frame_y.clamp(0, max_y),
         )
     }
 
@@ -357,47 +423,52 @@ impl ReportSession {
             .screen_buffer_square_to_world_square(self.term_to_screen_square(term_x, term_y))
     }
 
+    fn term_in_game_region(&self, term_x: u16, term_y: u16) -> bool {
+        !self
+            .editor_rect
+            .contains(term_x.saturating_sub(1), term_y.saturating_sub(1))
+    }
+
     fn toggle_flag_at_cursor(&mut self, game: &Game) {
         let square = game
             .graphics()
             .screen
             .screen_buffer_square_to_world_square(self.cursor);
-        self.toggle_flag(game, square);
+        self.toggle_square(game, square);
     }
 
-    fn toggle_flag(&mut self, game: &Game, world_square: WorldSquare) {
-        if let Some(index) = self
-            .flags
-            .iter()
-            .position(|flag| flag.world_square == world_square)
-        {
-            self.flags.remove(index);
+    /// A click toggles the region containing `world_square`: remove it if it is
+    /// already marked, otherwise add a 1x1 region.
+    fn toggle_square(&mut self, game: &Game, world_square: WorldSquare) {
+        if let Some(index) = self.regions.iter().position(|region| region.contains(world_square)) {
+            self.regions.remove(index);
             return;
         }
-        self.add_flag(game, world_square);
+        self.add_region(game, world_square, world_square);
     }
 
-    fn flag_box(&mut self, game: &Game, a: WorldSquare, b: WorldSquare) {
-        let (x0, x1) = (a.x.min(b.x), a.x.max(b.x));
-        let (y0, y1) = (a.y.min(b.y), a.y.max(b.y));
-        for y in y0..=y1 {
-            for x in x0..=x1 {
-                let square = WorldSquare::new(x, y);
-                if !self.flags.iter().any(|flag| flag.world_square == square) {
-                    self.add_flag(game, square);
-                }
+    /// Add one region spanning the inclusive world-square box `a`..`b`. Every
+    /// square gets its own `explain` summary (issue 0021, Q2).
+    fn add_region(&mut self, game: &Game, a: WorldSquare, b: WorldSquare) {
+        let world_min = WorldSquare::new(a.x.min(b.x), a.y.min(b.y));
+        let world_max = WorldSquare::new(a.x.max(b.x), a.y.max(b.y));
+        let screen = &game.graphics().screen;
+        let mut squares = Vec::new();
+        for y in world_min.y..=world_max.y {
+            for x in world_min.x..=world_max.x {
+                let world_square = WorldSquare::new(x, y);
+                let screen_square = screen.world_square_to_screen_buffer_square(world_square);
+                squares.push(FlaggedSquare {
+                    world_square,
+                    screen_square,
+                    summary: concise_explain(game, screen_square),
+                });
             }
         }
-    }
-
-    fn add_flag(&mut self, game: &Game, world_square: WorldSquare) {
-        let screen = &game.graphics().screen;
-        let screen_square = screen.world_square_to_screen_buffer_square(world_square);
-        let summary = concise_explain(game, screen_square);
-        self.flags.push(FlaggedSquare {
-            world_square,
-            screen_square,
-            summary,
+        self.regions.push(Region {
+            world_min,
+            world_max,
+            squares,
         });
     }
 
@@ -417,38 +488,154 @@ impl ReportSession {
         }
         self.dirty = false;
 
-        let screen = &game.graphics().screen;
-        let buffer = &screen.screen_buffer;
-        let width = self.terminal_width;
+        // The full desired frame (background + overlay). Because it covers every
+        // terminal cell, cells the previous draw touched but the new one does
+        // not are restored simply by diffing against `last`.
+        let desired = self.build_overlay(game);
 
-        // Restore anything the last overlay draw covered.
-        for &(cx, cy) in &self.drawn_cells {
-            if let Some(glyph) = glyph_at(buffer, cx, cy) {
+        for (&(cx, cy), &glyph) in desired.iter() {
+            if self.last.get(&(cx, cy)) != Some(&glyph) {
                 let _ = write!(writer, "{}{}", Goto(cx + 1, cy + 1), glyph);
             }
         }
-        self.drawn_cells.clear();
 
-        let squares: Vec<(ScreenBufferSquare, RGB8)> = self
-            .flags
-            .iter()
-            .map(|flag| (flag.screen_square, FLAG_BG))
-            .chain(std::iter::once((self.cursor, CURSOR_BG)))
-            .collect();
-        for (square, bg) in squares {
-            self.drawn_cells
-                .extend(paint_square(writer, buffer, square, bg, width));
-        }
-
-        let (help_row, help_width) = self.help_row_and_width();
-        self.drawn_cells
-            .extend(paint_help(writer, self.flags.len(), self.focus, help_width, help_row));
-
-        self.draw_editor(writer);
+        self.last = desired;
         let _ = writer.flush();
     }
 
-    fn draw_editor(&mut self, writer: &mut dyn Write) {
+    /// Build every terminal cell for the current overlay state.
+    fn build_overlay(&self, game: &Game) -> HashMap<(u16, u16), Glyph> {
+        let mut cells: HashMap<(u16, u16), Glyph> = HashMap::new();
+
+        // Frozen frame, repositioned and clipped into the game region.
+        for cy in 0..self.terminal_height {
+            for cx in 0..self.terminal_width {
+                if self.editor_rect.contains(cx, cy) {
+                    continue;
+                }
+                cells.insert(
+                    (cx, cy),
+                    self.frame_glyph_at(cx, cy).unwrap_or_else(blank_glyph),
+                );
+            }
+        }
+
+        // Committed regions, tinted so the glyph shows through.
+        for region in &self.regions {
+            for square in &region.squares {
+                self.tint_square(
+                    &mut cells,
+                    square.screen_square,
+                    FLAG_TINT,
+                    FLAG_TINT_STRENGTH,
+                );
+            }
+        }
+
+        // Live drag: tentatively tint the box and label it as the next region.
+        if let (Some(anchor), Some(current)) = (self.drag_anchor, self.drag_current) {
+            let screen = &game.graphics().screen;
+            for screen_square in world_box_screen_squares(screen, anchor, current) {
+                self.tint_square(
+                    &mut cells,
+                    screen_square,
+                    DRAG_TINT,
+                    DRAG_TINT_STRENGTH,
+                );
+            }
+        }
+
+        // Keyboard cursor (marking focus only).
+        if self.focus == Focus::Marking {
+            self.tint_square(&mut cells, self.cursor, CURSOR_TINT, CURSOR_TINT_STRENGTH);
+        }
+
+        // Numbered labels, one per region; the drag preview is numbered next.
+        for (index, region) in self.regions.iter().enumerate() {
+            self.draw_label(&mut cells, region.screen_bounds().0, index + 1);
+        }
+        if let (Some(anchor), Some(current)) = (self.drag_anchor, self.drag_current) {
+            if anchor != current {
+                let screen = &game.graphics().screen;
+                let a = screen.world_square_to_screen_buffer_square(anchor);
+                let b = screen.world_square_to_screen_buffer_square(current);
+                let top_left = ScreenBufferSquare::new(a.x.min(b.x), a.y.min(b.y));
+                self.draw_label(&mut cells, top_left, self.regions.len() + 1);
+            }
+        }
+
+        self.help_cells(&mut cells);
+        // Editor last, so it wins over anything that strayed into it.
+        self.editor_cells(&mut cells);
+
+        cells
+    }
+
+    /// The frozen-frame glyph at a terminal cell, if the frame covers it.
+    fn frame_glyph_at(&self, cx: u16, cy: u16) -> Option<Glyph> {
+        glyph_at(&self.frame, cx as i32 - self.offset_x, cy as i32 - self.offset_y)
+    }
+
+    /// Blend `color` into a square's two character cells, if present.
+    fn tint_square(
+        &self,
+        cells: &mut HashMap<(u16, u16), Glyph>,
+        square: ScreenBufferSquare,
+        color: RGB8,
+        strength: f32,
+    ) {
+        let (tx, ty) = self.screen_square_to_term(square);
+        for cx in [tx, tx + 1] {
+            if cx < 0 || ty < 0 {
+                continue;
+            }
+            if let Some(glyph) = cells.get_mut(&(cx as u16, ty as u16)) {
+                *glyph = tint_glyph(*glyph, color, strength);
+            }
+        }
+    }
+
+    /// Draw a region's 1-based number one row above its top-left corner,
+    /// clamped to the top edge and clipped out of the editor.
+    fn draw_label(
+        &self,
+        cells: &mut HashMap<(u16, u16), Glyph>,
+        top_left: ScreenBufferSquare,
+        index: usize,
+    ) {
+        let (tx, ty) = self.screen_square_to_term(top_left);
+        let row = (ty - 1).max(0) as u16;
+        let mut x = tx;
+        for character in index.to_string().chars() {
+            if x < 0 {
+                x += 1;
+                continue;
+            }
+            let cx = x as u16;
+            if cx >= self.terminal_width || self.editor_rect.contains(cx, row) {
+                break;
+            }
+            cells.insert((cx, row), Glyph::new(character, LABEL_FG, LABEL_BG));
+            x += 1;
+        }
+    }
+
+    fn help_cells(&self, cells: &mut HashMap<(u16, u16), Glyph>) {
+        let (help_row, help_width) = self.help_row_and_width();
+        let focus_label = match self.focus {
+            Focus::Marking => "MARK",
+            Focus::Editor => "EDIT",
+        };
+        let text = format!(
+            " REPORT [{focus_label}]  tab: swap  move: hjkl/arrows  flag: space/click/drag  clear: c  file: enter  cancel: esc/^P   [{} regions]",
+            self.regions.len()
+        );
+        for (cx, character) in (0..help_width).zip(text.chars().chain(std::iter::repeat(' '))) {
+            cells.insert((cx, help_row), Glyph::new(character, HELP_FG, HELP_BG));
+        }
+    }
+
+    fn editor_cells(&self, cells: &mut HashMap<(u16, u16), Glyph>) {
         let rect = self.editor_rect;
         if rect.width < 4 || rect.height < 3 {
             return;
@@ -471,9 +658,7 @@ impl ReportSession {
                     ' '
                 };
                 let fg = if character == ' ' { EDITOR_FG } else { EDITOR_BORDER };
-                let glyph = Glyph::new(character, fg, EDITOR_BG);
-                let _ = write!(writer, "{}{}", Goto(cx + 1, cy + 1), glyph);
-                self.drawn_cells.push((cx, cy));
+                cells.insert((cx, cy), Glyph::new(character, fg, EDITOR_BG));
             }
         }
 
@@ -488,9 +673,7 @@ impl ReportSession {
             if cx >= rect.x + rect.width - 1 {
                 break;
             }
-            let glyph = Glyph::new(character, EDITOR_BORDER, EDITOR_BG);
-            let _ = write!(writer, "{}{}", Goto(cx + 1, rect.y + 1), glyph);
-            self.drawn_cells.push((cx, rect.y));
+            cells.insert((cx, rect.y), Glyph::new(character, EDITOR_BORDER, EDITOR_BG));
         }
 
         // Scroll so the cursor line stays visible.
@@ -505,9 +688,7 @@ impl ReportSession {
             let row = inner.y + (index - scroll) as u16;
             for (col, &character) in line.iter().enumerate().take(inner.width as usize) {
                 let cx = inner.x + col as u16;
-                let glyph = Glyph::new(character, EDITOR_FG, EDITOR_BG);
-                let _ = write!(writer, "{}{}", Goto(cx + 1, row + 1), glyph);
-                self.drawn_cells.push((cx, row));
+                cells.insert((cx, row), Glyph::new(character, EDITOR_FG, EDITOR_BG));
             }
         }
 
@@ -521,9 +702,23 @@ impl ReportSession {
             .and_then(|line| line.get(self.buffer.col))
             .copied()
             .unwrap_or(' ');
-        let cursor = Glyph::new(character, EDITOR_BG, EDITOR_CURSOR_BG);
-        let _ = write!(writer, "{}{}", Goto(cursor_col + 1, cursor_row + 1), cursor);
-        self.drawn_cells.push((cursor_col, cursor_row));
+        cells.insert(
+            (cursor_col, cursor_row),
+            Glyph::new(character, EDITOR_BG, EDITOR_CURSOR_BG),
+        );
+    }
+}
+
+/// Shift (in terminal character cells) that moves the frozen frame's center —
+/// where the player is — into the middle of the game region. Kept even in `x`
+/// so the two-cells-per-square alignment is preserved.
+fn frame_offset(editor: &Rect) -> (i32, i32) {
+    if editor.x > 0 {
+        // Editor docked on the right: pull the frame left.
+        ((-(editor.width as i32 / 2)) & !1, 0)
+    } else {
+        // Editor docked at the bottom: pull the frame up.
+        (0, -(editor.height as i32 / 2))
     }
 }
 
@@ -553,9 +748,50 @@ fn editor_rect(terminal_width: u16, terminal_height: u16) -> Rect {
     }
 }
 
-/// The glyph at a screen character cell, if in bounds.
-fn glyph_at(buffer: &[Vec<Glyph>], cx: u16, cy: u16) -> Option<Glyph> {
-    buffer.get(cx as usize).and_then(|col| col.get(cy as usize)).copied()
+/// A blank cell for the parts of the game region the frozen frame does not
+/// cover (the frame is translated, not scaled, so translated edges fall off).
+fn blank_glyph() -> Glyph {
+    Glyph::new(' ', Glyph::DEFAULT_FG_COLOR, Glyph::DEFAULT_BG_COLOR)
+}
+
+/// Blend `color` into a glyph's foreground and background. The character is
+/// untouched, so a mark tints the underlying glyph instead of hiding it.
+fn tint_glyph(glyph: Glyph, color: RGB8, strength: f32) -> Glyph {
+    Glyph {
+        character: glyph.character,
+        fg_color: tint_color(glyph.fg_color, color, strength),
+        bg_color: tint_color(glyph.bg_color, color, strength),
+        bg_transparent: false,
+    }
+}
+
+/// Every screen square in the inclusive world-square box `a`..`b`.
+fn world_box_screen_squares(
+    screen: &terminal_rendering::Screen,
+    a: WorldSquare,
+    b: WorldSquare,
+) -> Vec<ScreenBufferSquare> {
+    let (x0, x1) = (a.x.min(b.x), a.x.max(b.x));
+    let (y0, y1) = (a.y.min(b.y), a.y.max(b.y));
+    let mut squares = Vec::new();
+    for y in y0..=y1 {
+        for x in x0..=x1 {
+            squares.push(screen.world_square_to_screen_buffer_square(WorldSquare::new(x, y)));
+        }
+    }
+    squares
+}
+
+/// The glyph at a screen character cell, if in bounds (coordinates may be
+/// negative, e.g. when a translated frame hangs off an edge).
+fn glyph_at(buffer: &[Vec<Glyph>], cx: i32, cy: i32) -> Option<Glyph> {
+    if cx < 0 || cy < 0 {
+        return None;
+    }
+    buffer
+        .get(cx as usize)
+        .and_then(|col| col.get(cy as usize))
+        .copied()
 }
 
 /// `explain_screen_cell` with the verbose draw-buffer lines dropped.
@@ -567,61 +803,8 @@ fn concise_explain(game: &Game, screen_square: ScreenBufferSquare) -> String {
         .join("\n")
 }
 
-/// Paint a flagged/cursor square's two character cells highlighted, returning
-/// the cells touched so they can be restored next frame.
-fn paint_square(
-    writer: &mut dyn Write,
-    buffer: &[Vec<Glyph>],
-    square: ScreenBufferSquare,
-    bg: RGB8,
-    terminal_width: u16,
-) -> Vec<(u16, u16)> {
-    let mut drawn = Vec::new();
-    if square.x < 0 || square.y < 0 || square.x * 2 + 1 >= terminal_width as i32 {
-        return drawn;
-    }
-    for cx in [square.x * 2, square.x * 2 + 1] {
-        let (cx, cy) = (cx as u16, square.y as u16);
-        let Some(glyph) = glyph_at(buffer, cx, cy) else {
-            continue;
-        };
-        let mut highlighted = glyph;
-        highlighted.bg_color = bg;
-        highlighted.bg_transparent = false;
-        let _ = write!(writer, "{}{}", Goto(cx + 1, cy + 1), highlighted);
-        drawn.push((cx, cy));
-    }
-    drawn
-}
-
-/// Paint the help/status line, returning the cells touched.
-fn paint_help(
-    writer: &mut dyn Write,
-    flag_count: usize,
-    focus: Focus,
-    width: u16,
-    row: u16,
-) -> Vec<(u16, u16)> {
-    let focus_label = match focus {
-        Focus::Marking => "MARK",
-        Focus::Editor => "EDIT",
-    };
-    let text = format!(
-        " REPORT [{focus_label}]  tab: swap  move: hjkl/arrows  flag: space/click/drag  clear: c  file: enter  cancel: esc/^P   [{flag_count} flagged]"
-    );
-    let mut drawn = Vec::new();
-    let mut chars = text.chars();
-    for cx in 0..width {
-        let character = chars.next().unwrap_or(' ');
-        let glyph = Glyph::new(character, HELP_FG, HELP_BG);
-        let _ = write!(writer, "{}{}", Goto(cx + 1, row + 1), glyph);
-        drawn.push((cx, row));
-    }
-    drawn
-}
-
 /// File the issue: create the numbered dir, write the snapshot (with the
-/// un-altered screen), then wrap the typed description and the flagged squares
+/// un-altered screen), then wrap the typed description and the flagged regions
 /// into `issue.md` and `flags.json`.
 pub fn finish_issue(
     game: &Game,
@@ -636,11 +819,11 @@ pub fn finish_issue(
         issue_number_of(&dir),
         map_name.unwrap_or(crate::DEFAULT_MAP_NAME),
         &session.description(),
-        session.flags(),
+        session.regions(),
     );
     std::fs::write(dir.join("issue.md"), note)
         .map_err(|error| format!("could not write issue.md: {error}"))?;
-    std::fs::write(dir.join("flags.json"), flags_json(session.flags()))
+    std::fs::write(dir.join("flags.json"), flags_json(session.regions()))
         .map_err(|error| format!("could not write flags.json: {error}"))?;
     eprintln!("Filed issue at {}", dir.display());
     Ok(dir)
@@ -654,12 +837,12 @@ fn issue_number_of(dir: &std::path::Path) -> u32 {
 }
 
 /// Build the issue markdown: template header, the reporter's description, then
-/// one section per flagged square.
+/// one section per flagged region with a summary for each of its squares.
 pub fn render_issue_markdown(
     number: u32,
     map: &str,
     description: &str,
-    flags: &[FlaggedSquare],
+    regions: &[Region],
 ) -> String {
     let mut out = format!(
         "# Issue {number:04}\n\nMap: {map}\nCaptured: {}\n\n## Description\n\n",
@@ -674,35 +857,68 @@ pub fn render_issue_markdown(
     }
 
     out.push_str("\n## Flagged squares\n\n");
-    if flags.is_empty() {
+    if regions.is_empty() {
         out.push_str("(none)\n");
     } else {
-        for (index, flag) in flags.iter().enumerate() {
+        for (index, region) in regions.iter().enumerate() {
+            let (screen_min, screen_max) = region.screen_bounds();
             out.push_str(&format!(
-                "### {}. world({}, {}) — screen({}, {})\n\n```\n{}\n```\n\n",
+                "### {}. region world({}, {})..({}, {}) — screen({}, {})..({}, {})\n\n",
                 index + 1,
-                flag.world_square.x,
-                flag.world_square.y,
-                flag.screen_square.x,
-                flag.screen_square.y,
-                flag.summary,
+                region.world_min.x,
+                region.world_min.y,
+                region.world_max.x,
+                region.world_max.y,
+                screen_min.x,
+                screen_min.y,
+                screen_max.x,
+                screen_max.y,
             ));
+            for square in &region.squares {
+                out.push_str(&format!(
+                    "world({}, {}) — screen({}, {}):\n\n```\n{}\n```\n\n",
+                    square.world_square.x,
+                    square.world_square.y,
+                    square.screen_square.x,
+                    square.screen_square.y,
+                    square.summary,
+                ));
+            }
         }
     }
     out
 }
 
-fn flags_json(flags: &[FlaggedSquare]) -> String {
-    let entries: Vec<String> = flags
+fn flags_json(regions: &[Region]) -> String {
+    let entries: Vec<String> = regions
         .iter()
-        .map(|flag| {
+        .map(|region| {
+            let (screen_min, screen_max) = region.screen_bounds();
+            let squares: Vec<String> = region
+                .squares
+                .iter()
+                .map(|flag| {
+                    format!(
+                        "      {{\"world\": [{}, {}], \"screen\": [{}, {}], \"summary\": {}}}",
+                        flag.world_square.x,
+                        flag.world_square.y,
+                        flag.screen_square.x,
+                        flag.screen_square.y,
+                        json_string(&flag.summary),
+                    )
+                })
+                .collect();
             format!(
-                "  {{\"world\": [{}, {}], \"screen\": [{}, {}], \"summary\": {}}}",
-                flag.world_square.x,
-                flag.world_square.y,
-                flag.screen_square.x,
-                flag.screen_square.y,
-                json_string(&flag.summary),
+                "  {{\n    \"region\": [[{}, {}], [{}, {}]],\n    \"screen_region\": [[{}, {}], [{}, {}]],\n    \"squares\": [\n{}\n    ]\n  }}",
+                region.world_min.x,
+                region.world_min.y,
+                region.world_max.x,
+                region.world_max.y,
+                screen_min.x,
+                screen_min.y,
+                screen_max.x,
+                screen_max.y,
+                squares.join(",\n"),
             )
         })
         .collect();
@@ -729,25 +945,36 @@ fn json_string(value: &str) -> String {
 mod tests {
     use super::*;
 
-    fn flag(x: i32, y: i32, summary: &str) -> FlaggedSquare {
-        FlaggedSquare {
-            world_square: WorldSquare::new(x, y),
-            screen_square: ScreenBufferSquare::new(x, y),
-            summary: summary.to_string(),
+    fn region(min: (i32, i32), max: (i32, i32), summaries: &[&str]) -> Region {
+        let squares = summaries
+            .iter()
+            .enumerate()
+            .map(|(i, summary)| FlaggedSquare {
+                world_square: WorldSquare::new(min.0 + i as i32, min.1),
+                screen_square: ScreenBufferSquare::new(min.0 + i as i32, min.1),
+                summary: summary.to_string(),
+            })
+            .collect();
+        Region {
+            world_min: WorldSquare::new(min.0, min.1),
+            world_max: WorldSquare::new(max.0, max.1),
+            squares,
         }
     }
 
     #[test]
-    fn markdown_wraps_description_and_flags() {
-        let note = render_issue_markdown(42, "cubes", "the tint is wrong", &[flag(4, 8, "depth 1")]);
+    fn markdown_wraps_description_and_regions() {
+        let note = render_issue_markdown(42, "cubes", "the tint is wrong", &[region((4, 8), (5, 8), &["depth 1", "depth 2"])]);
         assert!(note.starts_with("# Issue 0042\n\nMap: cubes\n"));
         assert!(note.contains("## Description\n\nthe tint is wrong\n"));
-        assert!(note.contains("### 1. world(4, 8) — screen(4, 8)"));
+        assert!(note.contains("### 1. region world(4, 8)..(5, 8) — screen(4, 8)..(5, 8)"));
+        assert!(note.contains("world(4, 8) — screen(4, 8):"));
         assert!(note.contains("depth 1"));
+        assert!(note.contains("depth 2"));
     }
 
     #[test]
-    fn markdown_handles_empty_description_and_no_flags() {
+    fn markdown_handles_empty_description_and_no_regions() {
         let note = render_issue_markdown(1, "cubes", "   \n", &[]);
         assert!(note.contains("(no description)"));
         assert!(note.contains("(none)"));
@@ -755,10 +982,11 @@ mod tests {
 
     #[test]
     fn flags_json_escapes_summary() {
-        let json = flags_json(&[flag(1, 2, "a \"b\"\nc")]);
+        let json = flags_json(&[region((1, 2), (1, 2), &["a \"b\"\nc"])]);
         assert!(json.contains("\"world\": [1, 2]"));
         assert!(json.contains("\\\"b\\\""));
         assert!(json.contains("\\nc"));
+        assert!(json.contains("\"region\": [[1, 2], [1, 2]]"));
     }
 
     #[test]
@@ -785,13 +1013,14 @@ mod tests {
         let game = crate::utils_for_tests::set_up_game_with_player();
         let mut session = ReportSession::open(&game);
         assert_eq!(session.focus(), Focus::Marking);
-        assert!(session.flags().is_empty());
+        assert!(session.regions().is_empty());
 
         session.handle_event(&game, Event::Key(Key::Char(' ')));
-        assert_eq!(session.flags().len(), 1, "space flags the cursor square");
+        assert_eq!(session.regions().len(), 1, "space marks the cursor square");
+        assert_eq!(session.regions()[0].squares.len(), 1, "a click is a 1x1 region");
 
         session.handle_event(&game, Event::Key(Key::Char(' ')));
-        assert!(session.flags().is_empty(), "space again unflags it");
+        assert!(session.regions().is_empty(), "space again unmarks it");
     }
 
     #[test]
@@ -845,5 +1074,84 @@ mod tests {
         let mut idle: Vec<u8> = Vec::new();
         session.draw(&game, &mut idle);
         assert!(idle.is_empty(), "an idle overlay emits nothing");
+    }
+
+    #[test]
+    fn frame_offset_centers_the_player_in_the_game_region() {
+        // Wide terminal: editor on the right, frame pulled left by half its width.
+        let (dx, dy) = frame_offset(&editor_rect(120, 40));
+        assert_eq!((dx, dy), (-20, 0), "shift is even and half the editor width");
+
+        // Tall terminal: editor at the bottom, frame pulled up.
+        let (dx, dy) = frame_offset(&editor_rect(40, 120));
+        assert_eq!((dx, dy), (0, -20), "shift is half the editor height");
+    }
+
+    #[test]
+    fn tint_keeps_the_character_and_blends_colors() {
+        let original = Glyph::new('X', RGB8::new(0, 0, 0), RGB8::new(0, 0, 0));
+        let tinted = tint_glyph(original, FLAG_TINT, FLAG_TINT_STRENGTH);
+        assert_eq!(tinted.character, 'X', "the underlying glyph still shows");
+        assert!(tinted.fg_color.r > 0 && tinted.fg_color.b > 0, "blended toward magenta");
+        assert!(!tinted.bg_transparent, "the tint is visible");
+    }
+
+    #[test]
+    fn mouse_maps_back_through_the_frame_offset() {
+        let game = crate::utils_for_tests::set_up_game_with_player();
+        let session = ReportSession::open(&game);
+        let player_square = game.player_square();
+        let screen_square = game
+            .graphics()
+            .screen
+            .world_square_to_screen_buffer_square(player_square);
+        let (tx, ty) = session.screen_square_to_term(screen_square);
+        // Terminal coordinates are 1-indexed.
+        let world = session.term_to_world(&game, (tx + 1) as u16, (ty + 1) as u16);
+        assert_eq!(world, player_square, "the offset round-trips mouse input");
+    }
+
+    #[test]
+    fn drag_creates_one_region_per_square_explained() {
+        let game = crate::utils_for_tests::set_up_game_with_player();
+        let mut session = ReportSession::open(&game);
+        let a = WorldSquare::new(0, 0);
+        let b = WorldSquare::new(2, 1);
+        session.add_region(&game, a, b);
+        assert_eq!(session.regions().len(), 1, "a drag is a single region");
+        assert_eq!(session.regions()[0].squares.len(), 6, "3x2 box has six squares");
+    }
+
+    #[test]
+    fn diff_draw_only_writes_changed_cells() {
+        let game = crate::utils_for_tests::set_up_game_with_player();
+        let mut session = ReportSession::open(&game);
+        let mut opening: Vec<u8> = Vec::new();
+        session.draw(&game, &mut opening);
+
+        // Marking the cursor square changes only its two cells; the diff must
+        // emit far less than the opening full-screen draw.
+        session.handle_event(&game, Event::Key(Key::Char(' ')));
+        let mut marked: Vec<u8> = Vec::new();
+        session.draw(&game, &mut marked);
+        assert!(!marked.is_empty());
+        assert!(
+            marked.len() < opening.len(),
+            "a mark diff ({}) should be smaller than the full draw ({})",
+            marked.len(),
+            opening.len()
+        );
+    }
+
+    #[test]
+    fn labels_sit_one_row_above_a_region() {
+        let game = crate::utils_for_tests::set_up_game_with_player();
+        let session = ReportSession::open(&game);
+        let mut cells: HashMap<(u16, u16), Glyph> = HashMap::new();
+        let top_left = ScreenBufferSquare::new(4, 4);
+        session.draw_label(&mut cells, top_left, 3);
+        let (tx, ty) = session.screen_square_to_term(top_left);
+        let label = cells.get(&(tx as u16, (ty - 1) as u16));
+        assert_eq!(label.map(|glyph| glyph.character), Some('3'));
     }
 }

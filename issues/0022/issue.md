@@ -1,0 +1,121 @@
+# Issue 0022
+
+Map: cubes
+Captured: 2026-10-11
+
+## Description
+
+Why can't I see cube sides at this region?
+
+## Flagged squares
+
+### 1. region world(-8, 9)..(-5, 11) — screen(46, 46)..(48, 49)
+
+world(-8, 9) — screen(48, 49):
+
+```
+cell screen-square (48, 49) = char cols 96..97 (row 49); world(-8,9) rel(-18,4) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-8,9) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-7, 9) — screen(48, 48):
+
+```
+cell screen-square (48, 48) = char cols 96..97 (row 48); world(-7,9) rel(-17,4) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-7,9) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-6, 9) — screen(48, 47):
+
+```
+cell screen-square (48, 47) = char cols 96..97 (row 47); world(-6,9) rel(-16,4) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-6,9) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-5, 9) — screen(48, 46):
+
+```
+cell screen-square (48, 46) = char cols 96..97 (row 46); world(-5,9) rel(-15,4) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-5,9) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-8, 10) — screen(47, 49):
+
+```
+cell screen-square (47, 49) = char cols 94..95 (row 49); world(-8,10) rel(-18,5) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-8,10) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-7, 10) — screen(47, 48):
+
+```
+cell screen-square (47, 48) = char cols 94..95 (row 48); world(-7,10) rel(-17,5) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-7,10) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-6, 10) — screen(47, 47):
+
+```
+cell screen-square (47, 47) = char cols 94..95 (row 47); world(-6,10) rel(-16,5) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-6,10) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-5, 10) — screen(47, 46):
+
+```
+cell screen-square (47, 46) = char cols 94..95 (row 46); world(-5,10) rel(-15,5) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-5,10) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-8, 11) — screen(46, 49):
+
+```
+cell screen-square (46, 49) = char cols 92..93 (row 49); world(-8,11) rel(-18,6) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-8,11) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-7, 11) — screen(46, 48):
+
+```
+cell screen-square (46, 48) = char cols 92..93 (row 48); world(-7,11) rel(-17,6) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-7,11) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-6, 11) — screen(46, 47):
+
+```
+cell screen-square (46, 47) = char cols 92..93 (row 47); world(-6,11) rel(-16,6) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-6,11) rot 0 abs_vis "  " rel_vis "  "
+```
+
+world(-5, 11) — screen(46, 46):
+
+```
+cell screen-square (46, 46) = char cols 92..93 (row 46); world(-5,11) rel(-15,6) fov_center(10,5):
+  final: ' ' fg(255,255,255) bg(0,0,0)
+  fov visibilities: 1
+    depth 0 abs(-5,11) rot 0 abs_vis "  " rel_vis "  "
+```
+
