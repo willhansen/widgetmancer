@@ -5,6 +5,12 @@
 //!
 //! Subcommands:
 //!   render <dir>          print the headless render of <dir>/game_state.json
+//!       --no-terrain-pass   skip the raised-terrain forward column pass
+//!       --no-portal-tint    do not tint portal-depth views red
+//!       --no-portal-los     composite portal views per absolute square
+//!   screen-explain <dir>  per-screen-square FOV resolution, one TSV line each
+//!       --region x0 y0 x1 y1  limit to screen-square bounds (inclusive)
+//!       --only-visible        skip cells with no FOV visibility
 //!   diff   <dir> [ref]    compare render against ref (default <dir>/screen.txt)
 //!   bless  <dir>          overwrite <dir>/screen.txt with the render
 //!   cells  <dir>          print the parsed reference grid as plain characters
@@ -31,12 +37,14 @@ use game::game::snapshot::debug;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "Usage: snapshot_tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|explain-diff|invariants|render-at|simulate|verify-issues|minimize> <dir> [args]\n\
+        "Usage: snapshot_tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|screen-explain|explain-diff|invariants|render-at|simulate|verify-issues|minimize> <dir> [args]\n\
          \n\
          Prefer the repo-root wrapper, which rebuilds from source:\n\
          ./snapshot-tool <args>\n\
          \n\
          explain <dir> X Y [--char-col]   X,Y are screen-buffer squares unless --char-col\n\
+         screen-explain <dir> [--region x0 y0 x1 y1] [--only-visible]\n\
+         render <dir> [--no-terrain-pass] [--no-portal-tint] [--no-portal-los]\n\
          render-at <dir> [--player X Y] [--rotate N]\n\
          simulate  <dir> --keys <chars> [--render-each]\n\
          verify-issues [<dir>...]         render must match screen.txt and differ from screen.pre-fix.txt\n\
@@ -72,16 +80,57 @@ fn main() -> ExitCode {
     let dir = PathBuf::from(dir);
 
     match command.as_str() {
-        "render" => match debug::render_snapshot_headless(&dir) {
-            Ok(text) => {
-                print!("{text}");
-                ExitCode::SUCCESS
+        "render" => {
+            let mut toggles = debug::RenderToggles::default();
+            for arg in args.iter().skip(2) {
+                match arg.as_str() {
+                    "--no-terrain-pass" => toggles.terrain_forward_pass = false,
+                    "--no-portal-tint" => toggles.tint_portals = false,
+                    "--no-portal-los" => toggles.render_portals_with_line_of_sight = false,
+                    _ => return usage(),
+                }
             }
-            Err(error) => {
-                eprintln!("error: {error}");
-                ExitCode::FAILURE
+            match debug::render_snapshot_headless_with(&dir, &toggles) {
+                Ok(text) => {
+                    print!("{text}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
             }
-        },
+        }
+        "screen-explain" => {
+            let mut options = debug::ScreenExplainOptions::default();
+            let mut numbers: Vec<usize> = Vec::new();
+            for arg in args.iter().skip(2) {
+                match arg.as_str() {
+                    "--only-visible" => options.only_visible = true,
+                    "--region" => {}
+                    other => match other.parse::<usize>() {
+                        Ok(n) => numbers.push(n),
+                        Err(_) => return usage(),
+                    },
+                }
+            }
+            if !numbers.is_empty() {
+                if numbers.len() != 4 {
+                    return usage();
+                }
+                options.region = Some((numbers[0], numbers[1], numbers[2], numbers[3]));
+            }
+            match debug::screen_explain(&dir, &options) {
+                Ok(text) => {
+                    print!("{text}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         "diff" => {
             let ref_path = args
                 .get(2)

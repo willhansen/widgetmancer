@@ -9,6 +9,89 @@ Newest first.
 
 ---
 
+## 2026-10-12 — Document fix (b) as the leading hypothesis for the portal cluster
+
+### docs(issues): fix (b) leading hypothesis for 0020/0022/0024/0025/0026
+
+The remaining `cubes` portal defect (the depth-1 sub-view owning cells at the
+portal's aperture edge, so the direct cube side is not drawn and the tint lands
+outside the portal) is recorded as a leading, unconfirmed hypothesis across
+0020/0022/0024/0025/0026: make the per-relative-cell ownership *coverage-aware*
+(nearest view owns the cell; partial only where geometry occludes; the terrain
+pass draws the direct column's top/wall on the part the direct view owns),
+which requires changing the FOV visibility merge (`fov_stuff.rs`, the
+`SquareVisibility` half-plane / `combined_*` path) and re-blessing the `cubes`
+fixtures. Notes that a compositing-only variant was prototyped and rejected.
+
+Docs only.
+
+---
+
+## 2026-10-12 — Portal tint no longer colors a partial cell's shadow half
+
+### fix(render): tint only the visible glyph of a partial, not the OUT_OF_SIGHT shadow
+
+Root cause of the "portal tint appears applied outside the portal" reported in
+issues 0020/0025 (part of the 0020/0022/0024/0025 `cubes` cluster): the
+portal-depth tint is applied from `portal_depth()` alone
+(`fov_stuff.rs:900-906`), and `PartialVisibilityDrawable::tinted`
+(`graphics/drawable.rs`) tinted **both** `fg_color` and `bg_color`. `bg_color`
+is the `OUT_OF_SIGHT_COLOR` shadow half set by
+`from_partially_visible_drawable`, so the red washed the half of a
+partially-visible cell that lies *outside* the portal aperture.
+
+`tinted` now leaves `bg_color` alone and tints only `fg_color`, so the red stays
+inside the visible portion. This is the "tint outside the edge" half of the
+cluster; a portal sub-view still overwrites the direct cube at aperture-edge
+cells ("can't see the cube side", 0022/0024) — a separate fix.
+
+- Regression test `tinting_a_partial_leaves_its_shadow_background_untinted`
+  (shown to fail pre-fix: the shadow `bg_color` came back red-tinted).
+- Re-blessed the fixtures whose shadow halves were tinted: repo-root
+  `snapshot/`, `solved/0004`–`0019`, and `solved/touching-floating-square-background`.
+  `solved/0003` (portal-free) is byte-identical. The `black-*` and
+  `player-border-rotation` records are intentionally left un-blessed (design
+  records, per the 2026-10-07 note).
+- Verified: `./snapshot-tool diff snapshot/` OK; `verify-issues` all 18 OK;
+  `./run-tests` 672 passed / 9 skipped.
+- `issues/0020`–`0025` now carry their confirmed root cause.
+
+---
+
+## 2026-10-12 — snapshot_tool: full-screen explain and render-pass toggles
+
+### tooling(snapshot): screen-explain dump; render --no-terrain-pass/--no-portal-tint/--no-portal-los
+
+Two introspection tools for localizing model-vs-render disagreements on the
+`cubes` map (open issues 0020/0022/0024/0025), where `explain` only reports one
+cell per call and `render` cannot isolate a pass.
+
+- **`screen-explain <dir> [--region x0 y0 x1 y1] [--only-visible]`** — prints
+  the FOV resolution for every screen square, one TSV line each:
+  `sx sy world(x,y) rel(x,y) char=.. fg=.. bg=.. vis=N` then one
+  `d{depth} abs(x,y) rot=.. abs_vis=.. rel_vis=.. db=<kind>; …` per visibility.
+  The per-cell body of `Game::explain_screen_cell` was factored into
+  `Game::screen_cell_explanation` (returns a `ScreenCellExplanation`); `explain`'s
+  multi-line output is unchanged. `db=` uses a short `DrawableEnum` kind name
+  (`drawable_kind_name`) so lines stay grep-able.
+- **`render` pass toggles** — `--no-terrain-pass` falls back to the legacy
+  inverse composite (skips the raised-terrain forward column pass),
+  `--no-portal-tint` removes the portal-depth red wash, `--no-portal-los`
+  composites per absolute square. Backed by a new `Graphics::terrain_forward_pass`
+  (default on) and a now-`pub` `render_portals_with_line_of_sight`; the terrain
+  pass's wall/top tint now respects `tint_portals` (it previously tinted
+  unconditionally, so the toggle was incomplete). `RenderToggles` +
+  `render_snapshot_headless_with`; the old `render_snapshot_headless` delegates
+  with defaults.
+- Tests: `screen_explain_reports_a_cell_and_its_visibilities`,
+  `screen_explain_only_visible_skips_empty_cells`,
+  `no_portal_tint_removes_reddish_backgrounds` (default has red bg cells; the
+  no-tint render has none), `terrain_forward_pass_toggle_changes_a_raised_render`.
+- Verified: default output byte-identical (`./snapshot-tool diff snapshot/` OK,
+  issue 0020 OK), `./run-tests` green. README usage + this entry updated.
+
+---
+
 ## 2026-10-11 — Report overlay: Esc is not cancel; drop per-square detail
 
 ### fix(report): stop Esc from cancelling; file only region bounds

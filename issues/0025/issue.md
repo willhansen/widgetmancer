@@ -8,6 +8,44 @@ Captured: 2026-10-12
 At these locations, the portal edge goes through these squares,
 but the portal tint appears to be applied outside the portal.
 
+## Root cause (2026-10-12)
+
+Confirmed to the line. The red is the portal-depth tint applied to the
+`OUT_OF_SIGHT` **shadow** half of a partially-visible portal cell.
+
+`screen-explain issues/0025/snapshot --region 44 39 44 39`:
+
+```
+44 39 world(40,23) rel(8,-8) char='🭞' fg=(88,68,83) bg=(26,0,0) vis=2
+  d0 abs(40,23) rot=0 abs_vis="🭥🭓" rel_vis="🭥🭓" db=<none>
+  d1 abs(21,11) rot=3 abs_vis="🭞🭚" rel_vis="🭍🬿" db=solid
+```
+
+`bg(26,0,0)` is `OUT_OF_SIGHT_COLOR` (black) tinted 0.1 toward RED. The chain:
+
+- `fov_stuff.rs:900-906` wraps the depth-1 drawable in
+  `PartialVisibilityDrawable` and calls `.tinted(RED, 0.1 * depth)`; the tint is
+  keyed on `portal_depth()` only, never on how much of the cell the portal
+  covers.
+- `PartialVisibilityDrawable::tinted` (`graphics/drawable.rs:232-239`) tints
+  **both** `fg_color` and `bg_color`, and `bg_color` is the
+  `OUT_OF_SIGHT_COLOR` set in `from_partially_visible_drawable`
+  (`drawable.rs:180`). So the shadow (non-visible) half is painted dark red,
+  exactly "outside the portal".
+
+`snapshot_tool invariants` reports 46 violations here.
+
+**Fix (a) applied (2026-10-12):** in
+`PartialVisibilityDrawable::tinted`, `bg_color` (the shadow background) is left
+un-tinted and only `fg_color` is tinted, so the portal red stays inside the
+visible portion instead of washing the shadow half. Regression test
+`tinting_a_partial_leaves_its_shadow_background_untinted` (shown to fail
+pre-fix); the affected portal fixtures were re-blessed. The flagged cell above
+now renders `bg=(0,0,0)`.
+
+The remaining cluster defect (the portal sub-view owning cells at its aperture
+edge) is tracked as the **leading hypothesis for fix (b)** in 0022/0024/0026.
+
 ## Flagged regions
 
 1. world(40, 23)..(40, 23) — screen(44, 39)..(44, 39)

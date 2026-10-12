@@ -44,3 +44,58 @@ vs. the stored `Portal::entrance().direction()`), and whether the intended
 behavior is that a free-standing portal's view is confined to the portal's own
 square(s). **Deferred** until the square-indicator UI (issue 0021) lets the
 reporter name the exact squares.
+
+## Root cause (2026-10-12) — same defect class as 0022/0024/0025
+
+Confirmed with the new `snapshot_tool screen-explain` full-frame dump and the
+`render --no-portal-tint` / `--no-terrain-pass` toggles.
+
+Both symptoms are the depth-1 portal sub-view being composited and tinted on
+cells the portal does not fully cover, plus the terrain pass skipping the
+direct cube where the portal view wins the cell:
+
+- `screen-explain issues/0020/snapshot | grep 'abs(4,8)'` shows the flagged
+  cells with `d0 abs(4,8) abs_vis="🬭🬭" db=solid` (a direct partial cube top)
+  **and** `d1 abs(19,20) … db=solid` (the portal sub-view), depth-1 on top.
+- `fov_stuff.rs:900-906` and the terrain pass (`graphics.rs:481`) tint by
+  `portal_depth()` alone, with no aperture-coverage test, and
+  `PartialVisibilityDrawable::tinted` (`graphics/drawable.rs:232-239`) tints the
+  `OUT_OF_SIGHT_COLOR` **shadow** background red. That is the red wash on the
+  half of the cell outside the portal — "tint appears outside its edge".
+- `load_screen_buffer_from_terrain` uses `resolved_visibility` (topmost =
+  deepest) for the whole column and only draws the wall when `wall_frame_matches
+  && within_frame` (`graphics.rs:499-530`), so a column whose cell is won by the
+  portal view gets no direct top/wall — "can't see the cube column".
+
+Model-level corroboration: `snapshot_tool invariants` reports 101
+visibility-consistency violations on this capture (the same absolute square
+fully visible via one path, partially via another). This is the same class as
+`solved/black-block-deep-in-portal`, whose fix (`combined_with_unioning_arcs`)
+covered only co-root portal *slices*; main-view/sub-view and the top-level fold
+still merge with `combined_with` (`union_arcs=false`) via
+`combined_increasing_visibility` (`fov_stuff.rs:105-130,1370,1499`).
+
+Fix (a) — stop tinting the shadow background in
+`PartialVisibilityDrawable::tinted` — is **applied** (2026-10-12; see 0025);
+it removes the red wash from the shadow half. The portal sub-view still
+overwrites the direct cube at aperture-edge cells (fix (b), separate).
+
+The "entrance face taken on the wrong side" lead above is **not** supported: the
+aperture arc `[149.04, 168.69]` is the -x face, which is the aperture the
+entrance direction describes; the defect is downstream of the arc.
+
+**Leading hypothesis for the remaining defect (fix (b), unconfirmed).** The FOV
+assigns each relative cell to exactly one topmost view (`resolved_visibility`,
+deepest wins) and the terrain pass draws that view's column there
+(`graphics.rs:436-462`). At a portal's aperture edge the same cell can be
+partially covered by both the direct view and the depth-1 portal view (the 101
+`invariants` violations). The leading hypothesis is that the correct model is
+*coverage-aware*: each relative cell should be owned by the nearest view, with
+partial coverage only where geometry actually occludes, and the terrain pass
+should draw the direct column's top/wall on the part of the cell the direct view
+owns, falling back to the portal view only where the direct view does not reach.
+A compositing-only variant was prototyped and rejected (the wall comes from the
+terrain pass, not the drawable compositor). Confirming this requires changing the
+FOV visibility merge (`fov_stuff.rs`: the `SquareVisibility` half-plane /
+`combined_*` path) and re-blessing the `cubes` fixtures. See 0022/0024/0026.
+

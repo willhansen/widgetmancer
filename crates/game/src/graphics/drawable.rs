@@ -230,12 +230,14 @@ impl Drawable for PartialVisibilityDrawable {
     }
 
     fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum {
-        Self {
-            fg_color: tint_color(self.fg_color, color, strength),
-            bg_color: tint_color(self.bg_color, color, strength),
-            ..self.clone()
-        }
-        .into()
+        // The portal-depth tint belongs to the *visible* portion of the cell.
+        // `bg_color` is the `OUT_OF_SIGHT_COLOR` shadow half (set in
+        // `from_partially_visible_drawable`); tinting it painted the portal red
+        // onto the half of the cell outside the portal aperture (issues
+        // 0020/0025). Leave the shadow background alone and tint only the glyph.
+        let mut tinted = self.clone();
+        tinted.fg_color = tint_color(self.fg_color, color, strength);
+        tinted.into()
     }
 }
 
@@ -727,6 +729,32 @@ mod tests {
         assert_ne!(
             stacked.to_glyphs()[0].fg_color,
             stacked.to_glyphs()[0].bg_color
+        );
+    }
+
+    #[test]
+    fn tinting_a_partial_leaves_its_shadow_background_untinted() {
+        // The portal-depth tint must not bleed onto the `OUT_OF_SIGHT` shadow
+        // half of a partially-visible cell (issues 0020/0025: "the portal tint
+        // appears applied outside the portal"). Only the visible glyph color is
+        // tinted; the shadow background stays out-of-sight.
+        let partial = PartialVisibilityDrawable::from_partially_visible_drawable(
+            &SolidColorDrawable::new(GREEN),
+            SquareVisibility::bottom_half_visible(),
+        );
+        assert_eq!(partial.bg_color, OUT_OF_SIGHT_COLOR);
+
+        let tinted = partial.tinted(RED, 1.0);
+        let DrawableEnum::PartialVisibility(tinted) = tinted else {
+            panic!("expected a partial drawable");
+        };
+        assert_eq!(
+            tinted.bg_color, OUT_OF_SIGHT_COLOR,
+            "the shadow half must not be tinted"
+        );
+        assert_ne!(
+            tinted.fg_color, partial.fg_color,
+            "the visible half must still be tinted"
         );
     }
 

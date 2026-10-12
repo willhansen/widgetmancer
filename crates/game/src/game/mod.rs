@@ -14,6 +14,8 @@ use strum::IntoEnumIterator;
 
 use crate::fov_stuff::{portal_aware_field_of_view_from_square, FieldOfViewResult};
 use crate::graphics::drawable::TextDrawable;
+#[cfg(feature = "debug-tools")]
+use crate::graphics::drawable::DrawableEnum;
 use crate::graphics::*;
 use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
@@ -48,6 +50,50 @@ pub const PLAYER_SIGHT_RADIUS: u32 = 16;
 pub const MAX_GRID_ENTITIES_IN_A_PUSH_CHAIN: u32 = 3;
 
 use floating_entities::FloatingEntityEnum;
+
+/// Structured per-cell breakdown for `explain`/`screen-explain` (roadmap W.B).
+#[cfg(feature = "debug-tools")]
+#[derive(Debug, Clone)]
+pub struct ScreenCellExplanation {
+    pub square_x: usize,
+    pub y: usize,
+    pub world_square: WorldSquare,
+    pub relative_square: WorldStep,
+    pub fov_center: WorldSquare,
+    pub character: char,
+    pub fg: RGB8,
+    pub bg: RGB8,
+    pub visibilities: Vec<CellVisibilityExplanation>,
+}
+
+#[cfg(feature = "debug-tools")]
+#[derive(Debug, Clone)]
+pub struct CellVisibilityExplanation {
+    pub depth: u32,
+    pub absolute_square: WorldSquare,
+    pub rotation_quarter_turns: i32,
+    pub abs_vis: String,
+    pub rel_vis: String,
+    pub drawable_kind: String,
+    pub drawable_debug: String,
+}
+
+/// A short, stable name for a draw-buffer drawable, so `screen-explain` lines
+/// stay grep-able (the `Debug` form is several lines per drawable).
+#[cfg(feature = "debug-tools")]
+pub fn drawable_kind_name(drawable: &DrawableEnum) -> String {
+    match drawable {
+        DrawableEnum::Text(_) => "text",
+        DrawableEnum::PartialVisibility(_) => "partial",
+        DrawableEnum::SolidColor(_) => "solid",
+        DrawableEnum::Braille(_) => "braille",
+        DrawableEnum::Arrow(_) => "arrow",
+        DrawableEnum::ConveyorBelt(_) => "conveyor",
+        DrawableEnum::OffsetSquare(_) => "offset-square",
+        DrawableEnum::Layered(_) => "layered",
+    }
+    .to_string()
+}
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
 enum GridEntity {
@@ -738,7 +784,9 @@ impl Game {
                 .screen
                 .set_camera_altitude(self.player_altitude());
             let fov = self.player_fov_for_draw();
-            let mut drawn = if self.terrain.max_top_altitude() > 1 {
+            let mut drawn = if self.terrain.max_top_altitude() > 1
+                && self.graphics.terrain_forward_pass
+            {
                 // On a raised board the forward column pass draws the whole
                 // scene. The legacy inverse composite is only needed underneath
                 // to reproduce portal views (its per-cell `drawn_over`
@@ -1749,67 +1797,124 @@ impl Game {
     /// draw-buffer drawable at each.
     #[cfg(feature = "debug-tools")]
     pub fn explain_screen_cell(&self, square_x: usize, y: usize) -> String {
+        let (fov, _trace) = self.player_field_of_view_traced();
+        let Some(explained) = self.screen_cell_explanation(&fov, square_x, y) else {
+            return format!(
+                "cell screen-square ({square_x}, row {y}) is out of bounds (terminal {}x{})",
+                self.graphics.screen.terminal_width, self.graphics.screen.terminal_height
+            );
+        };
+
+        let mut out = String::new();
+        out.push_str(&format!(
+            "cell screen-square ({}, {}) = char cols {}..{} (row {}); world({},{}) rel({},{}) fov_center({},{}):\n",
+            explained.square_x,
+            explained.y,
+            explained.square_x * 2,
+            explained.square_x * 2 + 1,
+            explained.y,
+            explained.world_square.x,
+            explained.world_square.y,
+            explained.relative_square.x,
+            explained.relative_square.y,
+            explained.fov_center.x,
+            explained.fov_center.y,
+        ));
+        out.push_str(&format!(
+            "  final: {:?} fg({},{},{}) bg({},{},{})\n",
+            explained.character,
+            explained.fg.r,
+            explained.fg.g,
+            explained.fg.b,
+            explained.bg.r,
+            explained.bg.g,
+            explained.bg.b,
+        ));
+        out.push_str(&format!(
+            "  fov visibilities: {}\n",
+            explained.visibilities.len()
+        ));
+        for visibility in &explained.visibilities {
+            out.push_str(&format!(
+                "    depth {} abs({},{}) rot {} abs_vis {:?} rel_vis {:?}\n",
+                visibility.depth,
+                visibility.absolute_square.x,
+                visibility.absolute_square.y,
+                visibility.rotation_quarter_turns,
+                visibility.abs_vis,
+                visibility.rel_vis,
+            ));
+            out.push_str(&format!(
+                "      draw_buffer: {}\n",
+                visibility.drawable_debug
+            ));
+        }
+        if explained.visibilities.is_empty() {
+            out.push_str("    (no FOV visibility maps to this cell)\n");
+        }
+        out
+    }
+
+    /// The structured form of [`Self::explain_screen_cell`], shared with the
+    /// full-frame `screen-explain` dump. `None` when the screen square is out of
+    /// bounds.
+    #[cfg(feature = "debug-tools")]
+    pub fn screen_cell_explanation(
+        &self,
+        fov: &FieldOfViewResult,
+        square_x: usize,
+        y: usize,
+    ) -> Option<ScreenCellExplanation> {
         let screen = &self.graphics.screen;
         let x = square_x * 2;
         if x >= screen.terminal_width as usize || y >= screen.terminal_height as usize {
-            return format!(
-                "cell screen-square ({square_x}, row {y}) is out of bounds (terminal {}x{})",
-                screen.terminal_width, screen.terminal_height
-            );
+            return None;
         }
 
         let glyph = screen.screen_buffer[x][y];
         let buffer_square = ScreenBufferCharacterSquare::new(x as i32, y as i32);
         let world_square = screen.screen_buffer_character_square_to_world_square(buffer_square);
-
-        let (fov, _trace) = self.player_field_of_view_traced();
         let relative_square = world_square - fov.root_square();
-        let visibilities = fov.visibilities_of_relative_square(relative_square);
 
-        let mut out = String::new();
-        out.push_str(&format!(
-            "cell screen-square ({square_x}, {y}) = char cols {x}..{} (row {y}); world({},{}) rel({},{}) fov_center({},{}):\n",
-            x + 1,
-            world_square.x,
-            world_square.y,
-            relative_square.x,
-            relative_square.y,
-            fov.root_square().x,
-            fov.root_square().y,
-        ));
-        out.push_str(&format!(
-            "  final: {:?} fg({},{},{}) bg({},{},{})\n",
-            glyph.character,
-            glyph.fg_color.r,
-            glyph.fg_color.g,
-            glyph.fg_color.b,
-            glyph.bg_color.r,
-            glyph.bg_color.g,
-            glyph.bg_color.b,
-        ));
-        out.push_str(&format!("  fov visibilities: {}\n", visibilities.len()));
-        for visibility in &visibilities {
-            let absolute = visibility.absolute_square();
-            let draw_buffer_drawable = self
-                .graphics
-                .get_drawable_for_square_from_draw_buffer(absolute)
-                .map(|drawable| format!("{drawable:?}"))
-                .unwrap_or_else(|| "<none>".to_string());
-            out.push_str(&format!(
-                "    depth {} abs({},{}) rot {} abs_vis {:?} rel_vis {:?}\n",
-                visibility.portal_depth(),
-                absolute.x,
-                absolute.y,
-                visibility.portal_rotation_from_relative_to_absolute().quarter_turns(),
-                visibility.square_visibility_in_absolute_frame().as_string(),
-                visibility.square_visibility_in_relative_frame().as_string(),
-            ));
-            out.push_str(&format!("      draw_buffer: {draw_buffer_drawable}\n"));
-        }
-        if visibilities.is_empty() {
-            out.push_str("    (no FOV visibility maps to this cell)\n");
-        }
-        out
+        let visibilities = fov
+            .visibilities_of_relative_square(relative_square)
+            .into_iter()
+            .map(|visibility| {
+                let absolute = visibility.absolute_square();
+                let drawable = self
+                    .graphics
+                    .get_drawable_for_square_from_draw_buffer(absolute);
+                let drawable_kind = drawable
+                    .map(drawable_kind_name)
+                    .unwrap_or_else(|| "<none>".to_string());
+                let drawable_debug = drawable
+                    .map(|drawable| format!("{drawable:?}"))
+                    .unwrap_or_else(|| "<none>".to_string());
+                CellVisibilityExplanation {
+                    depth: visibility.portal_depth(),
+                    absolute_square: absolute,
+                    rotation_quarter_turns: visibility
+                        .portal_rotation_from_relative_to_absolute()
+                        .quarter_turns(),
+                    abs_vis: visibility.square_visibility_in_absolute_frame().as_string(),
+                    rel_vis: visibility.square_visibility_in_relative_frame().as_string(),
+                    drawable_kind,
+                    drawable_debug,
+                }
+            })
+            .collect();
+
+        Some(ScreenCellExplanation {
+            square_x,
+            y,
+            world_square,
+            relative_square,
+            fov_center: fov.root_square(),
+            character: glyph.character,
+            fg: glyph.fg_color,
+            bg: glyph.bg_color,
+            visibilities,
+        })
     }
 
     pub fn get_color_for_faction(&self, faction: Faction) -> RGB8 {

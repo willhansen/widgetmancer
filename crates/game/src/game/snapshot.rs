@@ -1373,10 +1373,53 @@ pub mod debug {
         SnapshotData,
     };
 
+    /// Render-pass toggles for [`render_snapshot_headless_with`]. All on by
+    /// default, so the default render is unchanged.
+    #[derive(Debug, Clone, Copy)]
+    pub struct RenderToggles {
+        pub terrain_forward_pass: bool,
+        pub tint_portals: bool,
+        pub render_portals_with_line_of_sight: bool,
+    }
+
+    impl Default for RenderToggles {
+        fn default() -> Self {
+            Self {
+                terrain_forward_pass: true,
+                tint_portals: true,
+                render_portals_with_line_of_sight: true,
+            }
+        }
+    }
+
+    fn apply_render_toggles(game: &mut Game, toggles: &RenderToggles) {
+        let graphics = game.borrow_graphics_mut();
+        graphics.terrain_forward_pass = toggles.terrain_forward_pass;
+        graphics.tint_portals = toggles.tint_portals;
+        graphics.render_portals_with_line_of_sight = toggles.render_portals_with_line_of_sight;
+    }
+
+    /// Bounds and filter for [`screen_explain`]. `region` is inclusive
+    /// screen-square bounds `(x0, y0, x1, y1)`; `None` means the full terminal.
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct ScreenExplainOptions {
+        pub region: Option<(usize, usize, usize, usize)>,
+        pub only_visible: bool,
+    }
+
     /// Render `dir/game_state.json` headless at the captured world time and
     /// return the ANSI grid. Rendering at the captured elapsed time is what
     /// makes time-dependent visuals (e.g. death-cube technicolor) reproduce.
     pub fn render_snapshot_headless(dir: &Path) -> Result<String, String> {
+        render_snapshot_headless_with(dir, &RenderToggles::default())
+    }
+
+    /// Headless render with individual passes toggled off, so a suspected pass
+    /// can be isolated (`snapshot_tool render --no-terrain-pass`).
+    pub fn render_snapshot_headless_with(
+        dir: &Path,
+        toggles: &RenderToggles,
+    ) -> Result<String, String> {
         let path = dir.join("game_state.json");
         let contents = std::fs::read_to_string(&path)
             .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
@@ -1384,6 +1427,7 @@ pub mod debug {
             .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
         let elapsed = data.draw_elapsed();
         let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
+        apply_render_toggles(&mut game, toggles);
         game.draw_headless_at_duration_from_start(elapsed);
         Ok(screen_text(&game))
     }
@@ -1452,6 +1496,81 @@ pub mod debug {
         let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
         game.draw_headless_at_duration_from_start(elapsed);
         Ok(game.explain_screen_cell(x, y))
+    }
+
+    /// Dump every screen square's FOV resolution on one line, so a rendered
+    /// artifact can be correlated with the model in a single pass instead of
+    /// one `explain` call per cell. Columns (tab-separated):
+    /// `sx sy world(x,y) rel(x,y) char=.. fg=(..) bg=(..) vis=N then one
+    /// `d{depth} abs(x,y) rot=.. abs_vis=.. rel_vis=.. db=..` per visibility.
+    pub fn screen_explain(
+        dir: &Path,
+        options: &ScreenExplainOptions,
+    ) -> Result<String, String> {
+        let path = dir.join("game_state.json");
+        let contents = std::fs::read_to_string(&path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+        let data: SnapshotData = serde_json::from_str(&contents)
+            .map_err(|error| format!("Could not parse {}: {error}", path.display()))?;
+        let elapsed = data.draw_elapsed();
+        let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
+        game.draw_headless_at_duration_from_start(elapsed);
+
+        let (fov, _trace) = game.player_field_of_view_traced();
+        let width = game.graphics().screen.terminal_width as usize;
+        let height = game.graphics().screen.terminal_height as usize;
+        let (x0, y0, x1, y1) = options.region.unwrap_or((
+            0,
+            0,
+            width.saturating_sub(1) / 2,
+            height.saturating_sub(1),
+        ));
+
+        let mut out = String::from(
+            "# sx\tsy\tworld\trel\tchar\tfg\tbg\tvis\tvisibilities\n",
+        );
+        for square_x in x0..=x1 {
+            for y in y0..=y1 {
+                let Some(explained) = game.screen_cell_explanation(&fov, square_x, y) else {
+                    continue;
+                };
+                if options.only_visible && explained.visibilities.is_empty() {
+                    continue;
+                }
+                out.push_str(&format!(
+                    "{sx}\t{y}\tworld({wx},{wy})\trel({rx},{ry})\tchar={ch:?}\tfg=({fr},{fg},{fb})\tbg=({br},{bg},{bb})\tvis={n}\t{vis}\n",
+                    sx = explained.square_x,
+                    wx = explained.world_square.x,
+                    wy = explained.world_square.y,
+                    rx = explained.relative_square.x,
+                    ry = explained.relative_square.y,
+                    ch = explained.character,
+                    fr = explained.fg.r,
+                    fg = explained.fg.g,
+                    fb = explained.fg.b,
+                    br = explained.bg.r,
+                    bg = explained.bg.g,
+                    bb = explained.bg.b,
+                    n = explained.visibilities.len(),
+                    vis = explained
+                        .visibilities
+                        .iter()
+                        .map(|v| format!(
+                            "d{} abs({},{}) rot={} abs_vis={:?} rel_vis={:?} db={}",
+                            v.depth,
+                            v.absolute_square.x,
+                            v.absolute_square.y,
+                            v.rotation_quarter_turns,
+                            v.abs_vis,
+                            v.rel_vis,
+                            v.drawable_kind,
+                        ))
+                        .collect::<Vec<_>>()
+                        .join("; "),
+                ));
+            }
+        }
+        Ok(out)
     }
 
     /// FOV self-consistency violations for the loaded snapshot's player
@@ -2375,7 +2494,7 @@ pub mod debug {
     mod tests {
         use super::*;
         use std::time::Duration;
-        use crate::utils_for_tests::set_up_game_with_player;
+        use crate::utils_for_tests::{set_up_10x10_game, set_up_game_with_player};
 
         /// The parser must recover exactly the character/fg/bg trio the screen
         /// buffer held (transparency is not encoded, and is not compared).
@@ -2462,6 +2581,150 @@ pub mod debug {
             assert!(report.contains("final:"), "{report}");
             assert!(report.contains("depth 0"), "{report}");
             assert!(report.contains("fov visibilities:"), "{report}");
+        }
+
+        fn write_loaded_temp_snapshot(game: &Game, tag: &str) -> PathBuf {
+            let json = game_state_json(game, Some("test"));
+            let dir = std::env::temp_dir().join(format!(
+                "widgetmancer_{tag}_{}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&dir).expect("create temp snapshot dir");
+            std::fs::write(dir.join("game_state.json"), json).expect("write game_state.json");
+            dir
+        }
+
+        #[test]
+        fn screen_explain_reports_a_cell_and_its_visibilities() {
+            let mut game = set_up_game_with_player();
+            game.set_up_simple_portal_map();
+            game.world_time = game.world_start_time;
+            let dir = write_loaded_temp_snapshot(&game, "screen_explain_cell");
+
+            let player = game.player_square();
+            let cell = game
+                .graphics()
+                .screen
+                .world_square_to_left_screen_buffer_character_square(player);
+            let sx = (cell.x / 2) as usize;
+            let options = ScreenExplainOptions {
+                region: Some((sx, cell.y as usize, sx, cell.y as usize)),
+                only_visible: false,
+            };
+            let report = screen_explain(&dir, &options).expect("screen explain");
+            std::fs::remove_dir_all(&dir).ok();
+
+            let lines: Vec<&str> = report.lines().collect();
+            assert!(lines[0].starts_with("# sx"), "{report}");
+            assert_eq!(lines.len(), 2, "header plus one cell:\n{report}");
+            assert!(lines[1].contains("char="), "{report}");
+            assert!(lines[1].contains("d0 abs("), "{report}");
+            assert!(lines[1].contains("vis=1"), "{report}");
+        }
+
+        #[test]
+        fn screen_explain_only_visible_skips_empty_cells() {
+            let mut game = set_up_game_with_player();
+            game.set_up_simple_portal_map();
+            game.world_time = game.world_start_time;
+            let dir = write_loaded_temp_snapshot(&game, "screen_explain_filter");
+
+            let region = Some((0, 0, 20, 20));
+            let all = screen_explain(
+                &dir,
+                &ScreenExplainOptions {
+                    region,
+                    only_visible: false,
+                },
+            )
+            .expect("all cells");
+            let visible = screen_explain(
+                &dir,
+                &ScreenExplainOptions {
+                    region,
+                    only_visible: true,
+                },
+            )
+            .expect("visible cells");
+            std::fs::remove_dir_all(&dir).ok();
+
+            assert!(
+                visible.lines().count() < all.lines().count(),
+                "only-visible should drop empty cells"
+            );
+        }
+
+        /// `--no-portal-tint` must remove the red wash entirely; the default
+        /// render must still contain it. This is the toggle's reason to exist:
+        /// it isolates the portal-depth tint from the rest of the render.
+        #[test]
+        fn no_portal_tint_removes_reddish_backgrounds() {
+            use euclid::point2;
+
+            // A portal whose mouth is visible to the player (as in
+            // `test_portals_tint_views`), so a depth-1 view is actually tinted.
+            let mut game = set_up_10x10_game();
+            game.place_player(point2(3, 3));
+            game.place_offset_rightward_double_sided_two_way_portal(
+                game.player_square(),
+                utility::STEP_UP * 5,
+            );            game.world_time = game.world_start_time;
+            let dir = write_loaded_temp_snapshot(&game, "no_portal_tint");
+
+            let tinted = parse_screen_text(&render_snapshot_headless(&dir).expect("default render"))
+                .expect("parse default");
+            let plain = parse_screen_text(
+                &render_snapshot_headless_with(
+                    &dir,
+                    &RenderToggles {
+                        tint_portals: false,
+                        ..RenderToggles::default()
+                    },
+                )
+                .expect("no-tint render"),
+            )
+            .expect("parse no-tint");
+            std::fs::remove_dir_all(&dir).ok();
+
+            let is_red =
+                |cell: &Cell| cell.bg.r > cell.bg.g + 8 && cell.bg.r > cell.bg.b + 8 && cell.bg.r > 8;
+            assert!(
+                tinted.iter().flatten().any(is_red),
+                "expected a red-tinted portal cell by default"
+            );
+            assert!(
+                !plain.iter().flatten().any(is_red),
+                "no-portal-tint should leave no reddish background"
+            );
+        }
+
+        /// Disabling the raised-terrain forward pass must change the render:
+        /// it falls back to the legacy inverse composite, which is the whole
+        /// point of the toggle.
+        #[test]
+        fn terrain_forward_pass_toggle_changes_a_raised_render() {
+            use euclid::point2;
+
+            let mut game = set_up_game_with_player();
+            game.fill_column(point2(1, 1), 3);
+            game.world_time = game.world_start_time;
+            let dir = write_loaded_temp_snapshot(&game, "terrain_pass_toggle");
+
+            let default = render_snapshot_headless(&dir).expect("default render");
+            let no_pass = render_snapshot_headless_with(
+                &dir,
+                &RenderToggles {
+                    terrain_forward_pass: false,
+                    ..RenderToggles::default()
+                },
+            )
+            .expect("no-pass render");
+            std::fs::remove_dir_all(&dir).ok();
+
+            assert_ne!(
+                default, no_pass,
+                "no-terrain-pass should fall back to the inverse composite"
+            );
         }
 
         #[test]

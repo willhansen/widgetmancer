@@ -147,7 +147,11 @@ pub struct Graphics {
     current_time: LogicalTime,
     floor_color_enum: FloorColorEnum,
     pub tint_portals: bool,
-    render_portals_with_line_of_sight: bool,
+    pub render_portals_with_line_of_sight: bool,
+    /// Whether the raised-terrain forward column pass runs. Debug-only toggle
+    /// (`snapshot_tool render --no-terrain-pass`): disabling it falls back to
+    /// the legacy inverse composite so the forward pass can be isolated.
+    pub terrain_forward_pass: bool,
     /// Snap-family hysteresis memory for floating squares, keyed by entity
     /// id. Owned here (not on the entities) because family history is a
     /// rendering concern — as far as an entity knows, it is just a square
@@ -194,6 +198,7 @@ impl Graphics {
             floor_color_enum: FloorColorEnum::Function(Graphics::big_chess_pattern),
             tint_portals: true,
             render_portals_with_line_of_sight: true,
+            terrain_forward_pass: true,
             floating_entity_family_memory: HashMap::new(),
             floating_entities_drawn_this_frame: HashSet::new(),
             floating_entity_overlay: HashMap::new(),
@@ -473,7 +478,11 @@ impl Graphics {
                 .world_square_to_screen_buffer_square(
                     field_of_view.root_square() + visibility.relative_square(),
                 );
-            let tint_strength = (0.1 * visibility.portal_depth() as f32).min(1.0);
+            let tint_strength = if self.tint_portals {
+                (0.1 * visibility.portal_depth() as f32).min(1.0)
+            } else {
+                0.0
+            };
             // The face toward the screen bottom is the camera-facing side in
             // the view frame this column is seen through; map that direction
             // back into the column's absolute frame.

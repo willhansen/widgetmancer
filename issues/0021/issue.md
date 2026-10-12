@@ -64,3 +64,6 @@ workflow.
   cancels the issue (it leaves the editor to marking mode, vim-style; `Ctrl+P`
   remains the cancel). Filed issues now record only each region's world/screen
   bounds — the per-square `explain` summaries were dropped as redundant.
+- Follow-up (2026-10-12): the feature is complete and is what made 0022–0025
+  precise. `snapshot_tool screen-explain` now complements it with a full-frame
+  FOV dump. No code work remains here; close/archive per `issues/README.md`.

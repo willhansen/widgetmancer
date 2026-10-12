@@ -36,16 +36,21 @@ dumps; `Ctrl-P` files captures under `issues/` instead.
 Always run it through the repo-root wrapper, which rebuilds from source so the
 binary can't be stale:
 
-    ./snapshot-tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|explain-diff|invariants|render-at|simulate|verify-issues|minimize> <dir> [args]
+    ./snapshot-tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|screen-explain|explain-diff|invariants|render-at|simulate|verify-issues|minimize> <dir> [args]
 
 Notable modes: `diff` reports a char/fg/bg category split (fg/bg-only is usually
 time-dependent starfield); `explain X Y [--char-col]` says how a cell was
-resolved; `explain-diff <dir> <ref>` explains each changed cell in the current
-render; `render-at <dir> [--player X Y] [--rotate N]` renders a capture with the
-player moved (e.g. one step from where it was filed); `simulate <dir> --keys
-<chars> [--render-each]` steps a capture forward; and `verify-issues` checks that
-every `issues/solved/*` render matches its blessed `screen.txt` and still
-differs from `screen.pre-fix.txt` (a fixture that matches both proves nothing).
+resolved; `screen-explain [--region x0 y0 x1 y1] [--only-visible]` prints the
+same resolution for every screen square, one TSV line each, so an artifact can
+be correlated with the model in a single pass; `explain-diff <dir> <ref>`
+explains each changed cell in the current render; `render [--no-terrain-pass]
+[--no-portal-tint] [--no-portal-los]` renders with an individual pass disabled,
+so a suspected pass can be isolated; `render-at <dir> [--player X Y] [--rotate N]`
+renders a capture with the player moved (e.g. one step from where it was filed);
+`simulate <dir> --keys <chars> [--render-each]` steps a capture forward; and
+`verify-issues` checks that every `issues/solved/*` render matches its blessed
+`screen.txt` and still differs from `screen.pre-fix.txt` (a fixture that matches
+both proves nothing).
 
 ## Font debugging
 
