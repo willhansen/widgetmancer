@@ -26,8 +26,10 @@ workflow.
 - **Focus swap**: swap between marking the game screen and typing in the editor.
 - **Square selection**: both mouse (click / drag a box) and keyboard (cursor +
   flag key).
-- **Per-square capture**: world coordinates plus an auto `explain`-style
-  summary (glyph, FOV visibilities, portal depth).
+- **Per-square capture**: world and screen coordinates of each flagged region.
+  (Revised 2026-10-11: the auto `explain`-style summary — glyph, FOV
+  visibilities, portal depth — was dropped; it is cheap to re-derive while
+  investigating, so baking it into every filed issue was redundant.)
 - **Un-altered screen saved**: `snapshot/screen.txt` stays the pure game render
   (never baked with the overlay/markers), so `verify-issues` is unaffected.
 - **Gating**: behind `debug-tools`, enabled by default.
@@ -56,6 +58,9 @@ workflow.
   (so the player is centered there) and mouse input maps back through the
   recorded offset. Selection is now one numbered region per click/drag (a click
   is a 1x1 region), tinted magenta so the underlying glyph shows through, with
-  per-square `explain` summaries and numbered labels. Drawing is cell-diffed
-  against the previous overlay and mouse motion is coalesced, so typing and
-  dragging no longer flicker or lag.
+  numbered labels. Drawing is cell-diffed against the previous overlay and mouse
+  motion is coalesced, so typing and dragging no longer flicker or lag.
+- Phase 5 (2026-10-11): follow-up polish from reporter feedback. `Esc` no longer
+  cancels the issue (it leaves the editor to marking mode, vim-style; `Ctrl+P`
+  remains the cancel). Filed issues now record only each region's world/screen
+  bounds — the per-square `explain` summaries were dropped as redundant.

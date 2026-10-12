@@ -9,6 +9,29 @@ Newest first.
 
 ---
 
+## 2026-10-11 — Report overlay: Esc is not cancel; drop per-square detail
+
+### fix(report): stop Esc from cancelling; file only region bounds
+
+Follow-up polish from reporter feedback.
+
+- `Esc` no longer cancels the issue. In the editor it leaves the mode like
+  vim's insert mode (returns to marking); in marking it does nothing. A vim
+  user's habitual `Esc` was accidentally discarding the whole report. The
+  documented cancel is `Ctrl+P`, the same key that opens the overlay. The help
+  line now reads `back: esc  cancel: ^P`.
+- Filed issues no longer duplicate per-square `explain` detail; `issue.md`
+  lists each region's world/screen bounds and `flags.json` records the same
+  bounds. The detail is cheap to re-derive while investigating. `Region` is now
+  just its bounds (no `squares`, no `FlaggedSquare`/`concise_explain`).
+- `report` still implies `debug-tools` (default build keeps the snapshot
+  tooling); the Cargo comment no longer claims it is for `explain_screen_cell`.
+
+Tests: `escape_does_not_cancel_the_issue`, region-bounds markdown/JSON, and the
+1x1 click/region checks were updated. `./run-tests` 667 passed / 9 skipped.
+
+---
+
 ## 2026-10-11 — Report overlay: static frame, tinted regions, diffed drawing
 
 ### feat(report): static frame, tinted regions, cell-diff drawing

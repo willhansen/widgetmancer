@@ -201,8 +201,9 @@ The actual game. Modules:
   subcommand checks every solved capture against its blessed `screen.txt` and
   pre-fix render. In-game, `Ctrl+P` opens the report overlay: flag regions
   (mouse click/drag or a keyboard cursor), type the description in the built-in
-  editor (`Tab` swaps focus), and press `Enter` to file `issue.md` +
-  `flags.json` + the snapshot.
+  editor (`Tab` swaps focus; `Esc` leaves the editor rather than cancelling),
+  and press `Enter` to file `issue.md` + `flags.json` + the snapshot. `Ctrl+P`
+  again cancels.
 - `bacon.toml` — bacon watch config (incl. a `clippy` job); `flake.nix` — Nix
   dev shell; `scripts/` — test recording/printing and profiling helpers.
 

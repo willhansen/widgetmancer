@@ -9,9 +9,11 @@
 //! the un-altered render and `verify-issues` is unaffected.
 //!
 //! The reporter flags one *region* per click/drag (a click is a 1x1 region);
-//! each region is tinted magenta and numbered, and every square in it carries
-//! an `explain` summary. Drawing diffs the desired overlay against the last
-//! one, so typing touches only a few cells — no full-pane rewrite, no flicker.
+//! each region is tinted magenta, numbered, and filed by its world/screen
+//! bounds only. The per-square `explain` detail is cheap to re-derive during
+//! investigation, so it is not duplicated into the issue. Drawing diffs the
+//! desired overlay against the last one, so typing touches only a few cells —
+//! no full-pane rewrite, no flicker.
 //!
 //! Gated behind the default-on `report` feature (which implies `debug-tools`
 //! for `Game::explain_screen_cell`).
@@ -51,22 +53,15 @@ const EDITOR_FG: RGB8 = RGB8::new(214, 218, 232);
 const EDITOR_BORDER: RGB8 = RGB8::new(80, 80, 120);
 const EDITOR_CURSOR_BG: RGB8 = RGB8::new(150, 150, 60);
 
-/// One square flagged for the issue, with its auto-generated summary.
-#[derive(Clone, Debug)]
-pub struct FlaggedSquare {
-    pub world_square: WorldSquare,
-    pub screen_square: ScreenBufferSquare,
-    /// Concise `explain`-style summary (draw-buffer detail stripped).
-    pub summary: String,
-}
-
-/// One selected region: a click (1x1) or a mouse drag. Every square carries
-/// its own `explain` summary.
+/// One selected region: a click (1x1) or a mouse drag. Only the bounds are
+/// kept — the per-square `explain` detail is cheap to re-derive when the issue
+/// is investigated, so it is not duplicated into the filed issue.
 #[derive(Clone, Debug)]
 pub struct Region {
     pub world_min: WorldSquare,
     pub world_max: WorldSquare,
-    pub squares: Vec<FlaggedSquare>,
+    pub screen_min: ScreenBufferSquare,
+    pub screen_max: ScreenBufferSquare,
 }
 
 impl Region {
@@ -75,19 +70,6 @@ impl Region {
             && square.x <= self.world_max.x
             && square.y >= self.world_min.y
             && square.y <= self.world_max.y
-    }
-
-    /// The region's bounding box in screen-buffer squares.
-    fn screen_bounds(&self) -> (ScreenBufferSquare, ScreenBufferSquare) {
-        let first = self.squares[0].screen_square;
-        let (mut min, mut max) = (first, first);
-        for square in &self.squares {
-            min.x = min.x.min(square.screen_square.x);
-            min.y = min.y.min(square.screen_square.y);
-            max.x = max.x.max(square.screen_square.x);
-            max.y = max.y.max(square.screen_square.y);
-        }
-        (min, max)
     }
 }
 
@@ -315,7 +297,12 @@ impl ReportSession {
 
     fn handle_editor(&mut self, event: Event) -> ReportAction {
         match event {
-            Event::Key(Key::Esc) => return ReportAction::Cancel,
+            // Editing is a mode; `Esc` leaves it (like vim's insert mode)
+            // instead of cancelling the whole issue.
+            Event::Key(Key::Esc) => {
+                self.focus = Focus::Marking;
+                return ReportAction::None;
+            }
             Event::Key(Key::Char('\n')) | Event::Key(Key::Char('\r')) => {
                 self.buffer.insert_newline()
             }
@@ -335,7 +322,9 @@ impl ReportSession {
 
     fn handle_marking(&mut self, game: &Game, event: Event) -> ReportAction {
         match event {
-            Event::Key(Key::Esc) => ReportAction::Cancel,
+            // `Esc` never cancels: a vim user hits it out of habit. The
+            // documented cancel is the same key that opened the overlay, `Ctrl+P`.
+            Event::Key(Key::Esc) => ReportAction::None,
             Event::Key(key) => self.handle_marking_key(game, key),
             Event::Mouse(me) => self.handle_marking_mouse(game, me),
             _ => ReportAction::None,
@@ -447,28 +436,28 @@ impl ReportSession {
         self.add_region(game, world_square, world_square);
     }
 
-    /// Add one region spanning the inclusive world-square box `a`..`b`. Every
-    /// square gets its own `explain` summary (issue 0021, Q2).
+    /// Add one region spanning the inclusive world-square box `a`..`b`. Only
+    /// the world/screen bounds are recorded (issue 0021, revised: per-square
+    /// `explain` detail is not duplicated into the issue).
     fn add_region(&mut self, game: &Game, a: WorldSquare, b: WorldSquare) {
         let world_min = WorldSquare::new(a.x.min(b.x), a.y.min(b.y));
         let world_max = WorldSquare::new(a.x.max(b.x), a.y.max(b.y));
         let screen = &game.graphics().screen;
-        let mut squares = Vec::new();
-        for y in world_min.y..=world_max.y {
-            for x in world_min.x..=world_max.x {
-                let world_square = WorldSquare::new(x, y);
-                let screen_square = screen.world_square_to_screen_buffer_square(world_square);
-                squares.push(FlaggedSquare {
-                    world_square,
-                    screen_square,
-                    summary: concise_explain(game, screen_square),
-                });
-            }
-        }
+        let corner_a = screen.world_square_to_screen_buffer_square(world_min);
+        let corner_b = screen.world_square_to_screen_buffer_square(world_max);
+        let screen_min = ScreenBufferSquare::new(
+            corner_a.x.min(corner_b.x),
+            corner_a.y.min(corner_b.y),
+        );
+        let screen_max = ScreenBufferSquare::new(
+            corner_a.x.max(corner_b.x),
+            corner_a.y.max(corner_b.y),
+        );
         self.regions.push(Region {
             world_min,
             world_max,
-            squares,
+            screen_min,
+            screen_max,
         });
     }
 
@@ -522,13 +511,15 @@ impl ReportSession {
 
         // Committed regions, tinted so the glyph shows through.
         for region in &self.regions {
-            for square in &region.squares {
-                self.tint_square(
-                    &mut cells,
-                    square.screen_square,
-                    FLAG_TINT,
-                    FLAG_TINT_STRENGTH,
-                );
+            for sy in region.screen_min.y..=region.screen_max.y {
+                for sx in region.screen_min.x..=region.screen_max.x {
+                    self.tint_square(
+                        &mut cells,
+                        ScreenBufferSquare::new(sx, sy),
+                        FLAG_TINT,
+                        FLAG_TINT_STRENGTH,
+                    );
+                }
             }
         }
 
@@ -552,7 +543,7 @@ impl ReportSession {
 
         // Numbered labels, one per region; the drag preview is numbered next.
         for (index, region) in self.regions.iter().enumerate() {
-            self.draw_label(&mut cells, region.screen_bounds().0, index + 1);
+            self.draw_label(&mut cells, region.screen_min, index + 1);
         }
         if let (Some(anchor), Some(current)) = (self.drag_anchor, self.drag_current) {
             if anchor != current {
@@ -627,7 +618,7 @@ impl ReportSession {
             Focus::Editor => "EDIT",
         };
         let text = format!(
-            " REPORT [{focus_label}]  tab: swap  move: hjkl/arrows  flag: space/click/drag  clear: c  file: enter  cancel: esc/^P   [{} regions]",
+            " REPORT [{focus_label}]  tab: swap  move: hjkl/arrows  flag: space/click/drag  clear: c  file: enter  back: esc  cancel: ^P   [{} regions]",
             self.regions.len()
         );
         for (cx, character) in (0..help_width).zip(text.chars().chain(std::iter::repeat(' '))) {
@@ -794,15 +785,6 @@ fn glyph_at(buffer: &[Vec<Glyph>], cx: i32, cy: i32) -> Option<Glyph> {
         .copied()
 }
 
-/// `explain_screen_cell` with the verbose draw-buffer lines dropped.
-fn concise_explain(game: &Game, screen_square: ScreenBufferSquare) -> String {
-    let text = game.explain_screen_cell(screen_square.x.max(0) as usize, screen_square.y.max(0) as usize);
-    text.lines()
-        .filter(|line| !line.contains("draw_buffer:"))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
 /// File the issue: create the numbered dir, write the snapshot (with the
 /// un-altered screen), then wrap the typed description and the flagged regions
 /// into `issue.md` and `flags.json`.
@@ -837,7 +819,8 @@ fn issue_number_of(dir: &std::path::Path) -> u32 {
 }
 
 /// Build the issue markdown: template header, the reporter's description, then
-/// one section per flagged region with a summary for each of its squares.
+/// a compact list of the flagged regions (bounds only — the per-square detail
+/// is re-derivable when the issue is investigated).
 pub fn render_issue_markdown(
     number: u32,
     map: &str,
@@ -856,34 +839,23 @@ pub fn render_issue_markdown(
         out.push('\n');
     }
 
-    out.push_str("\n## Flagged squares\n\n");
+    out.push_str("\n## Flagged regions\n\n");
     if regions.is_empty() {
         out.push_str("(none)\n");
     } else {
         for (index, region) in regions.iter().enumerate() {
-            let (screen_min, screen_max) = region.screen_bounds();
             out.push_str(&format!(
-                "### {}. region world({}, {})..({}, {}) — screen({}, {})..({}, {})\n\n",
+                "{}. world({}, {})..({}, {}) — screen({}, {})..({}, {})\n",
                 index + 1,
                 region.world_min.x,
                 region.world_min.y,
                 region.world_max.x,
                 region.world_max.y,
-                screen_min.x,
-                screen_min.y,
-                screen_max.x,
-                screen_max.y,
+                region.screen_min.x,
+                region.screen_min.y,
+                region.screen_max.x,
+                region.screen_max.y,
             ));
-            for square in &region.squares {
-                out.push_str(&format!(
-                    "world({}, {}) — screen({}, {}):\n\n```\n{}\n```\n\n",
-                    square.world_square.x,
-                    square.world_square.y,
-                    square.screen_square.x,
-                    square.screen_square.y,
-                    square.summary,
-                ));
-            }
         }
     }
     out
@@ -893,84 +865,43 @@ fn flags_json(regions: &[Region]) -> String {
     let entries: Vec<String> = regions
         .iter()
         .map(|region| {
-            let (screen_min, screen_max) = region.screen_bounds();
-            let squares: Vec<String> = region
-                .squares
-                .iter()
-                .map(|flag| {
-                    format!(
-                        "      {{\"world\": [{}, {}], \"screen\": [{}, {}], \"summary\": {}}}",
-                        flag.world_square.x,
-                        flag.world_square.y,
-                        flag.screen_square.x,
-                        flag.screen_square.y,
-                        json_string(&flag.summary),
-                    )
-                })
-                .collect();
             format!(
-                "  {{\n    \"region\": [[{}, {}], [{}, {}]],\n    \"screen_region\": [[{}, {}], [{}, {}]],\n    \"squares\": [\n{}\n    ]\n  }}",
+                "  {{\"world\": [[{}, {}], [{}, {}]], \"screen\": [[{}, {}], [{}, {}]]}}",
                 region.world_min.x,
                 region.world_min.y,
                 region.world_max.x,
                 region.world_max.y,
-                screen_min.x,
-                screen_min.y,
-                screen_max.x,
-                screen_max.y,
-                squares.join(",\n"),
+                region.screen_min.x,
+                region.screen_min.y,
+                region.screen_max.x,
+                region.screen_max.y,
             )
         })
         .collect();
     format!("[\n{}\n]\n", entries.join(",\n"))
 }
 
-fn json_string(value: &str) -> String {
-    let mut out = String::from("\"");
-    for character in value.chars() {
-        match character {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn region(min: (i32, i32), max: (i32, i32), summaries: &[&str]) -> Region {
-        let squares = summaries
-            .iter()
-            .enumerate()
-            .map(|(i, summary)| FlaggedSquare {
-                world_square: WorldSquare::new(min.0 + i as i32, min.1),
-                screen_square: ScreenBufferSquare::new(min.0 + i as i32, min.1),
-                summary: summary.to_string(),
-            })
-            .collect();
+    fn region(min: (i32, i32), max: (i32, i32)) -> Region {
         Region {
             world_min: WorldSquare::new(min.0, min.1),
             world_max: WorldSquare::new(max.0, max.1),
-            squares,
+            screen_min: ScreenBufferSquare::new(min.0, min.1),
+            screen_max: ScreenBufferSquare::new(max.0, max.1),
         }
     }
 
     #[test]
-    fn markdown_wraps_description_and_regions() {
-        let note = render_issue_markdown(42, "cubes", "the tint is wrong", &[region((4, 8), (5, 8), &["depth 1", "depth 2"])]);
+    fn markdown_lists_regions_without_explain_detail() {
+        let note = render_issue_markdown(42, "cubes", "the tint is wrong", &[region((4, 8), (5, 9))]);
         assert!(note.starts_with("# Issue 0042\n\nMap: cubes\n"));
         assert!(note.contains("## Description\n\nthe tint is wrong\n"));
-        assert!(note.contains("### 1. region world(4, 8)..(5, 8) — screen(4, 8)..(5, 8)"));
-        assert!(note.contains("world(4, 8) — screen(4, 8):"));
-        assert!(note.contains("depth 1"));
-        assert!(note.contains("depth 2"));
+        assert!(note.contains("## Flagged regions"));
+        assert!(note.contains("1. world(4, 8)..(5, 9) — screen(4, 8)..(5, 9)"));
+        assert!(!note.contains("```"), "per-square explain blocks are not duplicated");
     }
 
     #[test]
@@ -981,12 +912,11 @@ mod tests {
     }
 
     #[test]
-    fn flags_json_escapes_summary() {
-        let json = flags_json(&[region((1, 2), (1, 2), &["a \"b\"\nc"])]);
-        assert!(json.contains("\"world\": [1, 2]"));
-        assert!(json.contains("\\\"b\\\""));
-        assert!(json.contains("\\nc"));
-        assert!(json.contains("\"region\": [[1, 2], [1, 2]]"));
+    fn flags_json_records_region_bounds() {
+        let json = flags_json(&[region((1, 2), (3, 4))]);
+        assert!(json.contains("\"world\": [[1, 2], [3, 4]]"));
+        assert!(json.contains("\"screen\": [[1, 2], [3, 4]]"));
+        assert!(!json.contains("summary"));
     }
 
     #[test]
@@ -1017,7 +947,11 @@ mod tests {
 
         session.handle_event(&game, Event::Key(Key::Char(' ')));
         assert_eq!(session.regions().len(), 1, "space marks the cursor square");
-        assert_eq!(session.regions()[0].squares.len(), 1, "a click is a 1x1 region");
+        let marked = &session.regions()[0];
+        assert_eq!(
+            marked.world_min, marked.world_max,
+            "a click is a 1x1 region"
+        );
 
         session.handle_event(&game, Event::Key(Key::Char(' ')));
         assert!(session.regions().is_empty(), "space again unmarks it");
@@ -1054,12 +988,31 @@ mod tests {
         let game = crate::utils_for_tests::set_up_game_with_player();
         let mut session = ReportSession::open(&game);
         assert!(matches!(
-            session.handle_event(&game, Event::Key(Key::Esc)),
+            session.handle_event(&game, Event::Key(Key::Ctrl('p'))),
             ReportAction::Cancel
         ));
         assert!(matches!(
             session.handle_event(&game, Event::Key(Key::Char('\n'))),
             ReportAction::File
+        ));
+    }
+
+    #[test]
+    fn escape_does_not_cancel_the_issue() {
+        let game = crate::utils_for_tests::set_up_game_with_player();
+        let mut session = ReportSession::open(&game);
+        // In the editor, `Esc` leaves the mode (vim-like) without cancelling.
+        session.handle_event(&game, Event::Key(Key::Char('\t')));
+        assert_eq!(session.focus(), Focus::Editor);
+        assert!(matches!(
+            session.handle_event(&game, Event::Key(Key::Esc)),
+            ReportAction::None
+        ));
+        assert_eq!(session.focus(), Focus::Marking, "Esc returns to marking");
+        // In marking too, `Esc` is not a cancel (a vim user hits it by habit).
+        assert!(matches!(
+            session.handle_event(&game, Event::Key(Key::Esc)),
+            ReportAction::None
         ));
     }
 
@@ -1112,14 +1065,14 @@ mod tests {
     }
 
     #[test]
-    fn drag_creates_one_region_per_square_explained() {
+    fn drag_creates_one_region_with_world_bounds() {
         let game = crate::utils_for_tests::set_up_game_with_player();
         let mut session = ReportSession::open(&game);
-        let a = WorldSquare::new(0, 0);
-        let b = WorldSquare::new(2, 1);
-        session.add_region(&game, a, b);
+        session.add_region(&game, WorldSquare::new(0, 0), WorldSquare::new(2, 1));
         assert_eq!(session.regions().len(), 1, "a drag is a single region");
-        assert_eq!(session.regions()[0].squares.len(), 6, "3x2 box has six squares");
+        let region = &session.regions()[0];
+        assert_eq!(region.world_min, WorldSquare::new(0, 0));
+        assert_eq!(region.world_max, WorldSquare::new(2, 1));
     }
 
     #[test]

@@ -35,7 +35,7 @@ default = ["report"]
 # shares with later W.B/W.C work. Off by default; no release-surface change.
 debug-tools = []
 # In-game issue-report overlay (issue 0021). Default-on; implies `debug-tools`
-# for `Game::explain_screen_cell`.
+# so the default build also includes the headless snapshot tooling.
 report = ["debug-tools"]
 
 [dependencies]
