@@ -203,7 +203,10 @@ The actual game. Modules:
   (mouse click/drag or a keyboard cursor), type the description in the built-in
   editor (`Tab` swaps focus; `Esc` leaves the editor rather than cancelling),
   and press `Enter` to file `issue.md` + `flags.json` + the snapshot. `Ctrl+P`
-  again cancels.
+  again cancels. The standalone `issue_review` bin (also `debug-tools`) reads a
+  filed capture back, renders the current tree as the "after" picture, and shows
+  a before / before-marked / after triple with a shared crop to approve moving
+  it to `issues/solved/` (or to append a clarification).
 - `bacon.toml` — bacon watch config (incl. a `clippy` job); `flake.nix` — Nix
   dev shell; `scripts/` — test recording/printing and profiling helpers.
 

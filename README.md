@@ -52,6 +52,17 @@ renders a capture with the player moved (e.g. one step from where it was filed);
 `screen.txt` and still differs from `screen.pre-fix.txt` (a fixture that matches
 both proves nothing).
 
+### `issue_review` (approve a fix)
+
+    cargo run -p game --features debug-tools --bin issue_review -- 0027
+
+Shows a saved capture's before / before-marked / after pictures (one shared crop
+over the flagged regions and the player) and asks whether to move the issue to
+`issues/solved/`. `y` preserves the original capture as `screen.pre-fix.txt`,
+blesses the current render into `screen.txt`, and `git mv`s the directory —
+warning if the render is unchanged from the capture. `n` opens an editor and
+appends a `## Clarification` section to `issue.md`.
+
 ## Font debugging
 
 Many glyphs the game draws are not in the configured terminal font, so the

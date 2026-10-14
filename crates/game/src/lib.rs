@@ -44,6 +44,8 @@ pub mod portal_geometry;
 /// In-game issue-report overlay (issue 0021).
 #[cfg(feature = "report")]
 pub mod report;
+/// Shared terminal-UI widgets for the report overlay and the issue review tool.
+pub mod review_ui;
 pub mod utils_for_tests;
 
 /// The complete glyph vocabulary, for font-fallback tooling (debug-tools only).

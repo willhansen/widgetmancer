@@ -67,3 +67,8 @@ workflow.
 - Follow-up (2026-10-12): the feature is complete and is what made 0022–0025
   precise. `snapshot_tool screen-explain` now complements it with a full-frame
   FOV dump. No code work remains here; close/archive per `issues/README.md`.
+
+## Archived (2026-10-12)
+
+Feature complete (phases 1–5 + follow-up); no code work remains. Moved to
+`issues/solved/` per `issues/README.md`, keeping the number reserved.

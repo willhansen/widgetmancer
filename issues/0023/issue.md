@@ -26,3 +26,13 @@ cluster defect, not this one.
 ## Flagged regions
 
 1. world(26, 17)..(32, 19) — screen(56, 31)..(62, 33)
+
+## Assessment (2026-10-12) — enhancement, deferred
+
+A partial tile renders as a single angled block in one `fg_color`
+(`PartialVisibilityDrawable::to_glyphs`, `graphics/drawable.rs`), so a conveyor
+belt's two-colour animation phase is discarded and the belt reads as static.
+Averaging the tile's colours (the report's suggestion) would remove the
+half-and-half pattern but still not convey motion. Showing motion through a
+partial would need per-character compositing (ROADMAP item 15). Deferred as an
+enhancement, not a regression.

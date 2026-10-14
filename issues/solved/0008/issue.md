@@ -36,3 +36,12 @@ walls from this capture. `screen.txt` re-blessed; `screen.pre-fix.txt` is
 unchanged (the 2026-10-08 original).
 
 
+
+## Post-fix re-bless (2026-10-12)
+
+The forward pass's wall-frame gate now also drops a column wall whose cell is
+*resolved to a void portal view* while a different view frame actually paints it
+(the deepest visibility has no drawable, so the flat composite falls through to a
+shallower frame). This is the over-painting bug behind issues 0020/0026: a portal
+sub-view of void painted its cube side over a directly-drawn cube. `screen.txt`
+re-blessed; `screen.pre-fix.txt` unchanged.

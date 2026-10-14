@@ -30,3 +30,12 @@ Tests: `faster_conveyor_belt_steps_grid_entities_on_its_own_period`,
 `map_file_parses_and_applies_ops` (speed), and the snapshot round-trip now
 includes a non-default-speed belt.
 
+
+## Post-fix re-bless (2026-10-12)
+
+The forward pass's wall-frame gate now also drops a column wall whose cell is
+*resolved to a void portal view* while a different view frame actually paints it
+(the deepest visibility has no drawable, so the flat composite falls through to a
+shallower frame). This is the over-painting bug behind issues 0020/0026: a portal
+sub-view of void painted its cube side over a directly-drawn cube. `screen.txt`
+re-blessed; `screen.pre-fix.txt` unchanged.

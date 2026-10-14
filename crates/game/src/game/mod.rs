@@ -794,7 +794,7 @@ impl Game {
                 // avoids drawing entity/floor duplicates at ground level.
                 let mut drawn = std::collections::HashSet::new();
                 if self.portal_geometry.iter_portals().next().is_some() {
-                    drawn = self.graphics.load_screen_buffer_from_fov(&fov);
+                    drawn = self.graphics.load_screen_buffer_from_fov(&fov, self.terrain.extent());
                 }
                 drawn.extend(
                     self.graphics
@@ -802,7 +802,8 @@ impl Game {
                 );
                 drawn
             } else {
-                self.graphics.load_screen_buffer_from_fov(&fov)
+                self.graphics
+                    .load_screen_buffer_from_fov(&fov, self.terrain.extent())
             };
             drawn.extend(self.graphics.overlay_floating_entities_at_altitude(&fov));
             (Some(fov), drawn)

@@ -9,6 +9,173 @@ Newest first.
 
 ---
 
+## 2026-10-14 — Interactive issue-approval gate (`issue_review`)
+
+### feat(tooling): add issue_review bin to approve moving an issue to solved/
+
+A standalone Rust tool that turns the documented "show before/after, get
+approval" gate into an interactive one, independent of the game loop and the
+in-game report overlay.
+
+- **`crates/game/src/review_ui.rs`** (new, ungated): the terminal-UI widgets the
+  in-game overlay and the review tool now share — `Region`, `Rect`,
+  `TextBuffer`, `tint_glyph`, `glyph_at`, `blank_glyph`,
+  `world_box_screen_squares`, and a parameterized `draw_editor_pane`.
+  `report.rs` is refactored to use them (its 16 tests are unchanged).
+- **`crates/game/src/bin/issue_review.rs`** (new, `debug-tools`): resolves an
+  `issues/NNNN` capture, reads `flags.json` (both the `world`/`screen` and the
+  older `region`/`screen_region` schemas; a missing file means no flags), renders
+  the **current working tree** as "after", and shows before / before-marked /
+  after panes that share one crop (flagged regions ∪ player, + margin). `y`
+  preserves the original capture as `screen.pre-fix.txt`, blesses the render,
+  and `git mv`s the directory to `issues/solved/`; an unchanged render moves but
+  warns that the fixture is vacuous. `n` opens a built-in editor that appends a
+  dated `## Clarification` section to `issue.md`. `q`/`Esc` cancels.
+- **`debug::render_snapshot_headless_buffer`**: the headless render as the
+  screen buffer plus the player's screen square, so the TUI draws "after"
+  directly without an ANSI encode/parse round-trip.
+- Tests (8 in the bin): both flag schemas, missing flags, crop union/clamping/
+  even-edge, shared pane size, marked-only tint, clarification append, and an
+  end-to-end archive move in a temporary git repo (which caught two real bugs:
+  a canonical-vs-relative `strip_prefix` mismatch and `git mv` needing the
+  destination directory created).
+- Docs: `issues/README.md` reworked around the tool; `README.md` and
+  `ARCHITECTURE.md` updated.
+
+---
+
+## 2026-10-13 — Before/after/marked image review gate for issue fixes
+
+### tooling(issues): add scripts/issue_before_after.py
+
+Rendering bugs can't be judged from a text diff, and a fix is only real when the
+reporter agrees the picture is right. `scripts/issue_before_after.py` turns a
+capture plus a candidate render into a before/after image triple — `before.png`,
+`before-marked.png` (flagged squares outlined in magenta) and `after.png` — with
+`--crop`/`--scale` to zoom the flagged region. It parses the ANSI screen format
+(one cell is `SGR bg SGR fg <glyph>`; two character columns per square).
+
+OpenCode's file-read tool displays PNGs inline, so the triple is read back into
+the conversation for approval. Documented the procedure in `issues/README.md`.
+Demonstrated on `solved/0026`: the region-2 gap (a black strip) now reads as a
+tinted red strip and the region-1 spurious wall is gone.
+
+Docs/tooling only.
+
+---
+
+## 2026-10-13 — Tint the portal aperture's empty cells (0026 region 2)
+
+### fix(render): portal-depth tint now washes on-board gaps in the aperture
+
+Issue 0026 region 2: an on-board gap (missing column) seen through a portal
+rendered as a black hole in the middle of the red portal view. The portal tint
+was attached only to drawables, so cells the FOV resolved to a portal view of
+*void* had nothing to tint.
+
+`Graphics::load_screen_buffer_from_fov` now takes the board extent and, where a
+cell has no drawable but the FOV resolves it to a depth>0 portal view whose
+absolute square is an **on-board gap**, paints a
+`tint_color(OUT_OF_SIGHT, RED, 0.1 * depth)` background. Off-board void keeps
+the starfield, so stars seen through a portal are preserved (the
+`portal_void_stars` test still passes). New regression test
+`portal_view_of_an_on_board_gap_is_tinted` (shown to fail pre-fix: `(42,5)` bg
+`(0,0,0)`).
+
+Callers pass `self.terrain.extent()`. Re-blessed the portal fixtures the wash
+touches: `solved/0007`–`0019` (root `snapshot/` unchanged). `issues/0026` is
+moved to `issues/solved/0026` (both regions now addressed).
+
+Also filed `issues/0027`: a pre-existing portal cube side (column
+`abs(19,12)`, depth 1) painted onto a void cell the FOV resolves to an on-board
+gap — the same wall-projection-vs-height-occlusion limitation (blanket removal
+drops 646 legitimate cliff cells in `solved/0009`), documented, left open.
+
+Verified: `./run-tests` 674 passed / 9 skipped, `verify-issues` all 18 OK,
+`diff snapshot/` OK.
+
+---
+
+## 2026-10-12 — Archive issue 0021 (report overlay feature complete)
+
+### docs(issues): archive 0021 to issues/solved/
+
+The issue-reporting overlay feature is complete (phases 1–5 + follow-up; it is
+what made 0022–0025 precise, and `screen-explain` complements it). Its own note
+says no code work remains, so it moves to `issues/solved/` per
+`issues/README.md`; the number stays reserved. Docs only.
+
+---
+
+## 2026-10-12 — Record why the remaining portal-cluster flags are not gate bugs
+
+### docs(issues): wall-gate + compositing findings for 0020/0022/0023/0024/0025/0026
+
+Continued through the remaining open issues with `SNAP_DEBUG_SKIP`
+instrumentation of the forward pass (which walls the frame gate drops) plus
+`visibility-pairs`. The remaining symptoms are model-level limitations, not
+wrong gate decisions:
+
+1. **Complementary-pair compositing.** For the exact-complement direct/portal
+   pairs, `drawable_at_relative_square` draws the deeper (portal) glyph and
+   reduces the shallower (direct) half to a flat colour; one terminal cell holds
+   one glyph, so the direct cube's shape cannot coexist with the portal content
+   (0020 `(51,34)/(51,35)`; 0022/0024/0025). New ROADMAP item 15.
+2. **Wall projection vs height occlusion.** Relaxing the per-cell frame gate so
+   portal columns may draw walls over void re-adds walls that the 0008/0017
+   fixes deemed spurious across seven fixtures (0007 +37, 0008 +60, 0012 +49,
+   0017 +78, 0009 +19 …), so it is unsafe without an occlusion model.
+
+Per-issue: 0020/0022/0025 are limitation 1/2; 0024's flagged region has *no*
+projected wall at all (needs a fresh read of intent); 0026 region 2 is a
+portal-visible *void* with nothing to tint (design choice); 0023 is a deferred
+enhancement (partial tiles drop belt animation).
+
+Docs only. The committed over-painting fix and its fixtures are unchanged;
+`./run-tests` and `verify-issues` remain green.
+
+---
+
+## 2026-10-12 — Refute the portal-cluster hypothesis; fix the wall over-painting bug
+
+### fix(render): portal void-view walls no longer overpaint a direct cube
+
+The leading "coverage-aware / nearest-view FOV merge" hypothesis for
+0020/0022/0024/0025/0026 is refuted. New tooling
+`./snapshot-tool visibility-pairs` (`Game::fov_visibility_pairs_report`) shows
+that at **every** relative cell with more than one visibility the direct and
+portal half-planes are exact complements: 0020 115/116, 0022 121/121,
+0024 112/112, 0025 112/112, 0026 172/172. The FOV already partitions each cell
+correctly; `combined_*` is never merged across depths, and one `SquareVisibility`
+cannot represent two contents.
+
+The real defect is in `Graphics::load_screen_buffer_from_terrain`
+(`graphics.rs`). Its wall-frame gate compared `resolved_visibility` (the
+**deepest** view) to decide whether a column's z-shifted wall may paint a cell.
+But the flat composite paints the topmost visibility *that has a drawable*
+(`drawable_at_relative_square` filters on the draw buffer). When the deepest view
+is a portal view of **void** (no drawable) the direct view paints the cell, yet a
+portal column of that void frame still matched and painted its wall over the
+directly-drawn cube — issue 0026 region 1 (`world(16,28)` at screen (44,21)), and
+the same class in 0020.
+
+Fix: additionally drop a wall whose own cell is resolved to a void view while a
+different frame actually paints it (suppression-only, so it can never add walls
+the gate had already dropped). Regression test
+`portal_void_wall_does_not_overpaint_a_direct_cube` (shown to fail pre-fix:
+`(44,21)` read `▒`).
+
+Re-blessed the portal fixtures the removed walls touched: `solved/0007`,
+`0008`, `0010`–`0014`, `0016`, `0017` (all removals, no additions). Root
+`snapshot/` unchanged. Open issues 0020/0022/0024/0025/0026 updated: the
+hypothesis is marked refuted and the remaining flagged regions (void/coverage and
+tint-on-void, not over-painting) are recorded as still open.
+
+Verified: `./snapshot-tool diff snapshot/` OK, `./snapshot-tool verify-issues`
+all 18 OK, `./run-tests` 673 passed / 9 skipped.
+
+---
+
 ## 2026-10-12 — Document fix (b) as the leading hypothesis for the portal cluster
 
 ### docs(issues): fix (b) leading hypothesis for 0020/0022/0024/0025/0026

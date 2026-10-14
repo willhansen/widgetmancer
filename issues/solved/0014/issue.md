@@ -25,3 +25,12 @@ Tests: `belt_under_the_player_rotates_with_the_view` (game) and
 `belt_beneath_content_rotates_with_the_composite` (drawable). `screen.pre-fix.txt`
 is the original capture; `screen.txt` is the fixed render.
 
+
+## Post-fix re-bless (2026-10-12)
+
+The forward pass's wall-frame gate now also drops a column wall whose cell is
+*resolved to a void portal view* while a different view frame actually paints it
+(the deepest visibility has no drawable, so the flat composite falls through to a
+shallower frame). This is the over-painting bug behind issues 0020/0026: a portal
+sub-view of void painted its cube side over a directly-drawn cube. `screen.txt`
+re-blessed; `screen.pre-fix.txt` unchanged.

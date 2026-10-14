@@ -374,6 +374,7 @@ impl Graphics {
     pub fn load_screen_buffer_from_fov(
         &mut self,
         field_of_view: &FieldOfViewResult,
+        board_extent: GridExtent,
     ) -> HashSet<ScreenBufferSquare> {
         let mut drawn: HashSet<ScreenBufferSquare> = HashSet::new();
         for screen_square in self.screen.all_screen_squares() {
@@ -391,6 +392,32 @@ impl Graphics {
                     unrotated.rotated(-self.screen.rotation().quarter_turns());
                 self.screen
                     .draw_glyphs_straight_to_screen_square(rotated.to_glyphs(), screen_square);
+            } else if self.tint_portals {
+                // A cell with no drawable that the FOV still resolves to a portal
+                // view is an *on-board gap* seen through the portal (a missing
+                // column between cubes). Tint its background by portal depth so
+                // the whole opening reads as one red window instead of a black
+                // hole punched in it (issue 0026, region 2). Off-board void is
+                // left to the starfield, which is meant to show space through a
+                // portal. `OUT_OF_SIGHT` is BLACK, so this is the same wash the
+                // portal tint applies to drawables, just with nothing underneath.
+                if let Some(visibility) =
+                    field_of_view.resolved_visibility(relative_world_square)
+                {
+                    let square = visibility.absolute_square();
+                    let on_board = square.x >= 0
+                        && square.y >= 0
+                        && (square.x as u32) < board_extent.width
+                        && (square.y as u32) < board_extent.height;
+                    if visibility.portal_depth() > 0 && on_board {
+                        let strength = (0.1 * visibility.portal_depth() as f32).min(1.0);
+                        let color = tint_color(OUT_OF_SIGHT_COLOR, RED, strength);
+                        let glyph = Glyph::new(' ', WHITE, color);
+                        self.screen
+                            .draw_glyphs_straight_to_screen_square([glyph, glyph], screen_square);
+                        drawn.insert(screen_square);
+                    }
+                }
             }
         }
         drawn
@@ -507,13 +534,43 @@ impl Graphics {
                     // only validated `visibility.relative_square()`).
                     let wall_relative =
                         visibility.relative_square() + toward_camera * (camera_altitude - z);
-                    let wall_frame_matches = field_of_view
-                        .resolved_visibility(wall_relative)
+                    // The wall's own cell may resolve through the portal to a
+                    // different view frame (issue 0009). Gate as before, but also
+                    // drop a wall whose cell is *resolved to a void view* while a
+                    // different frame actually paints it: the deepest visibility
+                    // there has no drawable, so the flat composite falls through to
+                    // the painted frame, and a wall from the void frame would paint
+                    // over it. This is the reported bug (0026, `world(16,28)`): a
+                    // portal sub-view of void painting its cube side over a
+                    // directly-drawn cube. Suppression-only, so it cannot add
+                    // walls the frame gate had already dropped.
+                    let resolved = field_of_view.resolved_visibility(wall_relative);
+                    let base_frame_matches = resolved
                         .map(|topmost| {
                             topmost.absolute_fov_center_square()
                                 == visibility.absolute_fov_center_square()
                         })
                         .unwrap_or(true);
+                    let deepest_is_void = resolved
+                        .map(|topmost| {
+                            !self.draw_buffer.contains_key(&topmost.absolute_square())
+                        })
+                        .unwrap_or(false);
+                    let painted_frame_differs = FieldOfViewResult::sorted_by_draw_order(
+                        field_of_view.visibilities_of_relative_square(wall_relative),
+                    )
+                    .into_iter()
+                    .filter(|candidate| {
+                        self.draw_buffer.contains_key(&candidate.absolute_square())
+                    })
+                    .last()
+                    .map(|painted| {
+                        painted.absolute_fov_center_square()
+                            != visibility.absolute_fov_center_square()
+                    })
+                    .unwrap_or(false);
+                    let wall_frame_matches =
+                        base_frame_matches && !(deepest_is_void && painted_frame_differs);
                     if wall_frame_matches && within_frame(wall_square) {
                         let color = tint_color(
                             lerp_rgb(
@@ -1367,7 +1424,7 @@ mod tests {
         );
         g.screen
             .set_screen_center_by_world_square(fov.root_square());
-        g.load_screen_buffer_from_fov(&fov);
+        g.load_screen_buffer_from_fov(&fov, GridExtent::new(5, 5));
         let screen_buffer_square = g.screen.world_square_to_screen_buffer_square(world_square);
         // g.print_draw_buffer(point2(0, 0), 3);
         // g.screen.print_screen_buffer();

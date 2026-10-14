@@ -1365,8 +1365,10 @@ pub mod debug {
     use regex::Regex;
     use rgb::RGB8;
     use terminal_rendering::glyph::Glyph;
-    use terminal_rendering::ScreenBufferCharacterSquare;
+    use terminal_rendering::{ScreenBufferCharacterSquare, ScreenBufferSquare};
     use utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
+
+    use crate::fov_stuff::FieldOfViewResult;
 
     use super::{
         game_state_json, issues_dir, load_snapshot_game, screen_text, snapshot_dir, Game,
@@ -1420,6 +1422,26 @@ pub mod debug {
         dir: &Path,
         toggles: &RenderToggles,
     ) -> Result<String, String> {
+        let game = render_snapshot_game(dir, toggles)?;
+        Ok(screen_text(&game))
+    }
+
+    /// The same headless render, but the screen buffer itself (`[x][y]`, one
+    /// `Glyph` per character column) plus the player's screen square, instead
+    /// of the ANSI encoding. The review TUI draws the `after` pane from this and
+    /// uses the player square for the shared crop, avoiding a round-trip.
+    pub fn render_snapshot_headless_buffer(
+        dir: &Path,
+    ) -> Result<(Vec<Vec<Glyph>>, ScreenBufferSquare), String> {
+        let game = render_snapshot_game(dir, &RenderToggles::default())?;
+        let screen = &game.graphics().screen;
+        let player = screen.world_square_to_screen_buffer_square(game.player_square());
+        Ok((screen.screen_buffer.clone(), player))
+    }
+
+    /// Load `dir/game_state.json`, apply pass toggles, and re-render headless at
+    /// the captured draw time. Shared by the text and buffer render paths.
+    fn render_snapshot_game(dir: &Path, toggles: &RenderToggles) -> Result<Game, String> {
         let path = dir.join("game_state.json");
         let contents = std::fs::read_to_string(&path)
             .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
@@ -1429,7 +1451,7 @@ pub mod debug {
         let mut game = Game::from_snapshot(data, LogicalTime::ZERO);
         apply_render_toggles(&mut game, toggles);
         game.draw_headless_at_duration_from_start(elapsed);
-        Ok(screen_text(&game))
+        Ok(game)
     }
 
     /// The repo-root `snapshot/` directory.
@@ -1569,6 +1591,63 @@ pub mod debug {
                         .join("; "),
                 ));
             }
+        }
+        Ok(out)
+    }
+
+    /// For each relative cell the FOV resolves to more than one visibility,
+    /// report whether the topmost (deepest, what the renderer draws) is an exact
+    /// complement of the union of the shallower ones. A complementary pair means
+    /// the cell is fully covered by the views together (the model is right and
+    /// only compositing is wrong); a non-complementary pair means two views both
+    /// claim part of the cell (the model over-covers). Used to localize the
+    /// `cubes` portal cluster (issues 0020/0022/0024/0025/0026).
+    pub fn fov_visibility_pairs_report(dir: &Path) -> Result<String, String> {
+        let game = load_snapshot_game(dir)?;
+        let (fov, _trace) = game.player_field_of_view_traced();
+        let [lower, upper] = fov.relative_limits_lower_left_and_upper_right();
+        let mut total = 0usize;
+        let mut complementary = 0usize;
+        let mut not_complementary = Vec::new();
+        for x in lower[0]..=upper[0] {
+            for y in lower[1]..=upper[1] {
+                let relative_square = WorldStep::new(x, y);
+                let visibilities = fov.visibilities_of_relative_square(relative_square);
+                if visibilities.len() < 2 {
+                    continue;
+                }
+                total += 1;
+                let sorted = FieldOfViewResult::sorted_by_draw_order(visibilities);
+                let topmost = sorted.last().unwrap();
+                let top_vis = topmost.square_visibility_in_relative_frame();
+                let shallower: Vec<_> = sorted[..sorted.len() - 1]
+                    .iter()
+                    .map(|v| v.square_visibility_in_relative_frame())
+                    .collect();
+                let is_complementary = shallower
+                    .iter()
+                    .all(|shallow| top_vis.is_about_complementary_to(*shallow));
+                if is_complementary {
+                    complementary += 1;
+                } else {
+                    not_complementary.push(format!(
+                        "  rel({x},{y}) depths={:?} rel_vis={:?}",
+                        sorted.iter().map(|v| v.portal_depth()).collect::<Vec<_>>(),
+                        sorted
+                            .iter()
+                            .map(|v| v.square_visibility_in_relative_frame().as_string())
+                            .collect::<Vec<_>>(),
+                    ));
+                }
+            }
+        }
+        let mut out = format!(
+            "{total} relative cells with >=2 visibilities: {complementary} complementary, {} not\n",
+            not_complementary.len()
+        );
+        for line in &not_complementary {
+            out.push_str(line);
+            out.push('\n');
         }
         Ok(out)
     }
@@ -2724,6 +2803,52 @@ pub mod debug {
             assert_ne!(
                 default, no_pass,
                 "no-terrain-pass should fall back to the inverse composite"
+            );
+        }
+
+        /// Issue 0026: a portal sub-view that resolves to *void* must not paint
+        /// its cube side over a directly-visible cube. Root cause: the forward
+        /// pass's wall gate compared the deepest visibility's frame, but the flat
+        /// composite paints the topmost visibility *with a drawable*, so a
+        /// void portal frame still let its column draw where a shallower frame
+        /// (here the direct cube) was actually shown.
+        #[test]
+        fn portal_void_wall_does_not_overpaint_a_direct_cube() {
+            let dir = issues_dir().join("0026").join("snapshot");
+            if !dir.join("game_state.json").exists() {
+                return;
+            }
+            let rendered = render_snapshot_headless(&dir).expect("render issue 0026");
+            let grid = parse_screen_text(&rendered).expect("parse render");
+            // Flagged region 1 is `world(16,28)` at screen square (44, 21); the
+            // portal sub-view of void used to overwrite the direct cube top there
+            // with a wall (`▒`).
+            let cell = grid[21][2 * 44].character;
+            assert_ne!(
+                cell, '▒',
+                "a portal view of void painted a wall over the direct cube at (44,21)"
+            );
+        }
+
+        #[test]
+        fn portal_view_of_an_on_board_gap_is_tinted() {
+            // Issue 0026 region 2: an on-board gap (a missing column) seen
+            // through a portal used to render as a black hole in the aperture.
+            // The portal-depth tint must wash the whole opening, gap included.
+            let dir = issues_dir().join("0026").join("snapshot");
+            if !dir.join("game_state.json").exists() {
+                return;
+            }
+            let rendered = render_snapshot_headless(&dir).expect("render issue 0026");
+            let grid = parse_screen_text(&rendered).expect("parse render");
+            // Region 2 is `world(14,36)..(15,44)` at screen (42,5)..(43,13); a
+            // sample cell at (42,5) is an on-board void square seen through the
+            // portal.
+            let cell = &grid[5][2 * 42];
+            assert!(
+                cell.bg.r > cell.bg.g && cell.bg.r > cell.bg.b && cell.bg.r > 0,
+                "on-board portal gap at (42,5) should be red-tinted, got {:?}",
+                cell.bg
             );
         }
 

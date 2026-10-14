@@ -216,6 +216,24 @@ installed anyway: no gdb/lldb/rr/perf/valgrind).
 
 ## Open
 
+### 15. Complementary direct/portal visibilities draw only one glyph
+- **Evidence:** `./snapshot-tool visibility-pairs` shows that at every relative
+  cell with more than one visibility the direct and portal half-planes are
+  **exact complements** (0020 115/116, 0022 121/121, 0024 112/112,
+  0025 112/112, 0026 172/172). The FOV model is correct; the renderer is not.
+  `drawable_at_relative_square` composites the stack with
+  `PartialVisibilityDrawable::drawn_over`, which paints the deeper (portal)
+  glyph and reduces the shallower (direct) half to a flat colour
+  (`color_if_backgroundified`). A terminal cell carries a single glyph, so the
+  direct cube's top/edge cannot be shown alongside the portal content — "can't
+  see the cube column" (issues 0020/0022/0024/0025).
+- **Scope:** sub-cell compositing. Options: per-character compositing of the two
+  visibilities (each clipped to its half-plane) rather than one reduced glyph; or
+  a model where a complementary pair that covers the whole cell is represented
+  once with both contents. Neither is a `combined_*` merge problem (the merge is
+  never applied across depths).
+- **Related:** item 14 (the opaque shadow half); issues 0020/0022/0024/0025.
+
 ### 14. Partial shadows over void suppress the starfield
 - **Evidence:** `issues/solved/0017/` (and its `screen.pre-fix.txt`): a portal
   view of a raised cube partially covers an off-board void square. The

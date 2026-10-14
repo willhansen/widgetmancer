@@ -25,6 +25,11 @@ path = "src/bin/snapshot_tool.rs"
 required-features = ["debug-tools"]
 
 [[bin]]
+name = "issue_review"
+path = "src/bin/issue_review.rs"
+required-features = ["debug-tools"]
+
+[[bin]]
 name = "glyph_vocabulary"
 path = "src/bin/glyph_vocabulary.rs"
 required-features = ["debug-tools"]

@@ -30,6 +30,8 @@ use terminal_rendering::*;
 
 use crate::game::snapshot::{create_issue_dir, write_snapshot_to, InputRecord};
 use crate::game::Game;
+use crate::review_ui::{self, EditorColors, Rect, TextBuffer};
+pub use crate::review_ui::Region;
 
 /// Magenta tint blended into a flagged region, so the glyph shows through.
 const FLAG_TINT: RGB8 = RGB8::new(255, 0, 255);
@@ -53,25 +55,13 @@ const EDITOR_FG: RGB8 = RGB8::new(214, 218, 232);
 const EDITOR_BORDER: RGB8 = RGB8::new(80, 80, 120);
 const EDITOR_CURSOR_BG: RGB8 = RGB8::new(150, 150, 60);
 
-/// One selected region: a click (1x1) or a mouse drag. Only the bounds are
-/// kept — the per-square `explain` detail is cheap to re-derive when the issue
-/// is investigated, so it is not duplicated into the filed issue.
-#[derive(Clone, Debug)]
-pub struct Region {
-    pub world_min: WorldSquare,
-    pub world_max: WorldSquare,
-    pub screen_min: ScreenBufferSquare,
-    pub screen_max: ScreenBufferSquare,
-}
-
-impl Region {
-    fn contains(&self, square: WorldSquare) -> bool {
-        square.x >= self.world_min.x
-            && square.x <= self.world_max.x
-            && square.y >= self.world_min.y
-            && square.y <= self.world_max.y
-    }
-}
+/// Editor pane colors (shared widget), themed for the overlay.
+const EDITOR_COLORS: EditorColors = EditorColors {
+    fg: EDITOR_FG,
+    bg: EDITOR_BG,
+    border: EDITOR_BORDER,
+    cursor_bg: EDITOR_CURSOR_BG,
+};
 
 /// Which pane owns keyboard/mouse input.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -85,129 +75,6 @@ pub enum ReportAction {
     None,
     Cancel,
     File,
-}
-
-/// A rectangle in terminal character cells (origin top-left, 0-indexed).
-#[derive(Clone, Copy, Debug)]
-struct Rect {
-    x: u16,
-    y: u16,
-    width: u16,
-    height: u16,
-}
-
-impl Rect {
-    fn inner(&self) -> Rect {
-        Rect {
-            x: self.x + 1,
-            y: self.y + 1,
-            width: self.width.saturating_sub(2).max(1),
-            height: self.height.saturating_sub(2).max(1),
-        }
-    }
-
-    fn contains(&self, x: u16, y: u16) -> bool {
-        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
-    }
-}
-
-/// A small multi-line text buffer for the description.
-#[derive(Default, Debug)]
-struct TextBuffer {
-    lines: Vec<Vec<char>>,
-    row: usize,
-    col: usize,
-}
-
-impl TextBuffer {
-    fn new() -> Self {
-        TextBuffer {
-            lines: vec![Vec::new()],
-            row: 0,
-            col: 0,
-        }
-    }
-
-    fn insert_char(&mut self, character: char) {
-        self.lines[self.row].insert(self.col, character);
-        self.col += 1;
-    }
-
-    fn insert_newline(&mut self) {
-        let rest = self.lines[self.row].split_off(self.col);
-        self.lines.insert(self.row + 1, rest);
-        self.row += 1;
-        self.col = 0;
-    }
-
-    fn backspace(&mut self) {
-        if self.col > 0 {
-            self.lines[self.row].remove(self.col - 1);
-            self.col -= 1;
-        } else if self.row > 0 {
-            let current = self.lines.remove(self.row);
-            self.row -= 1;
-            self.col = self.lines[self.row].len();
-            self.lines[self.row].extend(current);
-        }
-    }
-
-    fn delete(&mut self) {
-        if self.col < self.lines[self.row].len() {
-            self.lines[self.row].remove(self.col);
-        } else if self.row + 1 < self.lines.len() {
-            let next = self.lines.remove(self.row + 1);
-            self.lines[self.row].extend(next);
-        }
-    }
-
-    fn move_left(&mut self) {
-        if self.col > 0 {
-            self.col -= 1;
-        } else if self.row > 0 {
-            self.row -= 1;
-            self.col = self.lines[self.row].len();
-        }
-    }
-
-    fn move_right(&mut self) {
-        if self.col < self.lines[self.row].len() {
-            self.col += 1;
-        } else if self.row + 1 < self.lines.len() {
-            self.row += 1;
-            self.col = 0;
-        }
-    }
-
-    fn move_up(&mut self) {
-        if self.row > 0 {
-            self.row -= 1;
-            self.col = self.col.min(self.lines[self.row].len());
-        }
-    }
-
-    fn move_down(&mut self) {
-        if self.row + 1 < self.lines.len() {
-            self.row += 1;
-            self.col = self.col.min(self.lines[self.row].len());
-        }
-    }
-
-    fn home(&mut self) {
-        self.col = 0;
-    }
-
-    fn end(&mut self) {
-        self.col = self.lines[self.row].len();
-    }
-
-    fn text(&self) -> String {
-        self.lines
-            .iter()
-            .map(|line| line.iter().collect::<String>())
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
 }
 
 /// A live report overlay. Owns the flagged regions, the description buffer,
@@ -504,7 +371,7 @@ impl ReportSession {
                 }
                 cells.insert(
                     (cx, cy),
-                    self.frame_glyph_at(cx, cy).unwrap_or_else(blank_glyph),
+                    self.frame_glyph_at(cx, cy).unwrap_or_else(review_ui::blank_glyph),
                 );
             }
         }
@@ -526,7 +393,7 @@ impl ReportSession {
         // Live drag: tentatively tint the box and label it as the next region.
         if let (Some(anchor), Some(current)) = (self.drag_anchor, self.drag_current) {
             let screen = &game.graphics().screen;
-            for screen_square in world_box_screen_squares(screen, anchor, current) {
+            for screen_square in review_ui::world_box_screen_squares(screen, anchor, current) {
                 self.tint_square(
                     &mut cells,
                     screen_square,
@@ -564,7 +431,7 @@ impl ReportSession {
 
     /// The frozen-frame glyph at a terminal cell, if the frame covers it.
     fn frame_glyph_at(&self, cx: u16, cy: u16) -> Option<Glyph> {
-        glyph_at(&self.frame, cx as i32 - self.offset_x, cy as i32 - self.offset_y)
+        review_ui::glyph_at(&self.frame, cx as i32 - self.offset_x, cy as i32 - self.offset_y)
     }
 
     /// Blend `color` into a square's two character cells, if present.
@@ -581,7 +448,7 @@ impl ReportSession {
                 continue;
             }
             if let Some(glyph) = cells.get_mut(&(cx as u16, ty as u16)) {
-                *glyph = tint_glyph(*glyph, color, strength);
+                *glyph = review_ui::tint_glyph(*glyph, color, strength);
             }
         }
     }
@@ -627,75 +494,17 @@ impl ReportSession {
     }
 
     fn editor_cells(&self, cells: &mut HashMap<(u16, u16), Glyph>) {
-        let rect = self.editor_rect;
-        if rect.width < 4 || rect.height < 3 {
-            return;
-        }
-        let inner = rect.inner();
-
-        // Fill the pane, then draw its border.
-        for row in 0..rect.height {
-            for col in 0..rect.width {
-                let (cx, cy) = (rect.x + col, rect.y + row);
-                let character = if row == 0 || row == rect.height - 1 {
-                    if col == 0 || col == rect.width - 1 {
-                        '+'
-                    } else {
-                        '-'
-                    }
-                } else if col == 0 || col == rect.width - 1 {
-                    '|'
-                } else {
-                    ' '
-                };
-                let fg = if character == ' ' { EDITOR_FG } else { EDITOR_BORDER };
-                cells.insert((cx, cy), Glyph::new(character, fg, EDITOR_BG));
-            }
-        }
-
-        // Title on the top border.
         let title = if self.focus == Focus::Editor {
             " description (typing) "
         } else {
             " description "
         };
-        for (i, character) in title.chars().enumerate() {
-            let cx = rect.x + 1 + i as u16;
-            if cx >= rect.x + rect.width - 1 {
-                break;
-            }
-            cells.insert((cx, rect.y), Glyph::new(character, EDITOR_BORDER, EDITOR_BG));
-        }
-
-        // Scroll so the cursor line stays visible.
-        let inner_height = inner.height as usize;
-        let scroll = if self.buffer.row < inner_height {
-            0
-        } else {
-            self.buffer.row + 1 - inner_height
-        };
-
-        for (index, line) in self.buffer.lines.iter().enumerate().skip(scroll).take(inner_height) {
-            let row = inner.y + (index - scroll) as u16;
-            for (col, &character) in line.iter().enumerate().take(inner.width as usize) {
-                let cx = inner.x + col as u16;
-                cells.insert((cx, row), Glyph::new(character, EDITOR_FG, EDITOR_BG));
-            }
-        }
-
-        // Cursor as an inverted cell.
-        let cursor_row = inner.y + (self.buffer.row - scroll) as u16;
-        let cursor_col = inner.x + self.buffer.col.min(inner.width as usize - 1) as u16;
-        let character = self
-            .buffer
-            .lines
-            .get(self.buffer.row)
-            .and_then(|line| line.get(self.buffer.col))
-            .copied()
-            .unwrap_or(' ');
-        cells.insert(
-            (cursor_col, cursor_row),
-            Glyph::new(character, EDITOR_BG, EDITOR_CURSOR_BG),
+        review_ui::draw_editor_pane(
+            cells,
+            self.editor_rect,
+            &self.buffer,
+            title,
+            EDITOR_COLORS,
         );
     }
 }
@@ -737,52 +546,6 @@ fn editor_rect(terminal_width: u16, terminal_height: u16) -> Rect {
             height,
         }
     }
-}
-
-/// A blank cell for the parts of the game region the frozen frame does not
-/// cover (the frame is translated, not scaled, so translated edges fall off).
-fn blank_glyph() -> Glyph {
-    Glyph::new(' ', Glyph::DEFAULT_FG_COLOR, Glyph::DEFAULT_BG_COLOR)
-}
-
-/// Blend `color` into a glyph's foreground and background. The character is
-/// untouched, so a mark tints the underlying glyph instead of hiding it.
-fn tint_glyph(glyph: Glyph, color: RGB8, strength: f32) -> Glyph {
-    Glyph {
-        character: glyph.character,
-        fg_color: tint_color(glyph.fg_color, color, strength),
-        bg_color: tint_color(glyph.bg_color, color, strength),
-        bg_transparent: false,
-    }
-}
-
-/// Every screen square in the inclusive world-square box `a`..`b`.
-fn world_box_screen_squares(
-    screen: &terminal_rendering::Screen,
-    a: WorldSquare,
-    b: WorldSquare,
-) -> Vec<ScreenBufferSquare> {
-    let (x0, x1) = (a.x.min(b.x), a.x.max(b.x));
-    let (y0, y1) = (a.y.min(b.y), a.y.max(b.y));
-    let mut squares = Vec::new();
-    for y in y0..=y1 {
-        for x in x0..=x1 {
-            squares.push(screen.world_square_to_screen_buffer_square(WorldSquare::new(x, y)));
-        }
-    }
-    squares
-}
-
-/// The glyph at a screen character cell, if in bounds (coordinates may be
-/// negative, e.g. when a translated frame hangs off an edge).
-fn glyph_at(buffer: &[Vec<Glyph>], cx: i32, cy: i32) -> Option<Glyph> {
-    if cx < 0 || cy < 0 {
-        return None;
-    }
-    buffer
-        .get(cx as usize)
-        .and_then(|col| col.get(cy as usize))
-        .copied()
 }
 
 /// File the issue: create the numbered dir, write the snapshot (with the
@@ -1043,7 +806,7 @@ mod tests {
     #[test]
     fn tint_keeps_the_character_and_blends_colors() {
         let original = Glyph::new('X', RGB8::new(0, 0, 0), RGB8::new(0, 0, 0));
-        let tinted = tint_glyph(original, FLAG_TINT, FLAG_TINT_STRENGTH);
+        let tinted = review_ui::tint_glyph(original, FLAG_TINT, FLAG_TINT_STRENGTH);
         assert_eq!(tinted.character, 'X', "the underlying glyph still shows");
         assert!(tinted.fg_color.r > 0 && tinted.fg_color.b > 0, "blended toward magenta");
         assert!(!tinted.bg_transparent, "the tint is visible");

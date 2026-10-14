@@ -18,6 +18,7 @@
 //!   fov-trace-json <dir>  the same trace as JSON
 //!   explain <dir> X Y     explain how screen cell (X,Y) got its glyph
 //!   invariants <dir>      FOV visibility-consistency violations
+//!   visibility-pairs <dir>  per-cell multi-visibility complementarity
 //!   minimize <dir> X Y [out]
 //!       Writes minimized JSON to `out` (default <dir>/minimized.json) and,
 //!       for a `*.json` out, a loadable `<out-dir>/game_state.json` plus
@@ -37,7 +38,7 @@ use game::game::snapshot::debug;
 
 fn usage() -> ExitCode {
     eprintln!(
-        "Usage: snapshot_tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|screen-explain|explain-diff|invariants|render-at|simulate|verify-issues|minimize> <dir> [args]\n\
+        "Usage: snapshot_tool <render|diff|bless|cells|heights|fov-trace|fov-trace-json|explain|screen-explain|explain-diff|invariants|visibility-pairs|render-at|simulate|verify-issues|minimize> <dir> [args]\n\
          \n\
          Prefer the repo-root wrapper, which rebuilds from source:\n\
          ./snapshot-tool <args>\n\
@@ -279,6 +280,16 @@ fn main() -> ExitCode {
             }
         }
         "invariants" => match debug::fov_invariants_report(&dir) {
+            Ok(report) => {
+                print!("{report}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        "visibility-pairs" => match debug::fov_visibility_pairs_report(&dir) {
             Ok(report) => {
                 print!("{report}");
                 ExitCode::SUCCESS
