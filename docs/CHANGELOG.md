@@ -31,6 +31,10 @@ in-game report overlay.
   and `git mv`s the directory to `issues/solved/`; an unchanged render moves but
   warns that the fixture is vacuous. `n` opens a built-in editor that appends a
   dated `## Clarification` section to `issue.md`. `q`/`Esc` cancels.
+- **Multi-issue review**: `--all` queues every open capture and `--ready` keeps
+  only those whose current render differs from the capture (a candidate fix is
+  present); the tool advances after each decision, `s` skips, and the title
+  shows the queue position plus an `[unchanged from capture]` marker.
 - **`debug::render_snapshot_headless_buffer`**: the headless render as the
   screen buffer plus the player's screen square, so the TUI draws "after"
   directly without an ANSI encode/parse round-trip.

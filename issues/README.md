@@ -25,10 +25,29 @@ margin. Press:
   warns that the fixture is vacuous (no picture change).
 - `n` to reject — a built-in editor opens; the typed text is appended as a
   `## Clarification` section of `issue.md`, and the issue stays open.
+- `s` to skip to the next issue without deciding.
 - `q` / `Esc` to cancel.
 
 Options: `--flags FILE` (default `<issue>/flags.json`; a missing file means no
 flagged regions), `--margin N` (crop padding in squares, default 4), and
-`--no-crop` (show the whole capture). `scripts/issue_before_after.py` remains
-for offline PNG/HTML review of open and solved captures.
+`--no-crop` (show the whole capture).
+
+### Reviewing several issues
+
+Review every open issue, advancing after each decision:
+
+```
+cargo run -p game --features debug-tools --bin issue_review -- --all
+```
+
+Or only the ones with a candidate fix — where the current render differs from
+the saved capture ("ready for review"):
+
+```
+cargo run -p game --features debug-tools --bin issue_review -- --ready
+```
+
+The title shows the queue position and marks an issue `[unchanged from capture]`
+when the working tree still reproduces it. `scripts/issue_before_after.py`
+remains for offline PNG/HTML review of open and solved captures.
 

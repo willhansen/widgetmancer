@@ -55,9 +55,13 @@ const EDITOR_COLORS: EditorColors = EditorColors {
 
 fn usage() -> ExitCode {
     eprintln!(
-        "Usage: issue_review <NNNN|issues/NNNN> [--flags FILE] [--margin N] [--no-crop]\n\n\
-         Shows the saved capture's before / before-marked / after pictures in a\n\
-         terminal UI and asks whether to move the issue to issues/solved/.\n\
+        "Usage: issue_review <NNNN|issues/NNNN> [--flags FILE] [--margin N] [--no-crop]\n\
+         \x20      issue_review --all   [--margin N] [--no-crop]\n\
+         \x20      issue_review --ready [--margin N] [--no-crop]\n\n\
+         Shows a capture's before / before-marked / after pictures in a terminal UI\n\
+         and asks whether to move the issue to issues/solved/.\n\
+         \x20 --all    review every open issue, advancing after each decision\n\
+         \x20 --ready  review only issues whose render differs from the capture\n\n\
          Run via: cargo run -p game --features debug-tools --bin issue_review -- <args>"
     );
     ExitCode::from(2)
@@ -65,16 +69,19 @@ fn usage() -> ExitCode {
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let Some(target) = args.first() else {
-        return usage();
-    };
-
+    let mut target: Option<String> = None;
     let mut flags_path: Option<PathBuf> = None;
     let mut margin: u32 = 4;
     let mut crop = true;
-    let mut i = 1;
+    let mut all = false;
+    let mut ready = false;
+
+    let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
+            "--all" => all = true,
+            "--ready" => ready = true,
+            "--no-crop" => crop = false,
             "--flags" => {
                 i += 1;
                 match args.get(i) {
@@ -89,15 +96,25 @@ fn main() -> ExitCode {
                     None => return usage(),
                 }
             }
-            "--no-crop" => crop = false,
-            _ => return usage(),
+            other if other.starts_with("--") => return usage(),
+            other => target = Some(other.to_string()),
         }
         i += 1;
     }
 
-    match run(target, flags_path, margin, crop) {
-        Ok(outcome) => {
-            println!("{outcome}");
+    if !all && !ready && target.is_none() {
+        return usage();
+    }
+
+    match run(target.as_deref(), all, ready, flags_path, margin, crop) {
+        Ok(decisions) => {
+            if decisions.is_empty() {
+                println!("cancelled; nothing changed");
+            } else {
+                for decision in &decisions {
+                    println!("{decision}");
+                }
+            }
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -107,47 +124,138 @@ fn main() -> ExitCode {
     }
 }
 
-/// The reviewer's answer, reported after the terminal is restored.
-enum Outcome {
-    Moved { destination: PathBuf, changed: usize },
-    Clarified { path: PathBuf },
-    Cancelled,
+/// One reviewer decision, reported after the terminal is restored.
+enum Decision {
+    Moved {
+        number: String,
+        destination: PathBuf,
+        changed: usize,
+    },
+    Clarified {
+        number: String,
+        path: PathBuf,
+    },
+    Skipped {
+        number: String,
+    },
+    Failed {
+        number: String,
+        error: String,
+    },
 }
 
-impl std::fmt::Display for Outcome {
+impl std::fmt::Display for Decision {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Outcome::Moved {
+            Decision::Moved {
+                number,
                 destination,
                 changed,
             } => {
-                write!(f, "approved: moved to {}", destination.display())?;
+                write!(f, "issue {number}: approved — moved to {}", destination.display())?;
                 if *changed == 0 {
                     write!(
                         f,
-                        "\nwarning: the render is unchanged from the pre-fix capture \
-                         (vacuous fixture — the fix may not be present in the working tree)"
-                    )?;
+                        "\nwarning: issue {number}: the render is unchanged from the capture \
+                         (vacuous fixture — the fix may not be in the working tree)"
+                    )
                 } else {
-                    write!(f, " ({changed} cells differ from the pre-fix capture)")?;
+                    write!(f, " ({changed} cells differ from the capture)")
                 }
-                Ok(())
             }
-            Outcome::Clarified { path } => {
-                write!(f, "rejected: appended a clarification to {}", path.display())
+            Decision::Clarified { number, path } => write!(
+                f,
+                "issue {number}: rejected — appended a clarification to {}",
+                path.display()
+            ),
+            Decision::Skipped { number } => write!(f, "issue {number}: skipped"),
+            Decision::Failed { number, error } => {
+                write!(f, "issue {number}: FAILED — {error}")
             }
-            Outcome::Cancelled => write!(f, "cancelled; nothing changed"),
         }
     }
 }
 
+/// One issue loaded for review; built once per issue in the queue.
+struct IssueView {
+    number: String,
+    issue_dir: PathBuf,
+    panes: [Vec<Vec<Glyph>>; 3],
+    pane_width: u16,
+    pane_height: u16,
+    /// Cells that differ between the capture and the current render. `0` means
+    /// the working tree still reproduces the capture (no candidate fix).
+    changed: usize,
+}
+
 fn run(
-    target: &str,
+    target: Option<&str>,
+    all: bool,
+    ready: bool,
     flags_path: Option<PathBuf>,
     margin: u32,
     crop: bool,
-) -> Result<Outcome, String> {
-    let issue_dir = resolve_issue_dir(target)?;
+) -> Result<Vec<Decision>, String> {
+    let issue_dirs: Vec<PathBuf> = if all || ready {
+        if flags_path.is_some() {
+            return Err("--flags applies to a single issue; not with --all/--ready".to_string());
+        }
+        discover_open_issues()?
+    } else {
+        vec![resolve_issue_dir(target.expect("target checked in main"))?]
+    };
+
+    let mut views = Vec::new();
+    for issue_dir in &issue_dirs {
+        views.push(load_view(issue_dir, flags_path.as_deref(), margin, crop)?);
+    }
+    if ready {
+        views.retain(|view| view.changed > 0);
+    }
+    if views.is_empty() {
+        return Err(if ready {
+            "no issues are ready for review (the render still matches every capture)".to_string()
+        } else {
+            "no open issues to review".to_string()
+        });
+    }
+
+    let mut app = ReviewApp::new(views);
+    run_tui(&mut app)
+}
+
+/// Every open capture under `issues/`, numerically sorted. `issues/solved/` and
+/// non-capture entries are skipped.
+fn discover_open_issues() -> Result<Vec<PathBuf>, String> {
+    let issues = snapshot::issues_dir()
+        .canonicalize()
+        .map_err(|error| format!("could not locate issues/: {error}"))?;
+    let mut dirs = Vec::new();
+    for entry in std::fs::read_dir(&issues).map_err(|error| error.to_string())? {
+        let path = entry.map_err(|error| error.to_string())?.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if path.file_name().and_then(|name| name.to_str()) == Some("solved") {
+            continue;
+        }
+        if path.join("snapshot").join("game_state.json").exists() {
+            dirs.push(path);
+        }
+    }
+    dirs.sort();
+    Ok(dirs)
+}
+
+/// Load one capture: read its flags, render the current tree as "after", crop
+/// the flagged regions ∪ player once for all three panes, and count how many
+/// cells differ from the capture.
+fn load_view(
+    issue_dir: &Path,
+    flags_override: Option<&Path>,
+    margin: u32,
+    crop: bool,
+) -> Result<IssueView, String> {
     let snapshot_dir = issue_dir.join("snapshot");
     let number = issue_dir
         .file_name()
@@ -155,14 +263,18 @@ fn run(
         .map(str::to_owned)
         .unwrap_or_default();
 
-    let flags_path = flags_path.unwrap_or_else(|| issue_dir.join("flags.json"));
+    let flags_path = flags_override
+        .map(PathBuf::from)
+        .unwrap_or_else(|| issue_dir.join("flags.json"));
     let regions = load_flags(&flags_path)?;
 
-    let before = load_screen_buffer(&snapshot_dir.join("screen.txt"))?;
+    let before_rows = debug::parse_screen_text_file(&snapshot_dir.join("screen.txt"))?;
+    let before = cells_to_buffer(&before_rows);
     let (after, player) = debug::render_snapshot_headless_buffer(&snapshot_dir)?;
     if before.len() != after.len() || before[0].len() != after[0].len() {
         return Err(format!(
-            "capture size {}x{} does not match the render {}x{}",
+            "{}: capture size {}x{} does not match the render {}x{}",
+            issue_dir.display(),
             before.len(),
             before[0].len(),
             after.len(),
@@ -170,7 +282,6 @@ fn run(
         ));
     }
     let (width, height) = (before.len(), before[0].len());
-
     let crop = if crop {
         Crop::around(&regions, player, width, height, margin)
     } else {
@@ -182,10 +293,16 @@ fn run(
         }
     };
 
+    let changed = count_changes(&before_rows, &after);
     let (panes, pane_width, pane_height) = build_panes(&before, &after, &crop, &regions, player);
-
-    let mut app = ReviewApp::new(number, issue_dir, panes, pane_width, pane_height);
-    run_tui(&mut app)
+    Ok(IssueView {
+        number,
+        issue_dir: issue_dir.to_path_buf(),
+        panes,
+        pane_width,
+        pane_height,
+        changed,
+    })
 }
 
 // --- issue / flags ---
@@ -267,9 +384,9 @@ fn point(value: &serde_json::Value, index: usize) -> Result<(i32, i32), String> 
     Ok((x, y))
 }
 
-/// Parse a saved `screen.txt` into a `[x][y]` glyph buffer.
-fn load_screen_buffer(path: &Path) -> Result<Vec<Vec<Glyph>>, String> {
-    let rows = debug::parse_screen_text_file(path)?;
+/// Turn parsed `screen.txt` rows (`[y][x]` characters + colors) into a `[x][y]`
+/// glyph buffer, the indexing `Screen::screen_buffer` uses.
+fn cells_to_buffer(rows: &[Vec<debug::Cell>]) -> Vec<Vec<Glyph>> {
     let height = rows.len();
     let width = rows.first().map_or(0, Vec::len);
     let mut buffer = vec![vec![blank_glyph(); height]; width];
@@ -278,7 +395,25 @@ fn load_screen_buffer(path: &Path) -> Result<Vec<Vec<Glyph>>, String> {
             buffer[x][y] = Glyph::new(cell.character, cell.fg, cell.bg);
         }
     }
-    Ok(buffer)
+    buffer
+}
+
+/// Cells whose character or colors differ between the capture and the render.
+/// `0` means the working tree still reproduces the capture.
+fn count_changes(before: &[Vec<debug::Cell>], after: &[Vec<Glyph>]) -> usize {
+    let mut changed = 0;
+    for (y, row) in before.iter().enumerate() {
+        for (x, cell) in row.iter().enumerate() {
+            let glyph = after[x][y];
+            if cell.character != glyph.character
+                || cell.fg != glyph.fg_color
+                || cell.bg != glyph.bg_color
+            {
+                changed += 1;
+            }
+        }
+    }
+    changed
 }
 
 // --- crop & panes ---
@@ -400,15 +535,13 @@ enum Action {
     Redraw,
     Approve,
     SaveClarification,
+    Skip,
     Cancel,
 }
 
 struct ReviewApp {
-    number: String,
-    issue_dir: PathBuf,
-    panes: [Vec<Vec<Glyph>>; 3],
-    pane_width: u16,
-    pane_height: u16,
+    views: Vec<IssueView>,
+    index: usize,
     labels: [&'static str; 3],
     cycle: usize,
     editing: bool,
@@ -420,20 +553,11 @@ struct ReviewApp {
 }
 
 impl ReviewApp {
-    fn new(
-        number: String,
-        issue_dir: PathBuf,
-        panes: [Vec<Vec<Glyph>>; 3],
-        pane_width: u16,
-        pane_height: u16,
-    ) -> Self {
+    fn new(views: Vec<IssueView>) -> Self {
         let (term_width, term_height) = terminal_size().unwrap_or((120, 40));
         ReviewApp {
-            number,
-            issue_dir,
-            panes,
-            pane_width,
-            pane_height,
+            views,
+            index: 0,
             labels: ["before", "before-marked", "after"],
             cycle: 0,
             editing: false,
@@ -445,10 +569,28 @@ impl ReviewApp {
         }
     }
 
+    fn current(&self) -> &IssueView {
+        &self.views[self.index]
+    }
+
+    /// Move to the next issue; `false` when the queue is exhausted.
+    fn advance(&mut self) -> bool {
+        self.index += 1;
+        self.editing = false;
+        self.editor = TextBuffer::new();
+        self.cycle = 0;
+        self.last.clear();
+        self.dirty = true;
+        self.index < self.views.len()
+    }
+
     fn layout(&self) -> Layout {
         let w = self.term_width as usize;
         let h = self.term_height as usize;
-        let (pw, ph) = (self.pane_width as usize, self.pane_height as usize);
+        let (pw, ph) = (
+            self.current().pane_width as usize,
+            self.current().pane_height as usize,
+        );
         if 3 * pw + 2 <= w && ph + 3 <= h {
             Layout::SideBySide
         } else if ph * 3 + 4 <= h {
@@ -460,20 +602,17 @@ impl ReviewApp {
 
     /// Terminal rects for each pane (x, y, visible), plus the editor/help rows.
     fn pane_rects(&self) -> (Vec<(u16, u16)>, u16) {
+        let (pw, ph) = (self.current().pane_width, self.current().pane_height);
         match self.layout() {
             Layout::SideBySide => {
-                let origins = (0..3)
-                    .map(|i| (i as u16 * (self.pane_width + 1), 2))
-                    .collect();
-                (origins, 2 + self.pane_height)
+                let origins = (0..3).map(|i| (i as u16 * (pw + 1), 2)).collect();
+                (origins, 2 + ph)
             }
             Layout::Stacked => {
-                let origins = (0..3)
-                    .map(|i| (0u16, 2 + i as u16 * (self.pane_height + 1)))
-                    .collect();
-                (origins, 2 + 3 * (self.pane_height + 1))
+                let origins = (0..3).map(|i| (0u16, 2 + i as u16 * (ph + 1))).collect();
+                (origins, 2 + 3 * (ph + 1))
             }
-            Layout::Cycle => (vec![(0, 2)], 2 + self.pane_height),
+            Layout::Cycle => (vec![(0, 2)], 2 + ph),
         }
     }
 
@@ -497,6 +636,7 @@ impl ReviewApp {
                 self.editing = true;
                 Action::Redraw
             }
+            Event::Key(Key::Char('s')) => Action::Skip,
             Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => Action::Cancel,
             Event::Key(Key::Char('[')) | Event::Key(Key::Char(']')) | Event::Key(Key::Char('\t'))
                 if self.layout() == Layout::Cycle =>
@@ -626,9 +766,20 @@ impl ReviewApp {
     }
 
     fn title(&self) -> String {
+        let position = if self.views.len() > 1 {
+            format!(" ({}/{})", self.index + 1, self.views.len())
+        } else {
+            String::new()
+        };
+        let readiness = if self.current().changed == 0 {
+            "  [unchanged from capture]"
+        } else {
+            ""
+        };
         format!(
-            "Issue {} — approve move to issues/solved/?   y: approve   n: no / clarify   q: cancel",
-            self.number
+            "Issue {}{position} — approve move to issues/solved/?{readiness}   \
+             y: approve   n: no / clarify   s: skip   q: quit",
+            self.current().number
         )
     }
 
@@ -668,9 +819,10 @@ impl ReviewApp {
         origin: (u16, u16),
         editor_rect: Option<Rect>,
     ) {
-        let pane = &self.panes[index];
-        for x in 0..self.pane_width {
-            for y in 0..self.pane_height {
+        let view = self.current();
+        let pane = &view.panes[index];
+        for x in 0..view.pane_width {
+            for y in 0..view.pane_height {
                 let (cx, cy) = (origin.0 + x, origin.1 + y);
                 if cx >= self.term_width || cy >= self.term_height - 1 {
                     continue;
@@ -686,7 +838,7 @@ impl ReviewApp {
     }
 }
 
-fn run_tui(app: &mut ReviewApp) -> Result<Outcome, String> {
+fn run_tui(app: &mut ReviewApp) -> Result<Vec<Decision>, String> {
     let mut out = stdout().into_raw_mode().map_err(|error| error.to_string())?;
     let _ = write!(out, "{}{}", ToAlternateScreen, cursor::Hide);
 
@@ -700,7 +852,8 @@ fn run_tui(app: &mut ReviewApp) -> Result<Outcome, String> {
     result
 }
 
-fn tui_loop(app: &mut ReviewApp, out: &mut impl Write) -> Result<Outcome, String> {
+fn tui_loop(app: &mut ReviewApp, out: &mut impl Write) -> Result<Vec<Decision>, String> {
+    let mut decisions = Vec::new();
     app.draw(out)?;
     let stdin = std::io::stdin();
     for event in stdin.events() {
@@ -708,15 +861,43 @@ fn tui_loop(app: &mut ReviewApp, out: &mut impl Write) -> Result<Outcome, String
         match app.handle_event(event) {
             Action::None => {}
             Action::Redraw => app.draw(out)?,
-            Action::Approve => return move_to_solved(&app.issue_dir),
-            Action::SaveClarification => {
-                let path = append_clarification(&app.issue_dir, &app.editor.text())?;
-                return Ok(Outcome::Clarified { path });
+            Action::Approve => {
+                let issue_dir = app.current().issue_dir.clone();
+                let number = app.current().number.clone();
+                decisions.push(match move_to_solved(&issue_dir, &number) {
+                    Ok(decision) => decision,
+                    Err(error) => Decision::Failed { number, error },
+                });
+                if !app.advance() {
+                    return Ok(decisions);
+                }
+                app.draw(out)?;
             }
-            Action::Cancel => return Ok(Outcome::Cancelled),
+            Action::SaveClarification => {
+                let issue_dir = app.current().issue_dir.clone();
+                let number = app.current().number.clone();
+                decisions.push(match append_clarification(&issue_dir, &app.editor.text()) {
+                    Ok(path) => Decision::Clarified { number, path },
+                    Err(error) => Decision::Failed { number, error },
+                });
+                if !app.advance() {
+                    return Ok(decisions);
+                }
+                app.draw(out)?;
+            }
+            Action::Skip => {
+                decisions.push(Decision::Skipped {
+                    number: app.current().number.clone(),
+                });
+                if !app.advance() {
+                    return Ok(decisions);
+                }
+                app.draw(out)?;
+            }
+            Action::Cancel => return Ok(decisions),
         }
     }
-    Ok(Outcome::Cancelled)
+    Ok(decisions)
 }
 
 // --- move / clarify ---
@@ -725,7 +906,7 @@ fn tui_loop(app: &mut ReviewApp, out: &mut impl Write) -> Result<Outcome, String
 /// bless the current render into `screen.txt`, and `git mv` the directory to
 /// `issues/solved/`. A render identical to the pre-fix capture is a warning,
 /// not a blocker (the reviewer may still accept the picture).
-fn move_to_solved(issue_dir: &Path) -> Result<Outcome, String> {
+fn move_to_solved(issue_dir: &Path, number: &str) -> Result<Decision, String> {
     let issues = snapshot::issues_dir();
     let repo_root = issues
         .parent()
@@ -733,7 +914,8 @@ fn move_to_solved(issue_dir: &Path) -> Result<Outcome, String> {
         .canonicalize()
         .map_err(|error| format!("could not resolve the repository root: {error}"))?;
     let (destination, changed) = archive_issue(&repo_root, issue_dir)?;
-    Ok(Outcome::Moved {
+    Ok(Decision::Moved {
+        number: number.to_owned(),
         destination,
         changed,
     })
@@ -944,6 +1126,26 @@ mod tests {
         assert!(text.contains("original body"));
         assert!(text.contains("## Clarification ("));
         assert!(text.contains("still wrong on the east side"));
+    }
+
+    #[test]
+    fn count_changes_detects_differing_cells() {
+        let before = vec![vec![
+            debug::Cell {
+                character: 'a',
+                fg: RGB8::new(0, 0, 0),
+                bg: RGB8::new(0, 0, 0),
+            },
+            debug::Cell {
+                character: 'b',
+                fg: RGB8::new(0, 0, 0),
+                bg: RGB8::new(0, 0, 0),
+            },
+        ]];
+        let mut after = cells_to_buffer(&before);
+        assert_eq!(count_changes(&before, &after), 0);
+        after[0][0] = Glyph::new('a', RGB8::new(255, 0, 0), RGB8::new(0, 0, 0));
+        assert_eq!(count_changes(&before, &after), 1);
     }
 
     fn test_git(dir: &Path, args: &[&str]) {

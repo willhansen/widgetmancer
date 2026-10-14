@@ -63,6 +63,10 @@ blesses the current render into `screen.txt`, and `git mv`s the directory —
 warning if the render is unchanged from the capture. `n` opens an editor and
 appends a `## Clarification` section to `issue.md`.
 
+Review several at once with `--all` (every open issue) or `--ready` (only those
+whose current render differs from the saved capture); the tool advances after
+each decision. `s` skips, `q` quits.
+
 ## Font debugging
 
 Many glyphs the game draws are not in the configured terminal font, so the
