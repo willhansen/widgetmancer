@@ -99,3 +99,7 @@ Applied here: the flagged region is depth-0 fully-visible **void**; no wall is
 projected into it (no skipped wall lands there), so the side the reporter
 expects is simply one screen square away. Needs a fresh read of the intended
 geometry rather than a code fix.
+
+## Appended note (2026-10-16)
+
+Issue remains.

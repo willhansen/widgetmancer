@@ -36,3 +36,7 @@ Averaging the tile's colours (the report's suggestion) would remove the
 half-and-half pattern but still not convey motion. Showing motion through a
 partial would need per-character compositing (ROADMAP item 15). Deferred as an
 enhancement, not a regression.
+
+## Appended note (2026-10-16)
+
+This issue can't be fairly represented with just one picture.  Might be better to show a few seconds of video?

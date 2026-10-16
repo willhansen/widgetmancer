@@ -110,3 +110,7 @@ Applied here: the depth-1 portal sub-view's *solid* content reaches the flagged
 cells and the direct/portal halves are exact complements, so the model is
 correct; the perceived "tint outside the portal" is limitation 1 / aperture
 appearance.
+
+## Appended note (2026-10-16)
+
+I can't tell if the issue is still present because the highlighted regions are still overlaid on the "after" section.

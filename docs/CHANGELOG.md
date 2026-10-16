@@ -9,42 +9,54 @@ Newest first.
 
 ---
 
-## 2026-10-14 — Interactive issue-approval gate (`issue_review`)
+## 2026-10-16 — Issue review tool: view a capture, leave a note
 
-### feat(tooling): add issue_review bin to approve moving an issue to solved/
+### feat(tooling): add issue_review bin (viewer + note, sweep by default)
 
-A standalone Rust tool that turns the documented "show before/after, get
-approval" gate into an interactive one, independent of the game loop and the
-in-game report overlay.
+A standalone Rust tool, independent of the game loop and the in-game report
+overlay. It shows the three pictures that matter for a filed capture and lets
+the reviewer leave a free-form note; it never decides or moves anything, so
+later processing reads the note and acts. (An earlier approve/reject design
+that performed the `git mv` itself was dropped in favour of this.)
 
-- **`crates/game/src/review_ui.rs`** (new, ungated): the terminal-UI widgets the
-  in-game overlay and the review tool now share — `Region`, `Rect`,
-  `TextBuffer`, `tint_glyph`, `glyph_at`, `blank_glyph`,
-  `world_box_screen_squares`, and a parameterized `draw_editor_pane`.
-  `report.rs` is refactored to use them (its 16 tests are unchanged).
-- **`crates/game/src/bin/issue_review.rs`** (new, `debug-tools`): resolves an
-  `issues/NNNN` capture, reads `flags.json` (both the `world`/`screen` and the
-  older `region`/`screen_region` schemas; a missing file means no flags), renders
-  the **current working tree** as "after", and shows before / before-marked /
-  after panes that share one crop (flagged regions ∪ player, + margin). `y`
-  preserves the original capture as `screen.pre-fix.txt`, blesses the render,
-  and `git mv`s the directory to `issues/solved/`; an unchanged render moves but
-  warns that the fixture is vacuous. `n` opens a built-in editor that appends a
-  dated `## Clarification` section to `issue.md`. `q`/`Esc` cancels.
-- **Multi-issue review**: `--all` queues every open capture and `--ready` keeps
-  only those whose current render differs from the capture (a candidate fix is
-  present); the tool advances after each decision, `s` skips, and the title
-  shows the queue position plus an `[unchanged from capture]` marker.
+- **`crates/game/src/review_ui.rs`** (new, ungated): terminal-UI widgets shared
+  by the in-game overlay and the review tool — `Region`, `Rect`, `TextBuffer`,
+  `tint_glyph`, `glyph_at`, `blank_glyph`, `world_box_screen_squares`, a
+  parameterized `draw_editor_pane`, and — new — `edit_buffer`, the standard
+  line-editor key handling both editors now call so they cannot drift.
+  `report.rs` is refactored onto them (its 16 tests unchanged).
+- **`crates/game/src/bin/issue_review.rs`** (new, `debug-tools`): resolves a
+  capture (number or path), reads `flags.json` (both the `world`/`screen` and
+  the older `region`/`screen_region` schemas; a missing file means none),
+  renders the **current working tree** as "after", and shows before /
+  before-marked / after panes that share one crop (flagged regions ∪ player,
+  + margin), side-by-side or stacked by width. The note editor is the only
+  interactive pane: `Ctrl+S` appends the note to `issue.md` under a dated
+  `## Appended note` header and advances (empty note → skipped, file untouched);
+  `Ctrl+P` cancels. With no target (or `--all`) it sweeps every open issue,
+  numerically sorted. `--issues-dir` overrides the base for discovery (and for
+  tests).
 - **`debug::render_snapshot_headless_buffer`**: the headless render as the
   screen buffer plus the player's screen square, so the TUI draws "after"
-  directly without an ANSI encode/parse round-trip.
-- Tests (8 in the bin): both flag schemas, missing flags, crop union/clamping/
-  even-edge, shared pane size, marked-only tint, clarification append, and an
-  end-to-end archive move in a temporary git repo (which caught two real bugs:
-  a canonical-vs-relative `strip_prefix` mismatch and `git mv` needing the
-  destination directory created).
-- Docs: `issues/README.md` reworked around the tool; `README.md` and
-  `ARCHITECTURE.md` updated.
+  without an ANSI encode/parse round-trip.
+- **Tests**: 9 bin unit tests (both flag schemas, missing flags, crop union/
+  clamping/even-edge, shared pane size, marked-only tint, and note
+  append/skip-when-empty/skip-when-absent). New pty integration harness
+  (`tests/support/pty.rs`, hand-rolled on `libc`) with its own 6 tests (stdin
+  round-trip, exit status, window size, env set/clear, marker timeout), and a
+  2-test end-to-end suite (`tests/issue_review_tui.rs`) that drives the built
+  binary in a virtual terminal: the default sweep appends a note to one issue
+  and leaves another untouched for an empty note, and a single target reviews
+  just that issue — asserting the alternate-screen enter/leave sequences too.
+- Docs: `docs/ISSUE_REVIEW_PLAN.md` (design), `issues/README.md` reworked,
+  `README.md` and `ARCHITECTURE.md` updated.
+- Repo-root `./issue-review` wrapper (mirrors `./snapshot-tool`) runs the bin
+  through cargo so the binary matches the sources.
+- **Fix + document pane**: typing in the note editor now repaints (the event
+  handler sets `dirty`, so an edit actually redraws). The issue's `issue.md` is
+  shown word-wrapped in a scrollable right-hand column (`PageUp`/`PageDown`) on
+  wide terminals. `wrap_text` unit test, and the pty sweep test now asserts a
+  keystroke produces output growth (shown to fail before the `dirty` fix).
 
 ---
 

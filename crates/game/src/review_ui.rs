@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use rgb::RGB8;
 use terminal_rendering::glyph::Glyph;
 use terminal_rendering::*;
+use termion::event::{Event, Key};
 
 /// One selected region: a click (1x1) or a mouse drag. Only the bounds are
 /// kept — the per-square detail is cheap to re-derive when the issue is
@@ -159,6 +160,29 @@ impl TextBuffer {
             .collect::<Vec<_>>()
             .join("\n")
     }
+}
+
+/// Apply one standard line-editor key to `buffer`, returning `true` if the
+/// event was consumed as an edit. Callers handle their own meta keys (save,
+/// cancel, focus) around this, so the editing behaviour is shared between the
+/// in-game report overlay and the standalone issue review tool.
+pub fn edit_buffer(buffer: &mut TextBuffer, event: &Event) -> bool {
+    match event {
+        Event::Key(Key::Char('\n')) | Event::Key(Key::Char('\r')) => buffer.insert_newline(),
+        Event::Key(Key::Char(character)) if !character.is_control() => {
+            buffer.insert_char(*character)
+        }
+        Event::Key(Key::Backspace) => buffer.backspace(),
+        Event::Key(Key::Delete) => buffer.delete(),
+        Event::Key(Key::Left) => buffer.move_left(),
+        Event::Key(Key::Right) => buffer.move_right(),
+        Event::Key(Key::Up) => buffer.move_up(),
+        Event::Key(Key::Down) => buffer.move_down(),
+        Event::Key(Key::Home) => buffer.home(),
+        Event::Key(Key::End) => buffer.end(),
+        _ => return false,
+    }
+    true
 }
 
 /// A blank cell for parts of a region a translated frame does not cover.

@@ -205,8 +205,9 @@ The actual game. Modules:
   and press `Enter` to file `issue.md` + `flags.json` + the snapshot. `Ctrl+P`
   again cancels. The standalone `issue_review` bin (also `debug-tools`) reads a
   filed capture back, renders the current tree as the "after" picture, and shows
-  a before / before-marked / after triple with a shared crop to approve moving
-  it to `issues/solved/` (or to append a clarification).
+  a before / before-marked / after triple with a shared crop beside a note
+  editor; `Ctrl+S` appends the note to the issue's `issue.md` and advances (or
+  sweeps every open issue when given no target). It never decides or moves.
 - `bacon.toml` — bacon watch config (incl. a `clippy` job); `flake.nix` — Nix
   dev shell; `scripts/` — test recording/printing and profiling helpers.
 

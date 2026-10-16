@@ -2,52 +2,48 @@ Each issue is a directory or a single markdown file. If extra files need to be a
 
 This directory only represents existing and up to date issues. If an issue is no longer relevant, it is to be updated to relevancy or moved to the `solved/` subdirectory. Solved issues are never deleted and their numbers are never reused, so `solved/` is part of the record: new issues are numbered one past the highest number in `issues/` and `issues/solved/` combined. Their history also remains in git.
 
-## Resolving an issue: show before/after, get approval
+## Reviewing an issue: see the pictures, leave a note
 
-Rendering bugs are hard to judge from a diff, and a fix is only real when the
-reporter agrees the *picture* is right. The standalone `issue_review` tool
-presents a candidate fix as a before / before-marked / after triple and asks
-whether to move the issue to `issues/solved/`:
-
-```
-cargo run -p game --features debug-tools --bin issue_review -- 0027
-```
-
-It renders the **current working tree** as the "after" picture (so the fix must
-be in the tree), reads the capture's `screen.txt` as "before", and outlines the
-flagged regions from `flags.json` in magenta with the player in cyan. All three
-panes share one crop: the union of the flagged regions and the player, plus a
-margin. Press:
-
-- `y` to approve — the original capture is preserved as `screen.pre-fix.txt`,
-  the current render is blessed into `screen.txt`, and the issue is `git mv`d to
-  `issues/solved/`. A render identical to the pre-fix capture still moves, but
-  warns that the fixture is vacuous (no picture change).
-- `n` to reject — a built-in editor opens; the typed text is appended as a
-  `## Clarification` section of `issue.md`, and the issue stays open.
-- `s` to skip to the next issue without deciding.
-- `q` / `Esc` to cancel.
-
-Options: `--flags FILE` (default `<issue>/flags.json`; a missing file means no
-flagged regions), `--margin N` (crop padding in squares, default 4), and
-`--no-crop` (show the whole capture).
-
-### Reviewing several issues
-
-Review every open issue, advancing after each decision:
+Rendering bugs are hard to judge from a diff. The standalone `issue_review`
+tool shows the three pictures that matter beside a note editor; it does not
+decide or move anything, it just records a free-form note for later processing.
 
 ```
-cargo run -p game --features debug-tools --bin issue_review -- --all
+./issue-review --all
 ```
 
-Or only the ones with a candidate fix — where the current render differs from
-the saved capture ("ready for review"):
+With no issue (or `--all`) it sweeps every open issue in turn; a number or path
+reviews just that one:
 
 ```
-cargo run -p game --features debug-tools --bin issue_review -- --ready
+./issue-review 0027
 ```
 
-The title shows the queue position and marks an issue `[unchanged from capture]`
-when the working tree still reproduces it. `scripts/issue_before_after.py`
-remains for offline PNG/HTML review of open and solved captures.
+It renders the **current working tree** as the "after" picture, reads the
+capture's `screen.txt` as "before", and outlines the flagged regions from
+`flags.json` in magenta with the player in cyan. All three panes share one
+crop: the union of the flagged regions and the player, plus a margin. On a wide
+terminal the issue's `issue.md` is shown word-wrapped in a scrollable column on
+the right (`PageUp`/`PageDown`).
+
+Your note is the only input; the editing keys are the standard line-editor ones
+(characters, `Enter`, `Backspace`/`Delete`, arrows, `Home`/`End`), shared with
+the in-game report overlay. Two meta keys:
+
+- `Ctrl+S` — append the note to `issue.md` and go to the next issue. An empty
+  note is skipped (the file is left untouched).
+- `Ctrl+P` — cancel.
+
+A saved note is appended as:
+
+```
+## Appended note (YYYY-MM-DD)
+
+<your text>
+```
+
+Options: `--issues-dir DIR` (base for discovery; default `issues/`),
+`--margin N` (crop padding in squares, default 4), `--no-crop` (whole capture).
+`scripts/issue_before_after.py` remains for offline PNG/HTML review of open and
+solved captures.
 

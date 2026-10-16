@@ -52,20 +52,21 @@ renders a capture with the player moved (e.g. one step from where it was filed);
 `screen.txt` and still differs from `screen.pre-fix.txt` (a fixture that matches
 both proves nothing).
 
-### `issue_review` (approve a fix)
+### `issue_review` (see a capture, leave a note)
 
-    cargo run -p game --features debug-tools --bin issue_review -- 0027
+    ./issue-review --all
 
 Shows a saved capture's before / before-marked / after pictures (one shared crop
-over the flagged regions and the player) and asks whether to move the issue to
-`issues/solved/`. `y` preserves the original capture as `screen.pre-fix.txt`,
-blesses the current render into `screen.txt`, and `git mv`s the directory —
-warning if the render is unchanged from the capture. `n` opens an editor and
-appends a `## Clarification` section to `issue.md`.
+over the flagged regions and the player) with a note editor; `after` is a fresh
+render of the current working tree. On a wide terminal the issue's `issue.md` is
+shown word-wrapped in a scrollable column on the right. With no issue (or
+`--all`) it sweeps every open issue in turn. `Ctrl+S` appends the note to
+`issue.md` under a dated `## Appended note` header (an empty note is skipped)
+and moves on; `Ctrl+P` cancels; `PageUp`/`PageDown` scroll the document. It does
+not decide or move anything — later processing reads the note.
 
-Review several at once with `--all` (every open issue) or `--ready` (only those
-whose current render differs from the saved capture); the tool advances after
-each decision. `s` skips, `q` quits.
+The wrapper rebuilds from source (like `./snapshot-tool`); the underlying
+command is `cargo run -p game --features debug-tools --bin issue_review --`.
 
 ## Font debugging
 

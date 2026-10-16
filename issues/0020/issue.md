@@ -155,3 +155,7 @@ Applied here: the flagged cells `(51,34)`,`(51,35)` each carry a gate-dropped
 direct-column `abs(14,8)` wall **and** a depth-1 portal *solid* over a depth-0
 direct partial (exact complements). The direct cube is reduced to a colour by
 limitation 1; the dropped wall is limitation 2.
+
+## Appended note (2026-10-16)
+
+Issue reviewer crops too much to see the issue.

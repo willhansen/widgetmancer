@@ -214,3 +214,7 @@ decision but one of two model limitations:
 
 Applied here: the flagged cells `(46,46..49)` are depth-0 **void** with a
 gate-dropped depth-1 portal wall (`col abs(16,14)`). Drawing it is limitation 2.
+
+## Appended note (2026-10-16)
+
+Issue remains.  Highlighted region does not show side of cube as expected.

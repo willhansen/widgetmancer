@@ -163,27 +163,14 @@ impl ReportSession {
     }
 
     fn handle_editor(&mut self, event: Event) -> ReportAction {
-        match event {
-            // Editing is a mode; `Esc` leaves it (like vim's insert mode)
-            // instead of cancelling the whole issue.
-            Event::Key(Key::Esc) => {
-                self.focus = Focus::Marking;
-                return ReportAction::None;
-            }
-            Event::Key(Key::Char('\n')) | Event::Key(Key::Char('\r')) => {
-                self.buffer.insert_newline()
-            }
-            Event::Key(Key::Char(c)) if !c.is_control() => self.buffer.insert_char(c),
-            Event::Key(Key::Backspace) => self.buffer.backspace(),
-            Event::Key(Key::Delete) => self.buffer.delete(),
-            Event::Key(Key::Left) => self.buffer.move_left(),
-            Event::Key(Key::Right) => self.buffer.move_right(),
-            Event::Key(Key::Up) => self.buffer.move_up(),
-            Event::Key(Key::Down) => self.buffer.move_down(),
-            Event::Key(Key::Home) => self.buffer.home(),
-            Event::Key(Key::End) => self.buffer.end(),
-            _ => {}
+        // Editing is a mode; `Esc` leaves it (like vim's insert mode) instead
+        // of cancelling the whole issue. Everything else is the shared
+        // line-editor behaviour.
+        if let Event::Key(Key::Esc) = event {
+            self.focus = Focus::Marking;
+            return ReportAction::None;
         }
+        review_ui::edit_buffer(&mut self.buffer, &event);
         ReportAction::None
     }
 

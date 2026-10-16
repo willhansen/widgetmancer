@@ -1,27 +1,23 @@
-//! Interactive approval gate for moving a live capture (`issues/NNNN`) to the
-//! `issues/solved/` archive.
+//! Review a filed issue capture and leave a free-form note.
 //!
-//! It is deliberately independent of the game loop and the in-game report
-//! overlay: it loads the saved snapshot, renders the *current* working tree as
-//! the "after" picture, and shows a before / before-marked / after triple in a
-//! terminal UI with a shared crop (flagged regions + the player). The reviewer
-//! answers `approve? y/n`:
+//! Standalone and terminal-only: it never touches the game loop or the in-game
+//! report overlay. It loads a capture, renders the **current working tree** as
+//! the "after" picture, and shows a before / before-marked / after triple
+//! (one shared crop over the flagged regions and the player) beside a note
+//! editor. `Ctrl+S` appends the note to the issue's `issue.md` (if non-empty)
+//! and moves on; it does not decide, move, or archive anything — later
+//! processing reads the note and acts.
 //!
-//! * `y` — renames the original capture to `screen.pre-fix.txt`, blesses the
-//!   fresh render as `screen.txt`, and `git mv`s `issues/NNNN` to
-//!   `issues/solved/NNNN`. If the render is identical to the pre-fix capture it
-//!   still moves, but warns that the fixture is vacuous.
-//! * `n` — opens a built-in editor; the typed text is appended as a
-//!   `## Clarification` section of `issue.md` and the issue stays open.
+//! With no target (or `--all`) every open issue is reviewed in turn:
 //!
-//! Run through cargo so the binary matches the sources:
+//!     ./issue-review --all
 //!
-//!     cargo run -p game --features debug-tools --bin issue_review -- 0027
+//! (the repo-root wrapper runs this bin through cargo). See
+//! `docs/ISSUE_REVIEW_PLAN.md`.
 
 use std::collections::HashMap;
 use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
 
 use rgb::RGB8;
 use termion::cursor::Goto;
@@ -46,6 +42,10 @@ const TITLE_BG: RGB8 = RGB8::new(20, 20, 40);
 const TITLE_FG: RGB8 = RGB8::new(220, 220, 235);
 const HELP_BG: RGB8 = RGB8::new(40, 20, 20);
 const HELP_FG: RGB8 = RGB8::new(255, 220, 220);
+/// Issue-document pane colors.
+const DOC_BG: RGB8 = RGB8::new(16, 18, 26);
+const DOC_FG: RGB8 = RGB8::new(210, 214, 226);
+const DOC_BORDER: RGB8 = RGB8::new(90, 90, 130);
 const EDITOR_COLORS: EditorColors = EditorColors {
     fg: RGB8::new(214, 218, 232),
     bg: RGB8::new(10, 12, 22),
@@ -53,39 +53,36 @@ const EDITOR_COLORS: EditorColors = EditorColors {
     cursor_bg: RGB8::new(150, 150, 60),
 };
 
-fn usage() -> ExitCode {
+fn usage() -> std::process::ExitCode {
     eprintln!(
-        "Usage: issue_review <NNNN|issues/NNNN> [--flags FILE] [--margin N] [--no-crop]\n\
-         \x20      issue_review --all   [--margin N] [--no-crop]\n\
-         \x20      issue_review --ready [--margin N] [--no-crop]\n\n\
-         Shows a capture's before / before-marked / after pictures in a terminal UI\n\
-         and asks whether to move the issue to issues/solved/.\n\
-         \x20 --all    review every open issue, advancing after each decision\n\
-         \x20 --ready  review only issues whose render differs from the capture\n\n\
+        "Usage: issue_review [<NNNN|path>] [--all] [--issues-dir DIR] [--margin N] [--no-crop]\n\n\
+         Shows a capture's before / before-marked / after pictures and appends a\n\
+         note to its issue.md. With no issue (or --all) every open issue is\n\
+         reviewed in turn.\n\
+         \x20 Ctrl+S  save the note (if any) and go to the next issue\n\
+         \x20 Ctrl+P  cancel\n\n\
          Run via: cargo run -p game --features debug-tools --bin issue_review -- <args>"
     );
-    ExitCode::from(2)
+    std::process::ExitCode::from(2)
 }
 
-fn main() -> ExitCode {
+fn main() -> std::process::ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut target: Option<String> = None;
-    let mut flags_path: Option<PathBuf> = None;
+    let mut all = false;
+    let mut issues_dir: Option<PathBuf> = None;
     let mut margin: u32 = 4;
     let mut crop = true;
-    let mut all = false;
-    let mut ready = false;
 
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--all" => all = true,
-            "--ready" => ready = true,
             "--no-crop" => crop = false,
-            "--flags" => {
+            "--issues-dir" => {
                 i += 1;
                 match args.get(i) {
-                    Some(value) => flags_path = Some(PathBuf::from(value)),
+                    Some(value) => issues_dir = Some(PathBuf::from(value)),
                     None => return usage(),
                 }
             }
@@ -102,76 +99,37 @@ fn main() -> ExitCode {
         i += 1;
     }
 
-    if !all && !ready && target.is_none() {
-        return usage();
-    }
-
-    match run(target.as_deref(), all, ready, flags_path, margin, crop) {
-        Ok(decisions) => {
-            if decisions.is_empty() {
-                println!("cancelled; nothing changed");
+    match run(target.as_deref(), all, issues_dir, margin, crop) {
+        Ok(outcomes) => {
+            if outcomes.is_empty() {
+                println!("cancelled; no notes");
             } else {
-                for decision in &decisions {
-                    println!("{decision}");
+                for outcome in &outcomes {
+                    println!("{outcome}");
                 }
             }
-            ExitCode::SUCCESS
+            std::process::ExitCode::SUCCESS
         }
         Err(error) => {
             eprintln!("error: {error}");
-            ExitCode::FAILURE
+            std::process::ExitCode::FAILURE
         }
     }
 }
 
-/// One reviewer decision, reported after the terminal is restored.
-enum Decision {
-    Moved {
-        number: String,
-        destination: PathBuf,
-        changed: usize,
-    },
-    Clarified {
-        number: String,
-        path: PathBuf,
-    },
-    Skipped {
-        number: String,
-    },
-    Failed {
-        number: String,
-        error: String,
-    },
+/// What happened to one issue's note.
+enum NoteOutcome {
+    Appended { number: String, path: PathBuf, chars: usize },
+    Skipped { number: String },
 }
 
-impl std::fmt::Display for Decision {
+impl std::fmt::Display for NoteOutcome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Decision::Moved {
-                number,
-                destination,
-                changed,
-            } => {
-                write!(f, "issue {number}: approved — moved to {}", destination.display())?;
-                if *changed == 0 {
-                    write!(
-                        f,
-                        "\nwarning: issue {number}: the render is unchanged from the capture \
-                         (vacuous fixture — the fix may not be in the working tree)"
-                    )
-                } else {
-                    write!(f, " ({changed} cells differ from the capture)")
-                }
+            NoteOutcome::Appended { number, path, chars } => {
+                write!(f, "issue {number}: appended a {chars}-char note to {}", path.display())
             }
-            Decision::Clarified { number, path } => write!(
-                f,
-                "issue {number}: rejected — appended a clarification to {}",
-                path.display()
-            ),
-            Decision::Skipped { number } => write!(f, "issue {number}: skipped"),
-            Decision::Failed { number, error } => {
-                write!(f, "issue {number}: FAILED — {error}")
-            }
+            NoteOutcome::Skipped { number } => write!(f, "issue {number}: no note"),
         }
     }
 }
@@ -183,55 +141,76 @@ struct IssueView {
     panes: [Vec<Vec<Glyph>>; 3],
     pane_width: u16,
     pane_height: u16,
-    /// Cells that differ between the capture and the current render. `0` means
-    /// the working tree still reproduces the capture (no candidate fix).
-    changed: usize,
+    /// The issue's `issue.md`, shown (re-flowed) beside the pictures.
+    document: String,
 }
 
 fn run(
     target: Option<&str>,
     all: bool,
-    ready: bool,
-    flags_path: Option<PathBuf>,
+    issues_dir: Option<PathBuf>,
     margin: u32,
     crop: bool,
-) -> Result<Vec<Decision>, String> {
-    let issue_dirs: Vec<PathBuf> = if all || ready {
-        if flags_path.is_some() {
-            return Err("--flags applies to a single issue; not with --all/--ready".to_string());
-        }
-        discover_open_issues()?
+) -> Result<Vec<NoteOutcome>, String> {
+    let base = issues_dir.unwrap_or_else(snapshot::issues_dir);
+    let issue_dirs = if all || target.is_none() {
+        discover_open_issues(&base)?
     } else {
-        vec![resolve_issue_dir(target.expect("target checked in main"))?]
+        vec![resolve_issue_dir(target.unwrap(), &base)?]
     };
+    if issue_dirs.is_empty() {
+        return Err("no open issues to review".to_string());
+    }
 
     let mut views = Vec::new();
     for issue_dir in &issue_dirs {
-        views.push(load_view(issue_dir, flags_path.as_deref(), margin, crop)?);
-    }
-    if ready {
-        views.retain(|view| view.changed > 0);
-    }
-    if views.is_empty() {
-        return Err(if ready {
-            "no issues are ready for review (the render still matches every capture)".to_string()
-        } else {
-            "no open issues to review".to_string()
-        });
+        views.push(load_view(issue_dir, margin, crop)?);
     }
 
     let mut app = ReviewApp::new(views);
     run_tui(&mut app)
 }
 
-/// Every open capture under `issues/`, numerically sorted. `issues/solved/` and
-/// non-capture entries are skipped.
-fn discover_open_issues() -> Result<Vec<PathBuf>, String> {
-    let issues = snapshot::issues_dir()
+// --- issue / flags ---
+
+fn resolve_issue_dir(target: &str, base: &Path) -> Result<PathBuf, String> {
+    let path = if target.chars().all(|c| c.is_ascii_digit()) {
+        base.join(format!("{:04}", target.parse::<u32>().map_err(|e| e.to_string())?))
+    } else {
+        let candidate = PathBuf::from(target);
+        if candidate.is_absolute() {
+            candidate
+        } else {
+            base.join(target)
+        }
+    };
+    let path = path
         .canonicalize()
-        .map_err(|error| format!("could not locate issues/: {error}"))?;
+        .map_err(|error| format!("no capture at {}: {error}", path.display()))?;
+    if !path.join("snapshot").join("game_state.json").exists() {
+        return Err(format!(
+            "no capture at {} (expected snapshot/game_state.json)",
+            path.display()
+        ));
+    }
+    let solved = base
+        .canonicalize()
+        .map(|base| base.join("solved"))
+        .unwrap_or_else(|_| base.join("solved"));
+    if path.starts_with(&solved) {
+        return Err(format!("{} is archived under issues/solved/", path.display()));
+    }
+    Ok(path)
+}
+
+/// Every open capture under `base`, numerically sorted. `solved/` and
+/// non-capture entries are skipped.
+fn discover_open_issues(base: &Path) -> Result<Vec<PathBuf>, String> {
+    let base = base
+        .canonicalize()
+        .map_err(|error| format!("could not locate {}: {error}", base.display()))?;
     let mut dirs = Vec::new();
-    for entry in std::fs::read_dir(&issues).map_err(|error| error.to_string())? {
+    for entry in std::fs::read_dir(&base).map_err(|error| error.to_string())? {
         let path = entry.map_err(|error| error.to_string())?.path();
         if !path.is_dir() {
             continue;
@@ -245,97 +224,6 @@ fn discover_open_issues() -> Result<Vec<PathBuf>, String> {
     }
     dirs.sort();
     Ok(dirs)
-}
-
-/// Load one capture: read its flags, render the current tree as "after", crop
-/// the flagged regions ∪ player once for all three panes, and count how many
-/// cells differ from the capture.
-fn load_view(
-    issue_dir: &Path,
-    flags_override: Option<&Path>,
-    margin: u32,
-    crop: bool,
-) -> Result<IssueView, String> {
-    let snapshot_dir = issue_dir.join("snapshot");
-    let number = issue_dir
-        .file_name()
-        .and_then(|name| name.to_str())
-        .map(str::to_owned)
-        .unwrap_or_default();
-
-    let flags_path = flags_override
-        .map(PathBuf::from)
-        .unwrap_or_else(|| issue_dir.join("flags.json"));
-    let regions = load_flags(&flags_path)?;
-
-    let before_rows = debug::parse_screen_text_file(&snapshot_dir.join("screen.txt"))?;
-    let before = cells_to_buffer(&before_rows);
-    let (after, player) = debug::render_snapshot_headless_buffer(&snapshot_dir)?;
-    if before.len() != after.len() || before[0].len() != after[0].len() {
-        return Err(format!(
-            "{}: capture size {}x{} does not match the render {}x{}",
-            issue_dir.display(),
-            before.len(),
-            before[0].len(),
-            after.len(),
-            after[0].len(),
-        ));
-    }
-    let (width, height) = (before.len(), before[0].len());
-    let crop = if crop {
-        Crop::around(&regions, player, width, height, margin)
-    } else {
-        Crop {
-            x0: 0,
-            x1: width,
-            y0: 0,
-            y1: height,
-        }
-    };
-
-    let changed = count_changes(&before_rows, &after);
-    let (panes, pane_width, pane_height) = build_panes(&before, &after, &crop, &regions, player);
-    Ok(IssueView {
-        number,
-        issue_dir: issue_dir.to_path_buf(),
-        panes,
-        pane_width,
-        pane_height,
-        changed,
-    })
-}
-
-// --- issue / flags ---
-
-fn resolve_issue_dir(target: &str) -> Result<PathBuf, String> {
-    let issues = snapshot::issues_dir();
-    let path = if target.chars().all(|c| c.is_ascii_digit()) {
-        issues.join(format!("{:04}", target.parse::<u32>().map_err(|e| e.to_string())?))
-    } else {
-        let candidate = PathBuf::from(target);
-        if candidate.is_absolute() {
-            candidate
-        } else {
-            issues.join(target)
-        }
-    };
-    let path = path
-        .canonicalize()
-        .map_err(|error| format!("no capture at {}: {error}", path.display()))?;
-    if !path.join("snapshot").join("game_state.json").exists() {
-        return Err(format!(
-            "no capture at {} (expected snapshot/game_state.json)",
-            path.display()
-        ));
-    }
-    let solved = issues
-        .canonicalize()
-        .map(|issues| issues.join("solved"))
-        .unwrap_or_else(|_| issues.join("solved"));
-    if path.starts_with(&solved) {
-        return Err(format!("{} is already archived under issues/solved/", path.display()));
-    }
-    Ok(path)
 }
 
 /// Read `flags.json`, accepting both schemas: the newer `world`/`screen` pair
@@ -398,22 +286,53 @@ fn cells_to_buffer(rows: &[Vec<debug::Cell>]) -> Vec<Vec<Glyph>> {
     buffer
 }
 
-/// Cells whose character or colors differ between the capture and the render.
-/// `0` means the working tree still reproduces the capture.
-fn count_changes(before: &[Vec<debug::Cell>], after: &[Vec<Glyph>]) -> usize {
-    let mut changed = 0;
-    for (y, row) in before.iter().enumerate() {
-        for (x, cell) in row.iter().enumerate() {
-            let glyph = after[x][y];
-            if cell.character != glyph.character
-                || cell.fg != glyph.fg_color
-                || cell.bg != glyph.bg_color
-            {
-                changed += 1;
-            }
-        }
+/// Load one capture: read its flags, render the current tree as "after", crop
+/// the flagged regions ∪ player once for all three panes.
+fn load_view(issue_dir: &Path, margin: u32, crop: bool) -> Result<IssueView, String> {
+    let snapshot_dir = issue_dir.join("snapshot");
+    let number = issue_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_owned)
+        .unwrap_or_default();
+
+    let regions = load_flags(&issue_dir.join("flags.json"))?;
+
+    let before_rows = debug::parse_screen_text_file(&snapshot_dir.join("screen.txt"))?;
+    let before = cells_to_buffer(&before_rows);
+    let (after, player) = debug::render_snapshot_headless_buffer(&snapshot_dir)?;
+    if before.len() != after.len() || before[0].len() != after[0].len() {
+        return Err(format!(
+            "{}: capture size {}x{} does not match the render {}x{}",
+            issue_dir.display(),
+            before.len(),
+            before[0].len(),
+            after.len(),
+            after[0].len(),
+        ));
     }
-    changed
+    let (width, height) = (before.len(), before[0].len());
+    let crop = if crop {
+        Crop::around(&regions, player, width, height, margin)
+    } else {
+        Crop {
+            x0: 0,
+            x1: width,
+            y0: 0,
+            y1: height,
+        }
+    };
+
+    let (panes, pane_width, pane_height) = build_panes(&before, &after, &crop, &regions, player);
+    let document = std::fs::read_to_string(issue_dir.join("issue.md")).unwrap_or_default();
+    Ok(IssueView {
+        number,
+        issue_dir: issue_dir.to_path_buf(),
+        panes,
+        pane_width,
+        pane_height,
+        document,
+    })
 }
 
 // --- crop & panes ---
@@ -520,32 +439,58 @@ fn build_panes(
     (panes, width as u16, height as u16)
 }
 
+// --- note ---
+
+/// Append the note to `issue.md` unless it is empty or the file is absent.
+/// Returns the outcome; the file is left untouched when skipped.
+fn save_note(issue_dir: &Path, number: &str, text: &str) -> Result<NoteOutcome, String> {
+    let path = issue_dir.join("issue.md");
+    let trimmed = text.trim_end();
+    if trimmed.trim().is_empty() || !path.exists() {
+        return Ok(NoteOutcome::Skipped {
+            number: number.to_owned(),
+        });
+    }
+    let mut contents = std::fs::read_to_string(&path)
+        .map_err(|error| format!("could not read {}: {error}", path.display()))?;
+    if !contents.ends_with('\n') {
+        contents.push('\n');
+    }
+    contents.push_str(&format!(
+        "\n## Appended note ({})\n\n{trimmed}\n",
+        snapshot::today_utc()
+    ));
+    std::fs::write(&path, contents)
+        .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+    Ok(NoteOutcome::Appended {
+        number: number.to_owned(),
+        path,
+        chars: trimmed.chars().count(),
+    })
+}
+
 // --- TUI ---
 
-/// How the three panes are shown for the current terminal size.
+/// How the panes are shown; there is no hotkey to change it.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Layout {
     SideBySide,
     Stacked,
-    Cycle,
 }
 
 enum Action {
     None,
     Redraw,
-    Approve,
-    SaveClarification,
-    Skip,
+    Save,
     Cancel,
 }
 
 struct ReviewApp {
     views: Vec<IssueView>,
     index: usize,
-    labels: [&'static str; 3],
-    cycle: usize,
-    editing: bool,
     editor: TextBuffer,
+    /// Scroll offset (lines) of the re-flowed issue document.
+    document_scroll: usize,
     term_width: u16,
     term_height: u16,
     last: HashMap<(u16, u16), Glyph>,
@@ -558,10 +503,8 @@ impl ReviewApp {
         ReviewApp {
             views,
             index: 0,
-            labels: ["before", "before-marked", "after"],
-            cycle: 0,
-            editing: false,
             editor: TextBuffer::new(),
+            document_scroll: 0,
             term_width,
             term_height,
             last: HashMap::new(),
@@ -576,44 +519,11 @@ impl ReviewApp {
     /// Move to the next issue; `false` when the queue is exhausted.
     fn advance(&mut self) -> bool {
         self.index += 1;
-        self.editing = false;
         self.editor = TextBuffer::new();
-        self.cycle = 0;
+        self.document_scroll = 0;
         self.last.clear();
         self.dirty = true;
         self.index < self.views.len()
-    }
-
-    fn layout(&self) -> Layout {
-        let w = self.term_width as usize;
-        let h = self.term_height as usize;
-        let (pw, ph) = (
-            self.current().pane_width as usize,
-            self.current().pane_height as usize,
-        );
-        if 3 * pw + 2 <= w && ph + 3 <= h {
-            Layout::SideBySide
-        } else if ph * 3 + 4 <= h {
-            Layout::Stacked
-        } else {
-            Layout::Cycle
-        }
-    }
-
-    /// Terminal rects for each pane (x, y, visible), plus the editor/help rows.
-    fn pane_rects(&self) -> (Vec<(u16, u16)>, u16) {
-        let (pw, ph) = (self.current().pane_width, self.current().pane_height);
-        match self.layout() {
-            Layout::SideBySide => {
-                let origins = (0..3).map(|i| (i as u16 * (pw + 1), 2)).collect();
-                (origins, 2 + ph)
-            }
-            Layout::Stacked => {
-                let origins = (0..3).map(|i| (0u16, 2 + i as u16 * (ph + 1))).collect();
-                (origins, 2 + 3 * (ph + 1))
-            }
-            Layout::Cycle => (vec![(0, 2)], 2 + ph),
-        }
     }
 
     fn editor_rect(&self) -> Rect {
@@ -626,76 +536,73 @@ impl ReviewApp {
         }
     }
 
-    fn handle_event(&mut self, event: Event) -> Action {
-        if self.editing {
-            return self.handle_editor(event);
+    /// The issue-document column on the right, or `None` when the terminal is
+    /// too narrow (the pictures then get the full width).
+    fn document_rect(&self, editor_top: u16) -> Option<Rect> {
+        if self.term_width < 80 || self.current().document.is_empty() {
+            return None;
         }
-        match event {
-            Event::Key(Key::Char('y')) => Action::Approve,
-            Event::Key(Key::Char('n')) => {
-                self.editing = true;
-                Action::Redraw
-            }
-            Event::Key(Key::Char('s')) => Action::Skip,
-            Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => Action::Cancel,
-            Event::Key(Key::Char('[')) | Event::Key(Key::Char(']')) | Event::Key(Key::Char('\t'))
-                if self.layout() == Layout::Cycle =>
-            {
-                self.cycle = (self.cycle + 1) % 3;
-                Action::Redraw
-            }
-            _ => Action::None,
+        let width = (self.term_width / 3).clamp(24, 60);
+        let height = editor_top.saturating_sub(1);
+        if height < 3 || self.term_width - width < 40 {
+            return None;
+        }
+        Some(Rect {
+            x: self.term_width - width,
+            y: 1,
+            width,
+            height,
+        })
+    }
+
+    /// Side-by-side when the cropped width fits the left region, else stacked.
+    fn layout(&self, left_width: u16) -> Layout {
+        let pw = self.current().pane_width as usize;
+        if 3 * pw + 2 <= left_width as usize {
+            Layout::SideBySide
+        } else {
+            Layout::Stacked
         }
     }
 
-    fn handle_editor(&mut self, event: Event) -> Action {
+    fn pane_origins(&self, left_width: u16) -> Vec<(u16, u16)> {
+        let (pw, ph) = (self.current().pane_width, self.current().pane_height);
+        match self.layout(left_width) {
+            Layout::SideBySide => (0..3).map(|i| (i as u16 * (pw + 1), 2)).collect(),
+            Layout::Stacked => (0..3)
+                .map(|i| (0u16, 2 + i as u16 * (ph + 1)))
+                .collect(),
+        }
+    }
+
+    fn scroll_document(&mut self, pages: i32) {
+        let page = (self.term_height as i32 / 2).max(1);
+        let next = self.document_scroll as i32 + pages * page;
+        self.document_scroll = next.max(0) as usize;
+    }
+
+    fn handle_event(&mut self, event: Event) -> Action {
+        // Any event may change what is drawn; the caller redraws on `Redraw`,
+        // and `advance` sets `dirty` itself.
+        self.dirty = true;
         match event {
-            Event::Key(Key::Ctrl('s')) => Action::SaveClarification,
-            Event::Key(Key::Esc) => {
-                self.editing = false;
+            Event::Key(Key::Ctrl('p')) => Action::Cancel,
+            Event::Key(Key::Ctrl('s')) => Action::Save,
+            Event::Key(Key::PageUp) => {
+                self.scroll_document(-1);
                 Action::Redraw
             }
-            Event::Key(Key::Char('\n')) | Event::Key(Key::Char('\r')) => {
-                self.editor.insert_newline();
+            Event::Key(Key::PageDown) => {
+                self.scroll_document(1);
                 Action::Redraw
             }
-            Event::Key(Key::Char(c)) if !c.is_control() => {
-                self.editor.insert_char(c);
-                Action::Redraw
+            other => {
+                if review_ui::edit_buffer(&mut self.editor, &other) {
+                    Action::Redraw
+                } else {
+                    Action::None
+                }
             }
-            Event::Key(Key::Backspace) => {
-                self.editor.backspace();
-                Action::Redraw
-            }
-            Event::Key(Key::Delete) => {
-                self.editor.delete();
-                Action::Redraw
-            }
-            Event::Key(Key::Left) => {
-                self.editor.move_left();
-                Action::Redraw
-            }
-            Event::Key(Key::Right) => {
-                self.editor.move_right();
-                Action::Redraw
-            }
-            Event::Key(Key::Up) => {
-                self.editor.move_up();
-                Action::Redraw
-            }
-            Event::Key(Key::Down) => {
-                self.editor.move_down();
-                Action::Redraw
-            }
-            Event::Key(Key::Home) => {
-                self.editor.home();
-                Action::Redraw
-            }
-            Event::Key(Key::End) => {
-                self.editor.end();
-                Action::Redraw
-            }
-            _ => Action::None,
         }
     }
 
@@ -713,48 +620,35 @@ impl ReviewApp {
         }
 
         self.put_line(&mut cells, 0, &self.title(), TITLE_FG, TITLE_BG);
-        let (origins, _) = self.pane_rects();
-        let layout = self.layout();
-        let editor_rect = if self.editing {
-            Some(self.editor_rect())
-        } else {
-            None
-        };
 
-        let visible: Vec<usize> = match layout {
-            Layout::Cycle => vec![self.cycle],
-            _ => vec![0, 1, 2],
-        };
-        for (slot, index) in origins.iter().zip(visible.iter()) {
-            let label = self.labels[*index];
-            self.put_pane_label(&mut cells, &label, *slot);
-            self.put_pane(&mut cells, *index, *slot, editor_rect);
+        let editor_rect = self.editor_rect();
+        let document_rect = self.document_rect(editor_rect.y);
+        let left_width = document_rect.map_or(self.term_width, |rect| rect.x);
+
+        let labels = ["before", "before-marked", "after"];
+        for (index, origin) in self.pane_origins(left_width).iter().enumerate() {
+            self.put_pane_label(&mut cells, labels[index], *origin, left_width, editor_rect.y);
+            self.put_pane(&mut cells, index, *origin, left_width, editor_rect.y);
         }
 
-        if let Some(rect) = editor_rect {
-            review_ui::draw_editor_pane(
-                &mut cells,
-                rect,
-                &self.editor,
-                " clarification (^S save, esc back) ",
-                EDITOR_COLORS,
-            );
-            self.put_line(
-                &mut cells,
-                self.term_height - 1,
-                " type your clarification; ^S to save it to issue.md",
-                HELP_FG,
-                HELP_BG,
-            );
-        } else {
-            self.put_line(
-                &mut cells,
-                self.term_height - 1,
-                &self.help(layout),
-                HELP_FG,
-                HELP_BG,
-            );
+        if let Some(rect) = document_rect {
+            self.draw_document(&mut cells, rect);
         }
+
+        review_ui::draw_editor_pane(
+            &mut cells,
+            editor_rect,
+            &self.editor,
+            " note (^S save & next, ^P cancel) ",
+            EDITOR_COLORS,
+        );
+        self.put_line(
+            &mut cells,
+            self.term_height - 1,
+            " magenta: flags   cyan: player   pgup/pgdn: scroll doc   ^S: save note & next   ^P: cancel",
+            HELP_FG,
+            HELP_BG,
+        );
 
         for (&cell, &glyph) in &cells {
             if self.last.get(&cell) != Some(&glyph) {
@@ -765,31 +659,60 @@ impl ReviewApp {
         out.flush().map_err(|error| error.to_string())
     }
 
+    /// Draw the re-flowed issue document in a bordered, scrollable pane.
+    fn draw_document(&self, cells: &mut HashMap<(u16, u16), Glyph>, rect: Rect) {
+        if rect.width < 4 || rect.height < 3 {
+            return;
+        }
+        let inner = rect.inner();
+        // Border.
+        for row in 0..rect.height {
+            for col in 0..rect.width {
+                let (cx, cy) = (rect.x + col, rect.y + row);
+                let character = if row == 0 || row == rect.height - 1 {
+                    if col == 0 || col == rect.width - 1 {
+                        '+'
+                    } else {
+                        '-'
+                    }
+                } else if col == 0 || col == rect.width - 1 {
+                    '|'
+                } else {
+                    ' '
+                };
+                let fg = if character == ' ' { DOC_FG } else { DOC_BORDER };
+                cells.insert((cx, cy), Glyph::new(character, fg, DOC_BG));
+            }
+        }
+        for (i, character) in " issue.md ".chars().enumerate() {
+            let cx = rect.x + 1 + i as u16;
+            if cx >= rect.x + rect.width - 1 {
+                break;
+            }
+            cells.insert((cx, rect.y), Glyph::new(character, DOC_BORDER, DOC_BG));
+        }
+
+        let lines = wrap_text(&self.current().document, inner.width as usize);
+        let max_scroll = lines.len().saturating_sub(inner.height as usize);
+        let scroll = self.document_scroll.min(max_scroll);
+        for (row, line) in lines.iter().skip(scroll).take(inner.height as usize).enumerate() {
+            let cy = inner.y + row as u16;
+            for (col, character) in line.chars().enumerate().take(inner.width as usize) {
+                cells.insert((inner.x + col as u16, cy), Glyph::new(character, DOC_FG, DOC_BG));
+            }
+        }
+    }
+
     fn title(&self) -> String {
         let position = if self.views.len() > 1 {
             format!(" ({}/{})", self.index + 1, self.views.len())
         } else {
             String::new()
         };
-        let readiness = if self.current().changed == 0 {
-            "  [unchanged from capture]"
-        } else {
-            ""
-        };
         format!(
-            "Issue {}{position} — approve move to issues/solved/?{readiness}   \
-             y: approve   n: no / clarify   s: skip   q: quit",
+            "Issue {}{position} — before | before-marked | after (after = current working tree)",
             self.current().number
         )
-    }
-
-    fn help(&self, layout: Layout) -> String {
-        let mode = match layout {
-            Layout::SideBySide => "before | before-marked | after",
-            Layout::Stacked => "before / before-marked / after (stacked)",
-            Layout::Cycle => "one pane — [ ] / tab to cycle",
-        };
-        format!(" {mode}    magenta: flagged regions    cyan: player")
     }
 
     fn put_line(&self, cells: &mut HashMap<(u16, u16), Glyph>, row: u16, text: &str, fg: RGB8, bg: RGB8) {
@@ -801,11 +724,21 @@ impl ReviewApp {
         }
     }
 
-    fn put_pane_label(&self, cells: &mut HashMap<(u16, u16), Glyph>, label: &str, origin: (u16, u16)) {
+    fn put_pane_label(
+        &self,
+        cells: &mut HashMap<(u16, u16), Glyph>,
+        label: &str,
+        origin: (u16, u16),
+        right: u16,
+        bottom: u16,
+    ) {
         let row = origin.1.saturating_sub(1);
+        if row >= bottom {
+            return;
+        }
         for (i, character) in label.chars().enumerate() {
             let x = origin.0 + i as u16;
-            if x >= self.term_width || row >= self.term_height {
+            if x >= right || row >= self.term_height {
                 break;
             }
             cells.insert((x, row), Glyph::new(character, TITLE_FG, TITLE_BG));
@@ -817,20 +750,16 @@ impl ReviewApp {
         cells: &mut HashMap<(u16, u16), Glyph>,
         index: usize,
         origin: (u16, u16),
-        editor_rect: Option<Rect>,
+        right: u16,
+        bottom: u16,
     ) {
         let view = self.current();
         let pane = &view.panes[index];
         for x in 0..view.pane_width {
             for y in 0..view.pane_height {
                 let (cx, cy) = (origin.0 + x, origin.1 + y);
-                if cx >= self.term_width || cy >= self.term_height - 1 {
+                if cx >= right || cy >= bottom {
                     continue;
-                }
-                if let Some(rect) = editor_rect {
-                    if rect.contains(cx, cy) {
-                        continue;
-                    }
                 }
                 cells.insert((cx, cy), pane[x as usize][y as usize]);
             }
@@ -838,7 +767,45 @@ impl ReviewApp {
     }
 }
 
-fn run_tui(app: &mut ReviewApp) -> Result<Vec<Decision>, String> {
+/// Greedy word-wrap `text` to `width` characters, preserving blank lines.
+/// Words longer than `width` are hard-broken.
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for raw in text.lines() {
+        if raw.trim().is_empty() {
+            out.push(String::new());
+            continue;
+        }
+        let mut line = String::new();
+        for word in raw.split_whitespace() {
+            let mut word = word.to_string();
+            while word.chars().count() > width {
+                if !line.is_empty() {
+                    out.push(std::mem::take(&mut line));
+                }
+                let head: String = word.chars().take(width).collect();
+                out.push(head);
+                word = word.chars().skip(width).collect();
+            }
+            if line.is_empty() {
+                line = word;
+            } else if line.chars().count() + 1 + word.chars().count() <= width {
+                line.push(' ');
+                line.push_str(&word);
+            } else {
+                out.push(std::mem::take(&mut line));
+                line = word;
+            }
+        }
+        out.push(line);
+    }
+    out
+}
+
+fn run_tui(app: &mut ReviewApp) -> Result<Vec<NoteOutcome>, String> {
     let mut out = stdout().into_raw_mode().map_err(|error| error.to_string())?;
     let _ = write!(out, "{}{}", ToAlternateScreen, cursor::Hide);
 
@@ -852,8 +819,8 @@ fn run_tui(app: &mut ReviewApp) -> Result<Vec<Decision>, String> {
     result
 }
 
-fn tui_loop(app: &mut ReviewApp, out: &mut impl Write) -> Result<Vec<Decision>, String> {
-    let mut decisions = Vec::new();
+fn tui_loop(app: &mut ReviewApp, out: &mut impl Write) -> Result<Vec<NoteOutcome>, String> {
+    let mut outcomes = Vec::new();
     app.draw(out)?;
     let stdin = std::io::stdin();
     for event in stdin.events() {
@@ -861,145 +828,19 @@ fn tui_loop(app: &mut ReviewApp, out: &mut impl Write) -> Result<Vec<Decision>, 
         match app.handle_event(event) {
             Action::None => {}
             Action::Redraw => app.draw(out)?,
-            Action::Approve => {
+            Action::Save => {
                 let issue_dir = app.current().issue_dir.clone();
                 let number = app.current().number.clone();
-                decisions.push(match move_to_solved(&issue_dir, &number) {
-                    Ok(decision) => decision,
-                    Err(error) => Decision::Failed { number, error },
-                });
+                outcomes.push(save_note(&issue_dir, &number, &app.editor.text())?);
                 if !app.advance() {
-                    return Ok(decisions);
+                    return Ok(outcomes);
                 }
                 app.draw(out)?;
             }
-            Action::SaveClarification => {
-                let issue_dir = app.current().issue_dir.clone();
-                let number = app.current().number.clone();
-                decisions.push(match append_clarification(&issue_dir, &app.editor.text()) {
-                    Ok(path) => Decision::Clarified { number, path },
-                    Err(error) => Decision::Failed { number, error },
-                });
-                if !app.advance() {
-                    return Ok(decisions);
-                }
-                app.draw(out)?;
-            }
-            Action::Skip => {
-                decisions.push(Decision::Skipped {
-                    number: app.current().number.clone(),
-                });
-                if !app.advance() {
-                    return Ok(decisions);
-                }
-                app.draw(out)?;
-            }
-            Action::Cancel => return Ok(decisions),
+            Action::Cancel => return Ok(outcomes),
         }
     }
-    Ok(decisions)
-}
-
-// --- move / clarify ---
-
-/// Archive the issue: preserve the original capture as `screen.pre-fix.txt`,
-/// bless the current render into `screen.txt`, and `git mv` the directory to
-/// `issues/solved/`. A render identical to the pre-fix capture is a warning,
-/// not a blocker (the reviewer may still accept the picture).
-fn move_to_solved(issue_dir: &Path, number: &str) -> Result<Decision, String> {
-    let issues = snapshot::issues_dir();
-    let repo_root = issues
-        .parent()
-        .ok_or_else(|| "could not locate the repository root".to_string())?
-        .canonicalize()
-        .map_err(|error| format!("could not resolve the repository root: {error}"))?;
-    let (destination, changed) = archive_issue(&repo_root, issue_dir)?;
-    Ok(Decision::Moved {
-        number: number.to_owned(),
-        destination,
-        changed,
-    })
-}
-
-/// The move itself, against an explicit repository root so it is testable.
-/// The issue must be tracked (as live captures are): `git mv` refuses an
-/// untracked path.
-fn archive_issue(repo_root: &Path, issue_dir: &Path) -> Result<(PathBuf, usize), String> {
-    archive_issue_with_env(repo_root, issue_dir, &[])
-}
-
-/// [`archive_issue`], but clearing the listed environment variables from the
-/// `git` child. Production inherits the ambient repo (the sandbox exports
-/// `GIT_DIR`/`GIT_WORK_TREE`); tests pass those names to bind `git` to their
-/// own temporary repository.
-fn archive_issue_with_env(
-    repo_root: &Path,
-    issue_dir: &Path,
-    clear_env: &[&str],
-) -> Result<(PathBuf, usize), String> {
-    let snapshot = issue_dir.join("snapshot");
-    let screen_txt = snapshot.join("screen.txt");
-    let pre_fix = snapshot.join("screen.pre-fix.txt");
-    if !pre_fix.exists() {
-        std::fs::copy(&screen_txt, &pre_fix)
-            .map_err(|error| format!("could not preserve {}: {error}", pre_fix.display()))?;
-    }
-    debug::bless_snapshot(&snapshot)?;
-
-    let changed = {
-        let pre = debug::parse_screen_text_file(&pre_fix)?;
-        let fixed = debug::parse_screen_text_file(&screen_txt)?;
-        debug::diff_cells(&pre, &fixed).len()
-    };
-
-    let from = issue_dir
-        .strip_prefix(repo_root)
-        .map_err(|_| format!("{} is not under {}", issue_dir.display(), repo_root.display()))?;
-    let name = issue_dir
-        .file_name()
-        .ok_or_else(|| "issue directory has no name".to_string())?;
-    let to = Path::new("issues").join("solved").join(name);
-    // `git mv` won't create the destination's parent directory.
-    std::fs::create_dir_all(repo_root.join("issues").join("solved"))
-        .map_err(|error| format!("could not create issues/solved: {error}"))?;
-    let mut command = Command::new("git");
-    command
-        .arg("mv")
-        .arg(from)
-        .arg(&to)
-        .current_dir(repo_root);
-    for key in clear_env {
-        command.env_remove(key);
-    }
-    let output = command
-        .output()
-        .map_err(|error| format!("could not run git: {error}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git mv failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok((repo_root.join(&to), changed))
-}
-
-/// Append a dated `## Clarification` section to the issue note, leaving the
-/// original text untouched.
-fn append_clarification(issue_dir: &Path, text: &str) -> Result<PathBuf, String> {
-    let path = issue_dir.join("issue.md");
-    let mut contents = std::fs::read_to_string(&path)
-        .map_err(|error| format!("could not read {}: {error}", path.display()))?;
-    if !contents.ends_with('\n') {
-        contents.push('\n');
-    }
-    contents.push_str(&format!(
-        "\n## Clarification ({})\n\n{}\n",
-        snapshot::today_utc(),
-        text.trim_end()
-    ));
-    std::fs::write(&path, contents)
-        .map_err(|error| format!("could not write {}: {error}", path.display()))?;
-    Ok(path)
+    Ok(outcomes)
 }
 
 #[cfg(test)]
@@ -1015,22 +856,28 @@ mod tests {
         }
     }
 
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "ir_{tag}_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
     #[test]
     fn flags_parse_both_schemas() {
         let new = r#"[{"world": [[1,2],[3,4]], "screen": [[5,6],[7,8]]}]"#;
         let old = r#"[{"region": [[1,2],[3,4]], "screen_region": [[5,6],[7,8]],
                         "squares": [{"world":[1,2],"screen":[5,6],"summary":"x"}]}]"#;
         for text in [new, old] {
-            let dir = std::env::temp_dir().join(format!(
-                "ir_flags_{}.json",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos()
-            ));
-            std::fs::write(&dir, text).unwrap();
-            let regions = load_flags(&dir).unwrap();
-            std::fs::remove_file(&dir).ok();
+            let path = temp_dir("flags").join("flags.json");
+            std::fs::write(&path, text).unwrap();
+            let regions = load_flags(&path).unwrap();
+            std::fs::remove_dir_all(path.parent().unwrap()).ok();
             assert_eq!(regions.len(), 1);
             assert_eq!(regions[0].screen_min, ScreenBufferSquare::new(5, 6));
             assert_eq!(regions[0].screen_max, ScreenBufferSquare::new(7, 8));
@@ -1059,31 +906,19 @@ mod tests {
     #[test]
     fn crop_clamps_to_the_capture() {
         let regions = [region((0, 0), (1, 1))];
-        let crop = Crop::around(
-            &regions,
-            ScreenBufferSquare::new(0, 0),
-            20,
-            10,
-            100,
-        );
+        let crop = Crop::around(&regions, ScreenBufferSquare::new(0, 0), 20, 10, 100);
         assert_eq!((crop.x0, crop.y0), (0, 0));
         assert_eq!((crop.x1, crop.y1), (20, 10));
     }
 
     #[test]
     fn panels_share_one_crop_size() {
-        let width = 8;
-        let height = 6;
-        let before: Vec<Vec<Glyph>> =
-            vec![vec![blank_glyph(); height]; width];
+        let (width, height) = (8, 6);
+        let before: Vec<Vec<Glyph>> = vec![vec![blank_glyph(); height]; width];
         let after = before.clone();
-        let crop = Crop {
-            x0: 2,
-            x1: 6,
-            y0: 1,
-            y1: 5,
-        };
-        let (panes, pw, ph) = build_panes(&before, &after, &crop, &[], ScreenBufferSquare::new(1, 1));
+        let crop = Crop { x0: 2, x1: 6, y0: 1, y1: 5 };
+        let (panes, pw, ph) =
+            build_panes(&before, &after, &crop, &[], ScreenBufferSquare::new(1, 1));
         assert_eq!((pw as usize, ph as usize), (4, 4));
         assert_eq!(panes[0].len(), panes[1].len());
         assert_eq!(panes[1].len(), panes[2].len());
@@ -1092,16 +927,10 @@ mod tests {
 
     #[test]
     fn flagged_cells_are_tinted_in_the_marked_pane_only() {
-        let width = 6;
-        let height = 6;
+        let (width, height) = (6, 6);
         let before = vec![vec![blank_glyph(); height]; width];
         let after = before.clone();
-        let crop = Crop {
-            x0: 0,
-            x1: width,
-            y0: 0,
-            y1: height,
-        };
+        let crop = Crop { x0: 0, x1: width, y0: 0, y1: height };
         let regions = [region((1, 1), (1, 1))];
         let (panes, _, _) =
             build_panes(&before, &after, &crop, &regions, ScreenBufferSquare::new(9, 9));
@@ -1110,110 +939,50 @@ mod tests {
     }
 
     #[test]
-    fn clarification_appends_without_losing_the_original() {
-        let dir = std::env::temp_dir().join(format!(
-            "ir_clarify_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
+    fn note_appends_with_a_dated_header_and_preserves_the_original() {
+        let dir = temp_dir("note");
         std::fs::write(dir.join("issue.md"), "# Issue 0042\n\noriginal body\n").unwrap();
-        let path = append_clarification(&dir, "  still wrong on the east side  ").unwrap();
-        let text = std::fs::read_to_string(&path).unwrap();
+        let outcome = save_note(&dir, "0042", "  still wrong on the east side  ").unwrap();
+        let text = std::fs::read_to_string(dir.join("issue.md")).unwrap();
         std::fs::remove_dir_all(&dir).ok();
         assert!(text.contains("original body"));
-        assert!(text.contains("## Clarification ("));
+        assert!(text.contains("## Appended note ("));
         assert!(text.contains("still wrong on the east side"));
+        assert!(matches!(outcome, NoteOutcome::Appended { .. }));
     }
 
     #[test]
-    fn count_changes_detects_differing_cells() {
-        let before = vec![vec![
-            debug::Cell {
-                character: 'a',
-                fg: RGB8::new(0, 0, 0),
-                bg: RGB8::new(0, 0, 0),
-            },
-            debug::Cell {
-                character: 'b',
-                fg: RGB8::new(0, 0, 0),
-                bg: RGB8::new(0, 0, 0),
-            },
-        ]];
-        let mut after = cells_to_buffer(&before);
-        assert_eq!(count_changes(&before, &after), 0);
-        after[0][0] = Glyph::new('a', RGB8::new(255, 0, 0), RGB8::new(0, 0, 0));
-        assert_eq!(count_changes(&before, &after), 1);
-    }
-
-    fn test_git(dir: &Path, args: &[&str]) {
-        let status = Command::new("git")
-            .args(args)
-            // The sandbox exports GIT_DIR/GIT_WORK_TREE; don't let the test
-            // operate on the host repo.
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .current_dir(dir)
-            .status()
-            .expect("run git");
-        assert!(status.success(), "git {args:?} failed");
-    }
-
-    fn copy_dir(from: &Path, to: &Path) {
-        std::fs::create_dir_all(to).unwrap();
-        for entry in std::fs::read_dir(from).unwrap() {
-            let entry = entry.unwrap();
-            let source = entry.path();
-            let destination = to.join(entry.file_name());
-            if source.is_dir() {
-                copy_dir(&source, &destination);
-            } else {
-                std::fs::copy(&source, &destination).unwrap();
-            }
-        }
+    fn empty_note_is_skipped_and_leaves_the_file_untouched() {
+        let dir = temp_dir("skip");
+        let path = dir.join("issue.md");
+        std::fs::write(&path, "# Issue 0042\n\noriginal body\n").unwrap();
+        let before = std::fs::read_to_string(&path).unwrap();
+        let outcome = save_note(&dir, "0042", "   \n  ").unwrap();
+        let after = std::fs::read_to_string(&path).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(before, after);
+        assert!(matches!(outcome, NoteOutcome::Skipped { .. }));
     }
 
     #[test]
-    fn archive_moves_the_issue_and_preserves_the_pre_fix_capture() {
-        let base = std::env::temp_dir().join(format!(
-            "ir_archive_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let issue = base.join("issues/0027");
-        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../issues/0027/snapshot");
-        copy_dir(&source, &issue.join("snapshot"));
+    fn note_is_skipped_when_issue_md_is_absent() {
+        let dir = temp_dir("absent");
+        let outcome = save_note(&dir, "0042", "a real note").unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(matches!(outcome, NoteOutcome::Skipped { .. }));
+    }
 
-        test_git(&base, &["init", "-q"]);
-        test_git(&base, &["add", "-A"]);
-        test_git(
-            &base,
-            &[
-                "-c",
-                "user.email=test@example.com",
-                "-c",
-                "user.name=test",
-                "commit",
-                "-qm",
-                "seed",
-            ],
+    #[test]
+    fn wrap_text_reflows_words_and_hard_breaks_long_ones() {
+        assert_eq!(
+            wrap_text("the quick brown fox jumps", 10),
+            vec!["the quick", "brown fox", "jumps"]
         );
-
-        let (destination, _changed) =
-            archive_issue_with_env(&base, &issue, &["GIT_DIR", "GIT_WORK_TREE"]).unwrap();
-
-        assert!(!issue.exists(), "the original directory is moved, not copied");
-        let snapshot = destination.join("snapshot");
-        assert!(snapshot.join("screen.txt").exists());
-        assert!(
-            snapshot.join("screen.pre-fix.txt").exists(),
-            "the original capture is preserved as the pre-fix render"
+        assert_eq!(
+            wrap_text("supercalifragilistic", 6),
+            vec!["superc", "alifra", "gilist", "ic"]
         );
-
-        std::fs::remove_dir_all(&base).ok();
+        assert_eq!(wrap_text("a\n\nb", 10), vec!["a", "", "b"]);
+        assert!(wrap_text("anything", 0).is_empty());
     }
 }
