@@ -57,6 +57,14 @@ that performed the `git mv` itself was dropped in favour of this.)
   shown word-wrapped in a scrollable right-hand column (`PageUp`/`PageDown`) on
   wide terminals. `wrap_text` unit test, and the pty sweep test now asserts a
   keystroke produces output growth (shown to fail before the `dirty` fix).
+- **Dynamic crop, clean panes (reviewer feedback)**: the crop now shows as much
+  of the frame as the pane fits, windowed around the flagged regions (or the
+  frame center when there are none); the layout (side-by-side vs stacked) is
+  whichever shows more. The magenta region overlay is confined to
+  `before-marked` — `before` and `after` are clean and directly comparable — and
+  the player marker is gone. `--margin`/`--no-crop` are removed (behaviour is
+  automatic). The motion-playback idea for animation-only bugs (issue 0023) is
+  recorded in `docs/vision/ideas.md` and the plan's Future section.
 
 ---
 

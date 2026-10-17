@@ -218,3 +218,7 @@ gate-dropped depth-1 portal wall (`col abs(16,14)`). Drawing it is limitation 2.
 ## Appended note (2026-10-16)
 
 Issue remains.  Highlighted region does not show side of cube as expected.
+
+## Appended note (2026-10-17)
+
+Remains valid

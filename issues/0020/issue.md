@@ -159,3 +159,7 @@ limitation 1; the dropped wall is limitation 2.
 ## Appended note (2026-10-16)
 
 Issue reviewer crops too much to see the issue.
+
+## Appended note (2026-10-17)
+
+Portal tint appears at least partially resolved. Still can't see block edges outside of portal

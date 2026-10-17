@@ -1365,7 +1365,7 @@ pub mod debug {
     use regex::Regex;
     use rgb::RGB8;
     use terminal_rendering::glyph::Glyph;
-    use terminal_rendering::{ScreenBufferCharacterSquare, ScreenBufferSquare};
+    use terminal_rendering::ScreenBufferCharacterSquare;
     use utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
 
     use crate::fov_stuff::FieldOfViewResult;
@@ -1427,16 +1427,11 @@ pub mod debug {
     }
 
     /// The same headless render, but the screen buffer itself (`[x][y]`, one
-    /// `Glyph` per character column) plus the player's screen square, instead
-    /// of the ANSI encoding. The review TUI draws the `after` pane from this and
-    /// uses the player square for the shared crop, avoiding a round-trip.
-    pub fn render_snapshot_headless_buffer(
-        dir: &Path,
-    ) -> Result<(Vec<Vec<Glyph>>, ScreenBufferSquare), String> {
+    /// `Glyph` per character column) instead of the ANSI encoding. The review
+    /// TUI draws the `after` pane from this, avoiding a round-trip.
+    pub fn render_snapshot_headless_buffer(dir: &Path) -> Result<Vec<Vec<Glyph>>, String> {
         let game = render_snapshot_game(dir, &RenderToggles::default())?;
-        let screen = &game.graphics().screen;
-        let player = screen.world_square_to_screen_buffer_square(game.player_square());
-        Ok((screen.screen_buffer.clone(), player))
+        Ok(game.graphics().screen.screen_buffer.clone())
     }
 
     /// Load `dir/game_state.json`, apply pass toggles, and re-render headless at

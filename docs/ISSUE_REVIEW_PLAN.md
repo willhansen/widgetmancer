@@ -13,7 +13,7 @@ the note and acts.
 ## CLI
 
 ```
-issue_review [<NNNN|path>] [--all] [--issues-dir DIR] [--margin N] [--no-crop]
+issue_review [<NNNN|path>] [--all] [--issues-dir DIR]
 ```
 
 - No target (or `--all`) — sweep every open issue (`issues/*` with a
@@ -23,28 +23,30 @@ issue_review [<NNNN|path>] [--all] [--issues-dir DIR] [--margin N] [--no-crop]
   `snapshot::issues_dir()`. It also lets the tool review a checkout elsewhere,
   and lets the integration test run against a temporary copy instead of the
   real issue files.
-- `--margin N` — crop padding in screen squares (default 4).
-- `--no-crop` — show the whole capture.
 
 The repo-root `./issue-review` wrapper runs the bin through cargo (so the
 binary matches the sources), forwarding all arguments.
 
 ## Display
 
-Three panes sharing **one** crop: the union of the flagged regions and the
-player, padded by `--margin` and clamped to the capture.
+Three panes sharing **one** crop. The crop is **dynamic**: it shows as much of
+the frame as the pane fits, windowed around the flagged regions (or the frame
+center when there are none) and clamped to the frame. The layout — side-by-side
+or stacked — is whichever shows more of the frame. There is no hotkey to change
+either.
 
 | pane | content |
 |------|---------|
-| `before` | the saved capture (`screen.txt`) |
-| `before-marked` | the capture with flagged regions tinted magenta and the player tinted cyan |
-| `after` | a fresh render of the **current working tree** |
+| `before` | the saved capture (`screen.txt`), clean |
+| `before-marked` | the capture with flagged regions tinted magenta |
+| `after` | a fresh render of the **current working tree**, clean |
 
-Layout is automatic, with no hotkey to change it: side-by-side when the cropped
-width fits, otherwise stacked, otherwise clipped to what fits. The note editor
-is a sub-pane at the bottom, and — on a wide terminal — the issue's `issue.md`
-is shown, word-wrapped to the pane width, in a scrollable column on the right
-(`PageUp`/`PageDown`).
+`before` and `after` are deliberately free of overlays so they can be compared
+directly; only `before-marked` carries the region tint.
+
+The note editor is a sub-pane at the bottom, and — on a wide terminal — the
+issue's `issue.md` is shown, word-wrapped to the pane width, in a scrollable
+column on the right (`PageUp`/`PageDown`).
 
 ## Control scheme
 
@@ -93,3 +95,9 @@ terminal, passing input through the pty slave (the child's stdin):
 This supersedes an earlier interactive approve/reject design that performed the
 `git mv` to `issues/solved/` itself. That direction was dropped: movement is
 left to later processing, and the tool only records a note.
+
+## Future
+
+- **Animation.** A static `after` cannot show a motion bug (issue 0023). Play
+  back a few seconds by stepping the capture's logical time (or
+  `simulate_keys`) and rendering N frames. Recorded in `docs/vision/ideas.md`.

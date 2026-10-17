@@ -114,3 +114,7 @@ appearance.
 ## Appended note (2026-10-16)
 
 I can't tell if the issue is still present because the highlighted regions are still overlaid on the "after" section.
+
+## Appended note (2026-10-17)
+
+Appears fixed

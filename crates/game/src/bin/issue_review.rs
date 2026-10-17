@@ -35,9 +35,6 @@ use terminal_rendering::{ScreenBufferSquare, WorldSquare};
 /// Magenta tint on flagged regions, matching the in-game overlay.
 const FLAG_TINT: RGB8 = RGB8::new(255, 0, 255);
 const FLAG_STRENGTH: f32 = 0.45;
-/// Cyan tint marks the player, so the crop is orientable in every pane.
-const PLAYER_TINT: RGB8 = RGB8::new(0, 255, 255);
-const PLAYER_STRENGTH: f32 = 0.5;
 const TITLE_BG: RGB8 = RGB8::new(20, 20, 40);
 const TITLE_FG: RGB8 = RGB8::new(220, 220, 235);
 const HELP_BG: RGB8 = RGB8::new(40, 20, 20);
@@ -55,10 +52,10 @@ const EDITOR_COLORS: EditorColors = EditorColors {
 
 fn usage() -> std::process::ExitCode {
     eprintln!(
-        "Usage: issue_review [<NNNN|path>] [--all] [--issues-dir DIR] [--margin N] [--no-crop]\n\n\
-         Shows a capture's before / before-marked / after pictures and appends a\n\
-         note to its issue.md. With no issue (or --all) every open issue is\n\
-         reviewed in turn.\n\
+        "Usage: issue_review [<NNNN|path>] [--all] [--issues-dir DIR]\n\n\
+         Shows a capture's before / before-marked / after pictures (cropped to\n\
+         show as much as the window allows) and appends a note to its issue.md.\n\
+         With no issue (or --all) every open issue is reviewed in turn.\n\
          \x20 Ctrl+S  save the note (if any) and go to the next issue\n\
          \x20 Ctrl+P  cancel\n\n\
          Run via: cargo run -p game --features debug-tools --bin issue_review -- <args>"
@@ -71,25 +68,15 @@ fn main() -> std::process::ExitCode {
     let mut target: Option<String> = None;
     let mut all = false;
     let mut issues_dir: Option<PathBuf> = None;
-    let mut margin: u32 = 4;
-    let mut crop = true;
 
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--all" => all = true,
-            "--no-crop" => crop = false,
             "--issues-dir" => {
                 i += 1;
                 match args.get(i) {
                     Some(value) => issues_dir = Some(PathBuf::from(value)),
-                    None => return usage(),
-                }
-            }
-            "--margin" => {
-                i += 1;
-                match args.get(i).and_then(|value| value.parse::<u32>().ok()) {
-                    Some(value) => margin = value,
                     None => return usage(),
                 }
             }
@@ -99,7 +86,7 @@ fn main() -> std::process::ExitCode {
         i += 1;
     }
 
-    match run(target.as_deref(), all, issues_dir, margin, crop) {
+    match run(target.as_deref(), all, issues_dir) {
         Ok(outcomes) => {
             if outcomes.is_empty() {
                 println!("cancelled; no notes");
@@ -134,13 +121,14 @@ impl std::fmt::Display for NoteOutcome {
     }
 }
 
-/// One issue loaded for review; built once per issue in the queue.
+/// One issue loaded for review. The cropped panes are built at draw time, since
+/// the crop depends on the terminal size.
 struct IssueView {
     number: String,
     issue_dir: PathBuf,
-    panes: [Vec<Vec<Glyph>>; 3],
-    pane_width: u16,
-    pane_height: u16,
+    before: Vec<Vec<Glyph>>,
+    after: Vec<Vec<Glyph>>,
+    regions: Vec<Region>,
     /// The issue's `issue.md`, shown (re-flowed) beside the pictures.
     document: String,
 }
@@ -149,8 +137,6 @@ fn run(
     target: Option<&str>,
     all: bool,
     issues_dir: Option<PathBuf>,
-    margin: u32,
-    crop: bool,
 ) -> Result<Vec<NoteOutcome>, String> {
     let base = issues_dir.unwrap_or_else(snapshot::issues_dir);
     let issue_dirs = if all || target.is_none() {
@@ -164,7 +150,7 @@ fn run(
 
     let mut views = Vec::new();
     for issue_dir in &issue_dirs {
-        views.push(load_view(issue_dir, margin, crop)?);
+        views.push(load_view(issue_dir)?);
     }
 
     let mut app = ReviewApp::new(views);
@@ -286,9 +272,9 @@ fn cells_to_buffer(rows: &[Vec<debug::Cell>]) -> Vec<Vec<Glyph>> {
     buffer
 }
 
-/// Load one capture: read its flags, render the current tree as "after", crop
-/// the flagged regions ∪ player once for all three panes.
-fn load_view(issue_dir: &Path, margin: u32, crop: bool) -> Result<IssueView, String> {
+/// Load one capture: read its flags, parse the saved screen, and render the
+/// current tree as "after". Cropping happens at draw time.
+fn load_view(issue_dir: &Path) -> Result<IssueView, String> {
     let snapshot_dir = issue_dir.join("snapshot");
     let number = issue_dir
         .file_name()
@@ -300,7 +286,7 @@ fn load_view(issue_dir: &Path, margin: u32, crop: bool) -> Result<IssueView, Str
 
     let before_rows = debug::parse_screen_text_file(&snapshot_dir.join("screen.txt"))?;
     let before = cells_to_buffer(&before_rows);
-    let (after, player) = debug::render_snapshot_headless_buffer(&snapshot_dir)?;
+    let after = debug::render_snapshot_headless_buffer(&snapshot_dir)?;
     if before.len() != after.len() || before[0].len() != after[0].len() {
         return Err(format!(
             "{}: capture size {}x{} does not match the render {}x{}",
@@ -311,26 +297,14 @@ fn load_view(issue_dir: &Path, margin: u32, crop: bool) -> Result<IssueView, Str
             after[0].len(),
         ));
     }
-    let (width, height) = (before.len(), before[0].len());
-    let crop = if crop {
-        Crop::around(&regions, player, width, height, margin)
-    } else {
-        Crop {
-            x0: 0,
-            x1: width,
-            y0: 0,
-            y1: height,
-        }
-    };
 
-    let (panes, pane_width, pane_height) = build_panes(&before, &after, &crop, &regions, player);
     let document = std::fs::read_to_string(issue_dir.join("issue.md")).unwrap_or_default();
     Ok(IssueView {
         number,
         issue_dir: issue_dir.to_path_buf(),
-        panes,
-        pane_width,
-        pane_height,
+        before,
+        after,
+        regions,
         document,
     })
 }
@@ -338,7 +312,7 @@ fn load_view(issue_dir: &Path, margin: u32, crop: bool) -> Result<IssueView, Str
 // --- crop & panes ---
 
 /// An exclusive character-cell rectangle, shared by all three panes.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Crop {
     x0: usize,
     x1: usize,
@@ -347,43 +321,77 @@ struct Crop {
 }
 
 impl Crop {
-    /// The flagged regions plus the player, padded by `margin` squares and
-    /// clamped to the capture. `x0` is snapped even so two-column squares stay
-    /// aligned.
-    fn around(
-        regions: &[Region],
-        player: ScreenBufferSquare,
-        width: usize,
-        height: usize,
-        margin: u32,
-    ) -> Crop {
-        let (mut min_x, mut min_y) = (player.x, player.y);
-        let (mut max_x, mut max_y) = (player.x, player.y);
-        for region in regions {
-            min_x = min_x.min(region.screen_min.x);
-            min_y = min_y.min(region.screen_min.y);
-            max_x = max_x.max(region.screen_max.x);
-            max_y = max_y.max(region.screen_max.y);
-        }
-        let margin = margin as i32;
-        let x0 = ((2 * min_x - 2 * margin).max(0) as usize) & !1;
-        let y0 = (min_y - margin).max(0) as usize;
-        let x1 = (2 * (max_x + 1) + 2 * margin).max(0) as usize;
-        let y1 = (max_y + 1 + margin).max(0) as usize;
-        Crop {
-            x0: x0.min(width),
-            x1: x1.min(width),
-            y0: y0.min(height),
-            y1: y1.min(height),
-        }
-    }
-
     fn width(&self) -> usize {
         self.x1.saturating_sub(self.x0)
     }
 
     fn height(&self) -> usize {
         self.y1.saturating_sub(self.y0)
+    }
+}
+
+/// The character-cell bounding box of the flagged regions (inclusive), or
+/// `None` when there are none.
+fn focus_rect(regions: &[Region]) -> Option<(usize, usize, usize, usize)> {
+    let mut bounds: Option<(i32, i32, i32, i32)> = None;
+    for region in regions {
+        let rect = (
+            region.screen_min.x,
+            region.screen_min.y,
+            region.screen_max.x,
+            region.screen_max.y,
+        );
+        bounds = Some(match bounds {
+            None => rect,
+            Some((x0, y0, x1, y1)) => (
+                x0.min(rect.0),
+                y0.min(rect.1),
+                x1.max(rect.2),
+                y1.max(rect.3),
+            ),
+        });
+    }
+    bounds.map(|(x0, y0, x1, y1)| {
+        (
+            (2 * x0).max(0) as usize,
+            y0.max(0) as usize,
+            (2 * x1 + 1).max(0) as usize,
+            y1.max(0) as usize,
+        )
+    })
+}
+
+/// The crop shown in a pane: as much of the frame as the pane fits, centered on
+/// `focus` (or the frame center with no focus) and clamped to the frame. The
+/// left edge is snapped even so two-column squares stay aligned.
+fn window_crop(
+    frame_width: usize,
+    frame_height: usize,
+    pane_width: usize,
+    pane_height: usize,
+    focus: Option<(usize, usize, usize, usize)>,
+) -> Crop {
+    let mut width = frame_width.min(pane_width.max(1));
+    width -= width & 1;
+    let height = frame_height.min(pane_height.max(1));
+
+    // Center on the focus; fall back to the frame center only when there are no
+    // flagged regions. A single-cell focus still has a definite center.
+    let (cx, cy) = match focus {
+        Some((fx0, fy0, fx1, fy1)) => ((fx0 + fx1) / 2, (fy0 + fy1) / 2),
+        None => (frame_width / 2, frame_height / 2),
+    };
+
+    let max_x0 = frame_width.saturating_sub(width);
+    let x0 = cx.saturating_sub(width / 2).min(max_x0) & !1;
+    let max_y0 = frame_height.saturating_sub(height);
+    let y0 = cy.saturating_sub(height / 2).min(max_y0);
+
+    Crop {
+        x0,
+        x1: (x0 + width).min(frame_width),
+        y0,
+        y1: (y0 + height).min(frame_height),
     }
 }
 
@@ -398,20 +406,15 @@ fn in_region(regions: &[Region], cx: usize, cy: usize) -> bool {
     })
 }
 
-fn is_player(player: ScreenBufferSquare, cx: usize, cy: usize) -> bool {
-    let x0 = (2 * player.x).max(0) as usize;
-    cx >= x0 && cx <= x0 + 1 && cy == player.y.max(0) as usize
-}
-
-/// Build the three cropped panes: before, before-marked (regions tinted), and
-/// after (regions tinted, so the change is locatable). The player is marked in
-/// all three.
+/// Build the three cropped panes: `before` (clean capture), `before-marked`
+/// (capture with the flagged regions tinted), and `after` (clean current
+/// render). Only the marked pane carries the region tint, so `before` and
+/// `after` can be compared directly.
 fn build_panes(
     before: &[Vec<Glyph>],
     after: &[Vec<Glyph>],
     crop: &Crop,
     regions: &[Region],
-    player: ScreenBufferSquare,
 ) -> ([Vec<Vec<Glyph>>; 3], u16, u16) {
     let width = crop.width();
     let height = crop.height();
@@ -423,9 +426,6 @@ fn build_panes(
                 if with_regions && in_region(regions, cx, cy) {
                     glyph = tint_glyph(glyph, FLAG_TINT, FLAG_STRENGTH);
                 }
-                if is_player(player, cx, cy) {
-                    glyph = tint_glyph(glyph, PLAYER_TINT, PLAYER_STRENGTH);
-                }
                 pane[cx - crop.x0][cy - crop.y0] = glyph;
             }
         }
@@ -434,7 +434,7 @@ fn build_panes(
     let panes = [
         build(before, false),
         build(before, true),
-        build(after, true),
+        build(after, false),
     ];
     (panes, width as u16, height as u16)
 }
@@ -471,11 +471,28 @@ fn save_note(issue_dir: &Path, number: &str, text: &str) -> Result<NoteOutcome, 
 
 // --- TUI ---
 
-/// How the panes are shown; there is no hotkey to change it.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Layout {
-    SideBySide,
-    Stacked,
+/// Choose side-by-side or stacked panes by whichever shows more of the frame.
+/// Returns `(side_by_side, pane_width, pane_height)` in character cells/rows;
+/// `pane_width` is even so two-column squares stay aligned.
+fn choose_layout(
+    region_cols: usize,
+    rows: usize,
+    frame_width: usize,
+    frame_height: usize,
+) -> (bool, usize, usize) {
+    let mut side_w = region_cols.saturating_sub(2) / 3;
+    side_w -= side_w & 1;
+    let side_h = rows;
+
+    let stack_w = region_cols - (region_cols & 1);
+    let stack_h = rows.saturating_sub(2) / 3;
+
+    let visible = |w: usize, h: usize| frame_width.min(w) * frame_height.min(h);
+    if visible(side_w, side_h) >= visible(stack_w, stack_h) {
+        (true, side_w.max(2), side_h.max(1))
+    } else {
+        (false, stack_w.max(2), stack_h.max(1))
+    }
 }
 
 enum Action {
@@ -555,26 +572,6 @@ impl ReviewApp {
         })
     }
 
-    /// Side-by-side when the cropped width fits the left region, else stacked.
-    fn layout(&self, left_width: u16) -> Layout {
-        let pw = self.current().pane_width as usize;
-        if 3 * pw + 2 <= left_width as usize {
-            Layout::SideBySide
-        } else {
-            Layout::Stacked
-        }
-    }
-
-    fn pane_origins(&self, left_width: u16) -> Vec<(u16, u16)> {
-        let (pw, ph) = (self.current().pane_width, self.current().pane_height);
-        match self.layout(left_width) {
-            Layout::SideBySide => (0..3).map(|i| (i as u16 * (pw + 1), 2)).collect(),
-            Layout::Stacked => (0..3)
-                .map(|i| (0u16, 2 + i as u16 * (ph + 1)))
-                .collect(),
-        }
-    }
-
     fn scroll_document(&mut self, pages: i32) {
         let page = (self.term_height as i32 / 2).max(1);
         let next = self.document_scroll as i32 + pages * page;
@@ -625,10 +622,47 @@ impl ReviewApp {
         let document_rect = self.document_rect(editor_rect.y);
         let left_width = document_rect.map_or(self.term_width, |rect| rect.x);
 
+        // The crop depends on the terminal size, so the panes are built here:
+        // pick the layout that shows more of the frame, then window the frame to
+        // the pane centered on the flagged regions (or the frame center).
+        let view = self.current();
+        let frame_width = view.before.len();
+        let frame_height = view.before.first().map_or(0, Vec::len);
+        let region_cols = left_width as usize;
+        let rows = editor_rect.y.saturating_sub(2) as usize;
+        let (side_by_side, pane_width, pane_height) =
+            choose_layout(region_cols, rows, frame_width, frame_height);
+        let crop = window_crop(
+            frame_width,
+            frame_height,
+            pane_width,
+            pane_height,
+            focus_rect(&view.regions),
+        );
+        let (panes, pane_width, pane_height) =
+            build_panes(&view.before, &view.after, &crop, &view.regions);
+        let pane_width = pane_width as usize;
+        let pane_height = pane_height as usize;
+        let origins: Vec<(u16, u16)> = if side_by_side {
+            (0..3).map(|i| (i as u16 * (pane_width as u16 + 1), 2)).collect()
+        } else {
+            (0..3)
+                .map(|i| (0u16, 2 + i as u16 * (pane_height as u16 + 1)))
+                .collect()
+        };
+
         let labels = ["before", "before-marked", "after"];
-        for (index, origin) in self.pane_origins(left_width).iter().enumerate() {
+        for (index, (origin, pane)) in origins.iter().zip(panes.iter()).enumerate() {
             self.put_pane_label(&mut cells, labels[index], *origin, left_width, editor_rect.y);
-            self.put_pane(&mut cells, index, *origin, left_width, editor_rect.y);
+            self.put_pane(
+                &mut cells,
+                pane,
+                *origin,
+                pane_width,
+                pane_height,
+                left_width,
+                editor_rect.y,
+            );
         }
 
         if let Some(rect) = document_rect {
@@ -645,7 +679,7 @@ impl ReviewApp {
         self.put_line(
             &mut cells,
             self.term_height - 1,
-            " magenta: flags   cyan: player   pgup/pgdn: scroll doc   ^S: save note & next   ^P: cancel",
+            " magenta: flagged regions   pgup/pgdn: scroll doc   ^S: save note & next   ^P: cancel",
             HELP_FG,
             HELP_BG,
         );
@@ -748,20 +782,20 @@ impl ReviewApp {
     fn put_pane(
         &self,
         cells: &mut HashMap<(u16, u16), Glyph>,
-        index: usize,
+        pane: &[Vec<Glyph>],
         origin: (u16, u16),
+        pane_width: usize,
+        pane_height: usize,
         right: u16,
         bottom: u16,
     ) {
-        let view = self.current();
-        let pane = &view.panes[index];
-        for x in 0..view.pane_width {
-            for y in 0..view.pane_height {
-                let (cx, cy) = (origin.0 + x, origin.1 + y);
+        for x in 0..pane_width {
+            for y in 0..pane_height {
+                let (cx, cy) = (origin.0 + x as u16, origin.1 + y as u16);
                 if cx >= right || cy >= bottom {
                     continue;
                 }
-                cells.insert((cx, cy), pane[x as usize][y as usize]);
+                cells.insert((cx, cy), pane[x][y]);
             }
         }
     }
@@ -893,22 +927,38 @@ mod tests {
     }
 
     #[test]
-    fn crop_contains_flags_and_player_with_even_left_edge() {
-        let regions = [region((46, 46), (48, 49))];
-        let player = ScreenBufferSquare::new(10, 5);
-        let crop = Crop::around(&regions, player, 100, 50, 4);
-        assert!(crop.x0 <= 2 * 10, "player's left cell inside the crop");
-        assert!(crop.x1 >= 2 * 48 + 1, "flagged region inside the crop");
-        assert!(crop.y0 <= 5 && crop.y1 >= 50);
+    fn window_crop_shows_the_whole_frame_when_the_pane_is_large_enough() {
+        let crop = window_crop(40, 20, 60, 30, None);
+        assert_eq!(crop, Crop { x0: 0, x1: 40, y0: 0, y1: 20 });
+    }
+
+    #[test]
+    fn window_crop_windows_a_large_frame_around_the_focus() {
+        // A 200x60 frame in a 40x20 pane, focused near (160, 40).
+        let focus = Some((160, 40, 162, 40));
+        let crop = window_crop(200, 60, 40, 20, focus);
+        assert!(crop.width() <= 40 && crop.height() == 20);
+        assert!(crop.x0 <= 160 && crop.x1 >= 161, "focus inside: {crop:?}");
         assert_eq!(crop.x0 % 2, 0, "left edge is square-aligned");
     }
 
     #[test]
-    fn crop_clamps_to_the_capture() {
-        let regions = [region((0, 0), (1, 1))];
-        let crop = Crop::around(&regions, ScreenBufferSquare::new(0, 0), 20, 10, 100);
+    fn window_crop_clamps_at_the_frame_edge() {
+        let crop = window_crop(200, 60, 40, 20, Some((0, 0, 1, 0)));
         assert_eq!((crop.x0, crop.y0), (0, 0));
-        assert_eq!((crop.x1, crop.y1), (20, 10));
+        assert_eq!(crop.x1, 40);
+        assert_eq!(crop.y1, 20);
+    }
+
+    #[test]
+    fn choose_layout_prefers_the_larger_visible_area() {
+        // Wide/short frame in a 90x30 region: stacked shows the full width,
+        // side-by-side cannot (3 panes of <=29 columns each), so stack wins.
+        let (side, w, h) = choose_layout(90, 30, 120, 20);
+        assert!(!side, "stacked should win for a wide frame; got {w}x{h}");
+        // Tall/narrow frame: side-by-side gives each pane full height.
+        let (side, _, _) = choose_layout(90, 30, 30, 30);
+        assert!(side, "side-by-side should win for a narrow frame");
     }
 
     #[test]
@@ -917,8 +967,7 @@ mod tests {
         let before: Vec<Vec<Glyph>> = vec![vec![blank_glyph(); height]; width];
         let after = before.clone();
         let crop = Crop { x0: 2, x1: 6, y0: 1, y1: 5 };
-        let (panes, pw, ph) =
-            build_panes(&before, &after, &crop, &[], ScreenBufferSquare::new(1, 1));
+        let (panes, pw, ph) = build_panes(&before, &after, &crop, &[]);
         assert_eq!((pw as usize, ph as usize), (4, 4));
         assert_eq!(panes[0].len(), panes[1].len());
         assert_eq!(panes[1].len(), panes[2].len());
@@ -926,16 +975,16 @@ mod tests {
     }
 
     #[test]
-    fn flagged_cells_are_tinted_in_the_marked_pane_only() {
+    fn only_the_marked_pane_is_tinted() {
         let (width, height) = (6, 6);
         let before = vec![vec![blank_glyph(); height]; width];
         let after = before.clone();
         let crop = Crop { x0: 0, x1: width, y0: 0, y1: height };
         let regions = [region((1, 1), (1, 1))];
-        let (panes, _, _) =
-            build_panes(&before, &after, &crop, &regions, ScreenBufferSquare::new(9, 9));
+        let (panes, _, _) = build_panes(&before, &after, &crop, &regions);
         assert_eq!(panes[0][2][1], blank_glyph(), "before pane is unmarked");
         assert_ne!(panes[1][2][1], blank_glyph(), "marked pane tints the flag");
+        assert_eq!(panes[2][2][1], blank_glyph(), "after pane is unmarked");
     }
 
     #[test]

@@ -21,10 +21,12 @@ reviews just that one:
 
 It renders the **current working tree** as the "after" picture, reads the
 capture's `screen.txt` as "before", and outlines the flagged regions from
-`flags.json` in magenta with the player in cyan. All three panes share one
-crop: the union of the flagged regions and the player, plus a margin. On a wide
-terminal the issue's `issue.md` is shown word-wrapped in a scrollable column on
-the right (`PageUp`/`PageDown`).
+`flags.json` in magenta. All three panes share one crop, which shows as much of
+the frame as the pane fits (windowed around the flagged regions, or the frame
+center when there are none). `before` and `after` carry no overlay so they can
+be compared directly; only `before-marked` is tinted. On a wide terminal the
+issue's `issue.md` is shown word-wrapped in a scrollable column on the right
+(`PageUp`/`PageDown`).
 
 Your note is the only input; the editing keys are the standard line-editor ones
 (characters, `Enter`, `Backspace`/`Delete`, arrows, `Home`/`End`), shared with
@@ -42,8 +44,7 @@ A saved note is appended as:
 <your text>
 ```
 
-Options: `--issues-dir DIR` (base for discovery; default `issues/`),
-`--margin N` (crop padding in squares, default 4), `--no-crop` (whole capture).
+Options: `--issues-dir DIR` (base for discovery; default `issues/`).
 `scripts/issue_before_after.py` remains for offline PNG/HTML review of open and
 solved captures.
 

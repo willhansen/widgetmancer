@@ -41,3 +41,7 @@ void square are adjacent, so the wall spills onto the void cell. Blanket-
 suppressing walls that land on void cells is not viable — it removes legitimate
 cliff sides (e.g. solved/0009 drops 646 cells). Needs an occlusion model, not a
 frame heuristic.
+
+## Appended note (2026-10-17)
+
+Remains valid

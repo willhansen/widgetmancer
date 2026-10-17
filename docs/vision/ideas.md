@@ -11,3 +11,11 @@ called "kind of interesting, and I'd like it to be saved as reference
 somewhere." Consider re-creating it as a deliberate decorative variant (an
 ornate frame that rotates with the view) rather than discarding the look.
 
+## Issue review: animation
+
+A single static "after" picture cannot represent a bug that only shows in motion
+(e.g. issue 0023's conveyor-belt animation). Consider letting `issue_review`
+play back a few seconds: step the capture's logical time (or `simulate_keys`)
+and render N frames in sequence, so one pane is an animation rather than a
+still.
+

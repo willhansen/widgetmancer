@@ -57,13 +57,14 @@ both proves nothing).
     ./issue-review --all
 
 Shows a saved capture's before / before-marked / after pictures (one shared crop
-over the flagged regions and the player) with a note editor; `after` is a fresh
-render of the current working tree. On a wide terminal the issue's `issue.md` is
-shown word-wrapped in a scrollable column on the right. With no issue (or
-`--all`) it sweeps every open issue in turn. `Ctrl+S` appends the note to
-`issue.md` under a dated `## Appended note` header (an empty note is skipped)
-and moves on; `Ctrl+P` cancels; `PageUp`/`PageDown` scroll the document. It does
-not decide or move anything — later processing reads the note.
+that shows as much of the frame as the pane fits) with a note editor; `after` is
+a fresh render of the current working tree, and only `before-marked` carries the
+magenta region overlay. On a wide terminal the issue's `issue.md` is shown
+word-wrapped in a scrollable column on the right. With no issue (or `--all`) it
+sweeps every open issue in turn. `Ctrl+S` appends the note to `issue.md` under a
+dated `## Appended note` header (an empty note is skipped) and moves on;
+`Ctrl+P` cancels; `PageUp`/`PageDown` scroll the document. It does not decide or
+move anything — later processing reads the note.
 
 The wrapper rebuilds from source (like `./snapshot-tool`); the underlying
 command is `cargo run -p game --features debug-tools --bin issue_review --`.

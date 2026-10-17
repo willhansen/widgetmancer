@@ -103,3 +103,7 @@ geometry rather than a code fix.
 ## Appended note (2026-10-16)
 
 Issue remains.
+
+## Appended note (2026-10-17)
+
+Still valid, though the highlighted region doesn't look quite right.  Possible the highlighted region itself has rendering issues.
