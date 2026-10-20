@@ -45,3 +45,12 @@ frame heuristic.
 ## Appended note (2026-10-17)
 
 Remains valid
+
+## Related (2026-10-20)
+
+The inverse of the missing-side reports 0022/0024 (there: an expected cube side
+is not drawn; here: a cube side is drawn where the FOV sees void). Both come
+from the forward pass gating a wall by the resolved view of the *destination*
+cell instead of the wall's own occlusion, so they share ROADMAP item 17
+("Portal wall projection vs height occlusion"). Filed separately because the
+picture is visibly different; fixing one is not evidence for the other.

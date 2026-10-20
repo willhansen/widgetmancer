@@ -107,3 +107,11 @@ Issue remains.
 ## Appended note (2026-10-17)
 
 Still valid, though the highlighted region doesn't look quite right.  Possible the highlighted region itself has rendering issues.
+
+## Consolidated into 0029 (2026-10-20)
+
+This capture is part of the "direct cube column shadowed by portal" cluster
+(0020 + 0022 + 0024) tracked by **issue 0029**, with a minimized repro at
+`issues/0029/snapshot`. Do not fix this report in isolation; re-check it with
+`./issue-review 0020` (or the matching number) after the 0029 work and archive
+it once its own picture reads fixed.

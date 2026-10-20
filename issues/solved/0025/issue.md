@@ -118,3 +118,21 @@ I can't tell if the issue is still present because the highlighted regions are s
 ## Appended note (2026-10-17)
 
 Appears fixed
+
+## Resolution (2026-10-20)
+
+Reporter confirmed ("Appears fixed") and the current tree reproduces it: all five
+flagged cells have been examined and now render with an untinted shadow half.
+
+Fix (a) from the root cause stands alone here: `PartialVisibilityDrawable::tinted`
+tints only `fg_color`, leaving the `OUT_OF_SIGHT` shadow background alone, so the
+portal red no longer washes the half of the cell outside the portal. Regression
+test `tinting_a_partial_leaves_its_shadow_background_untinted`
+(`graphics/drawable.rs`, shown to fail pre-fix).
+
+The remaining question from this report — the depth-1 portal's *geometry*
+reaching the aperture-edge cells — is the direct/portal coverage problem tracked
+by the consolidated issue 0029 (and ROADMAP items 15/17), not a tint defect.
+`screen.pre-fix.txt` is the original capture; `screen.txt` is the current render.
+
+Moved to `issues/solved/0025`.

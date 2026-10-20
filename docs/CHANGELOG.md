@@ -9,6 +9,43 @@ Newest first.
 
 ---
 
+## 2026-10-20 — Issue triage: archive 0025, consolidate 0020/0022/0024, roadmap cleanup
+
+### docs(issues): archive 0025 (portal tint outside the portal)
+
+All five flagged cells render with an untinted shadow half on the current tree,
+and the reporter confirmed it ("Appears fixed"). `screen.pre-fix.txt` is the
+original capture (it carries the tinted `OUT_OF_SIGHT`, `bg=(26,0,0)`), the
+render is re-blessed into `screen.txt`, `verify-issues` now covers 19 fixtures.
+The residual aperture geometry is delegated to 0029/items 15+17.
+
+### docs(issues): add 0029, the direct-cube-column cluster
+
+0020, 0022 and 0024 all report "the cube is right there but I can't see it".
+0029 is the umbrella, recording the measured per-capture split into
+**A** (compositor: the deeper portal glyph wins and the direct half is reduced
+to a flat colour — 0020) and **B** (forward-pass wall dropped — 0022/0024),
+with 0027 noted as the separate inverse class (a side painted over void). It
+carries a minimized repro (`snapshot_tool minimize`, 50 renders, 141x78 ->
+17x12) and a `flags.json`. 0020/0022/0024 stay in `issues/` as evidence with a
+"consolidated into 0029" note — archiving them would need `screen.pre-fix.txt`
+and freeze still-buggy renders as fixed fixtures.
+
+### docs(roadmap): clean up stale items, add 16/17
+
+- Items **9** (floating-square tearing; acceptance test passes, no `branch=`
+  label) and **2** (globally suppressed warnings: the blanket allow is gone,
+  only `non_snake_case` remains, un-suppressing 13 warnings) moved to Done.
+- Item **3**: 10 -> 9 ignored tests, exact file:line list.
+- Wishlist **W.B-W.F** marked LANDED; **W.A**/**W.G** remain open.
+- Items 4/5/6/7 re-checked against the tree and refreshed (globs, unwrap
+  counts, two duplicate panic hooks at `lib.rs:58` / `portal_playground.rs:41`).
+- New **16** (capture and review animation/video issues, motivating 0023) and
+  **17** (portal wall projection vs height occlusion, 0029 class B + 0027).
+  Item 15 now points at 0029 class A.
+
+---
+
 ## 2026-10-16 — Issue review tool: view a capture, leave a note
 
 ### feat(tooling): add issue_review bin (viewer + note, sweep by default)
